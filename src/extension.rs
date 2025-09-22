@@ -1,13 +1,17 @@
 use std::{collections::HashSet, hash::Hash};
 
-use crate::{Assignment, LocalOracle, System};
+use crate::{Assignment, System, oracle::LocalOracle};
 
-pub trait TermSystem<VarKey: Copy, VarValue, TermKey>: System<VarKey, VarValue> {
+pub trait TermSystem<VarKey: Copy, VarValue: PartialOrd, TermKey: Copy>:
+    System<VarKey, VarValue>
+{
     fn definition(&self, variable: VarKey) -> TermKey;
 }
 
-pub trait LocalExtension<K: Hash + Eq + Copy, V> {
-    type TermKey;
+pub trait LocalExtension<K: Hash + Eq + Copy, V: PartialOrd>:
+    LocalOracle<K, V, Self::System>
+{
+    type TermKey: Copy;
     type System: TermSystem<K, V, Self::TermKey>;
 
     fn depends(
@@ -17,18 +21,17 @@ pub trait LocalExtension<K: Hash + Eq + Copy, V> {
         possible: &HashSet<(K, K)>,
         system: &Self::System,
     ) -> HashSet<(K, Self::TermKey)>;
-}
 
-impl<K: Hash + Eq + Copy, V, T: Hash + Eq + Copy, E: LocalExtension<K, V, TermKey = T>>
-    LocalOracle<K, V, E::System> for E
-{
     fn flow(
         &self,
         visited: &HashSet<K>,
         assignment: &dyn Assignment<K, V>,
         possible: &HashSet<(K, K)>,
-        system: &E::System,
-    ) -> HashSet<(K, K)> {
+        system: &Self::System,
+    ) -> HashSet<(K, K)>
+    where
+        <Self as LocalExtension<K, V>>::TermKey: std::cmp::PartialEq,
+    {
         let unvisited = system
             .variables()
             .into_iter()

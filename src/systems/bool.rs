@@ -1,6 +1,10 @@
-use std::hash::Hash;
+use std::{
+    collections::{HashMap, HashSet},
+    hash::Hash,
+};
 
 use crate::bislotmap::BiSlotMap;
+use radguy::{Assignment, System, extension::TermSystem};
 use slotmap::{Key, SecondaryMap};
 
 #[derive(Default, Debug)]
@@ -11,6 +15,89 @@ pub struct BoolSystem<V: Key + Hash, T: Key + Hash> {
     pub terms: BiSlotMap<T, BoolTerm<V, T>>,
 }
 
+impl<V: Key + Hash, T: Key + Hash> BoolSystem<V, T> {
+    pub fn print_assignment(&self, a: &dyn Assignment<V, bool>) {
+        for (key, &name) in self.names.iter() {
+            println!("{name} = {}", a.get(&key));
+        }
+    }
+
+    pub fn print_definitions(&self) {
+        for (var, term) in &self.definitions {
+            println!(
+                "{} = {}",
+                self.names
+                    .get_value(var)
+                    .expect("variable should have name"),
+                self.terms
+                    .get_value(*term)
+                    .expect("term should be valid")
+                    .to_string(self)
+            );
+        }
+    }
+
+    fn evaluate_term(&self, term_key: T, assignment: &dyn Assignment<V, bool>) -> bool {
+        match self.terms.get_value(term_key).expect("term must exist") {
+            BoolTerm::True => true,
+            BoolTerm::False => false,
+            BoolTerm::Variable(k) => assignment.get(k),
+            BoolTerm::Or(lhs, rhs) => {
+                self.evaluate_term(*lhs, assignment) || self.evaluate_term(*rhs, assignment)
+            }
+            BoolTerm::And(lhs, rhs) => {
+                self.evaluate_term(*lhs, assignment) && self.evaluate_term(*rhs, assignment)
+            }
+        }
+    }
+
+    fn term_arguments(&self, term_key: T) -> HashSet<V> {
+        match self.terms.get_value(term_key).expect("term must exist") {
+            BoolTerm::False | BoolTerm::True => HashSet::new(),
+            BoolTerm::Variable(k) => HashSet::from_iter([*k]),
+            BoolTerm::Or(lhs, rhs) | BoolTerm::And(lhs, rhs) => self
+                .term_arguments(*lhs)
+                .union(&self.term_arguments(*rhs))
+                .copied()
+                .collect(),
+        }
+    }
+}
+
+impl<V: Key + Hash, T: Key + Hash> System<V, bool> for BoolSystem<V, T> {
+    fn evaluate(&self, key: V, assignment: &dyn Assignment<V, bool>) -> bool {
+        let term_key = self.definitions.get(key).expect("variable must be defined");
+        println!(
+            "evaluate {}",
+            self.names.get_value(key).expect("variable must be defined")
+        );
+        self.print_assignment(assignment);
+        dbg!(self.evaluate_term(*term_key, assignment))
+    }
+
+    fn arguments(&self, key: V) -> HashSet<V> {
+        let term_key = self.definitions.get(key).expect("variable must be defined");
+        self.term_arguments(*term_key)
+    }
+
+    fn variables(&self) -> HashSet<V> {
+        self.definitions.keys().collect()
+    }
+
+    fn bottom_assignment(&self) -> impl Assignment<V, bool> {
+        HashMap::new()
+    }
+}
+
+impl<V: Key + Hash, T: Key + Hash> TermSystem<V, bool, T> for BoolSystem<V, T> {
+    fn definition(&self, variable: V) -> T {
+        *self
+            .definitions
+            .get(variable)
+            .expect("variable should have a definition")
+    }
+}
+
 #[derive(Hash, PartialEq, Eq, Clone, Debug)]
 pub enum BoolTerm<V: Key, T: Key> {
     True,
@@ -18,6 +105,40 @@ pub enum BoolTerm<V: Key, T: Key> {
     Variable(V),
     Or(T, T),
     And(T, T),
+}
+
+impl<V: Key, T: Key> BoolTerm<V, T> {
+    pub fn to_string(&self, sys: &BoolSystem<V, T>) -> String {
+        match self {
+            Self::True => "tt".to_owned(),
+            Self::False => "ff".to_owned(),
+            Self::Variable(k) => {
+                (*sys.names.get_value(*k).expect("variable must have name")).to_owned()
+            }
+            Self::Or(lhs, rhs) => format!(
+                "{} || {}",
+                sys.terms
+                    .get_value(*lhs)
+                    .expect("lhs should exist")
+                    .to_string(sys),
+                sys.terms
+                    .get_value(*rhs)
+                    .expect("rhs should exist")
+                    .to_string(sys)
+            ),
+            Self::And(lhs, rhs) => format!(
+                "{} && {}",
+                sys.terms
+                    .get_value(*lhs)
+                    .expect("lhs should exist")
+                    .to_string(sys),
+                sys.terms
+                    .get_value(*rhs)
+                    .expect("rhs should exist")
+                    .to_string(sys)
+            ),
+        }
+    }
 }
 
 #[macro_export]

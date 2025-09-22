@@ -22,6 +22,10 @@ impl<K: Key, V: Hash + Eq + Clone> BiSlotMap<K, V> {
             key
         }
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = (K, &V)> {
+        self.vals.iter()
+    }
 }
 
 impl<K: Key, V: Hash + Eq + Clone> Default for BiSlotMap<K, V> {

@@ -1,52 +1,63 @@
-use std::{collections::HashSet, hash::Hash};
+#![feature(negative_impls)]
+use crate::oracle::LocalOracle;
+use std::{
+    collections::{HashMap, HashSet},
+    hash::Hash,
+};
 
 pub mod extension;
+pub mod oracle;
 
-pub trait System<VarKey: Clone + Copy, VarValue> {
+pub trait System<VarKey: Clone + Copy, VarValue: PartialOrd> {
     fn evaluate(&self, key: VarKey, assignment: &dyn Assignment<VarKey, VarValue>) -> VarValue;
 
     fn arguments(&self, key: VarKey) -> HashSet<VarKey>;
     fn variables(&self) -> HashSet<VarKey>;
-    fn bottom_assignment(&self) -> Box<dyn Assignment<VarKey, VarValue>>;
+    fn bottom_assignment(&self) -> impl Assignment<VarKey, VarValue>;
 }
 
 pub trait Assignment<K, V> {
-    fn get(&self, key: K) -> V;
+    fn get(&self, key: &K) -> V;
     fn update(&mut self, key: K, value: V);
 }
 
-pub trait LocalOracle<K: Hash + Eq + Copy, V, S: System<K, V>> {
-    fn flow(
-        &self,
-        visited: &HashSet<K>,
-        assignment: &dyn Assignment<K, V>,
-        possible: &HashSet<(K, K)>,
-        system: &S,
-    ) -> HashSet<(K, K)>;
+impl<K: Hash + Eq, V: Bottom + Clone, S: ::std::hash::BuildHasher> Assignment<K, V>
+    for HashMap<K, V, S>
+{
+    fn get(&self, key: &K) -> V {
+        self.get(key).cloned().unwrap_or_else(V::bottom)
+    }
+
+    fn update(&mut self, key: K, value: V) {
+        self.insert(key, value);
+    }
 }
 
-pub fn kleene_local<K: Clone + Copy + Hash + Eq, V: Eq, S: System<K, V>>(
+pub fn kleene_local<K: Clone + Copy + Hash + Eq, V: Eq + PartialOrd, S: System<K, V>>(
     system: &S,
     target: K,
     oracle: &dyn LocalOracle<K, V, S>,
 ) -> V {
     let mut assignment = system.bottom_assignment();
     let mut visited = HashSet::from([target]);
-    let mut todo = local_dependencies(target, &visited, &*assignment, oracle, system);
+    let mut todo = local_dependencies(target, &visited, &assignment, oracle, system);
 
     while let Some(&x) = todo.iter().next() {
-        let evaluated = system.evaluate(x, &*assignment);
-        if assignment.get(x) != evaluated || !system.arguments(x).is_subset(&visited) {
+        todo.remove(&x);
+        let evaluated = system.evaluate(x, &assignment);
+        let c1 = assignment.get(&x) != evaluated;
+        let c2 = !system.arguments(x).is_subset(&visited);
+        if dbg!(c1) || dbg!(c2) {
             assignment.update(x, evaluated);
             visited = visited.union(&system.arguments(x)).copied().collect();
-            todo = local_dependencies(target, &visited, &*assignment, oracle, system);
+            todo = local_dependencies(target, &visited, &assignment, oracle, system);
         }
     }
 
-    assignment.get(target)
+    assignment.get(&target)
 }
 
-fn local_dependencies<K: Clone + Copy + Hash + Eq, V, S: System<K, V>>(
+fn local_dependencies<K: Clone + Copy + Hash + Eq, V: PartialOrd, S: System<K, V>>(
     variable: K,
     visited: &HashSet<K>,
     assignment: &dyn Assignment<K, V>,
@@ -54,7 +65,7 @@ fn local_dependencies<K: Clone + Copy + Hash + Eq, V, S: System<K, V>>(
     system: &S,
 ) -> HashSet<K> {
     let variables = &system.variables();
-    let d = oracle.flow(
+    let d = oracle.approximate_flow(
         visited,
         assignment,
         &cartesian(variables, variables),
@@ -73,6 +84,26 @@ fn cartesian<T: Hash + Eq + Clone, U: Hash + Eq + Clone>(
     a.iter()
         .flat_map(|x| b.iter().map(|y| (x.clone(), y.clone())).collect::<Vec<_>>())
         .collect()
+}
+
+pub trait Maximal: PartialOrd {
+    fn is_maximal(&self) -> bool;
+}
+
+impl Maximal for bool {
+    fn is_maximal(&self) -> bool {
+        *self
+    }
+}
+
+pub trait Bottom: PartialOrd {
+    fn bottom() -> Self;
+}
+
+impl Bottom for bool {
+    fn bottom() -> Self {
+        false
+    }
 }
 
 #[cfg(test)]
