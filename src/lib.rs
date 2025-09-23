@@ -45,9 +45,7 @@ pub fn kleene_local<K: Clone + Copy + Hash + Eq, V: Eq + PartialOrd, S: System<K
     while let Some(&x) = todo.iter().next() {
         todo.remove(&x);
         let evaluated = system.evaluate(x, &assignment);
-        let c1 = assignment.get(&x) != evaluated;
-        let c2 = !system.arguments(x).is_subset(&visited);
-        if dbg!(c1) || dbg!(c2) {
+        if assignment.get(&x) != evaluated || !system.arguments(x).is_subset(&visited) {
             assignment.update(x, evaluated);
             visited = visited.union(&system.arguments(x)).copied().collect();
             todo = local_dependencies(target, &visited, &assignment, oracle, system);

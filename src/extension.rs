@@ -1,4 +1,4 @@
-use std::{collections::HashSet, hash::Hash};
+use std::{collections::HashSet, hash::Hash, marker::PhantomData};
 
 use crate::{Assignment, System, oracle::LocalOracle};
 
@@ -8,9 +8,7 @@ pub trait TermSystem<VarKey: Copy, VarValue: PartialOrd, TermKey: Copy>:
     fn definition(&self, variable: VarKey) -> TermKey;
 }
 
-pub trait LocalExtension<K: Hash + Eq + Copy, V: PartialOrd>:
-    LocalOracle<K, V, Self::System>
-{
+pub trait LocalExtension<K: Hash + Eq + Copy, V: PartialOrd> {
     type TermKey: Copy;
     type System: TermSystem<K, V, Self::TermKey>;
 
@@ -21,17 +19,34 @@ pub trait LocalExtension<K: Hash + Eq + Copy, V: PartialOrd>:
         possible: &HashSet<(K, K)>,
         system: &Self::System,
     ) -> HashSet<(K, Self::TermKey)>;
+}
 
-    fn flow(
+pub struct ExtensionOracle<
+    VarKey: Hash + Eq + Copy,
+    VarValue: PartialOrd,
+    TermKey: Copy,
+    S: TermSystem<VarKey, VarValue, TermKey>,
+    E: LocalExtension<VarKey, VarValue, TermKey = TermKey, System = S>,
+> {
+    extension: E,
+    _phantom_data: PhantomData<(VarKey, VarValue, TermKey)>,
+}
+
+impl<
+    VarKey: Hash + Eq + Copy,
+    VarValue: PartialOrd,
+    TermKey: Copy + Eq,
+    S: TermSystem<VarKey, VarValue, TermKey>,
+    E: LocalExtension<VarKey, VarValue, TermKey = TermKey, System = S>,
+> LocalOracle<VarKey, VarValue, S> for ExtensionOracle<VarKey, VarValue, TermKey, S, E>
+{
+    fn approximate_flow(
         &self,
-        visited: &HashSet<K>,
-        assignment: &dyn Assignment<K, V>,
-        possible: &HashSet<(K, K)>,
-        system: &Self::System,
-    ) -> HashSet<(K, K)>
-    where
-        <Self as LocalExtension<K, V>>::TermKey: std::cmp::PartialEq,
-    {
+        visited: &HashSet<VarKey>,
+        assignment: &dyn Assignment<VarKey, VarValue>,
+        possible: &HashSet<(VarKey, VarKey)>,
+        system: &E::System,
+    ) -> HashSet<(VarKey, VarKey)> {
         let unvisited = system
             .variables()
             .into_iter()
@@ -39,7 +54,9 @@ pub trait LocalExtension<K: Hash + Eq + Copy, V: PartialOrd>:
             .collect::<HashSet<_>>();
         let unvisited_dep = crate::cartesian(&system.variables(), &unvisited);
         let self_dep = visited.iter().map(|&x| (x, x)).collect();
-        let terms = self.depends(visited, assignment, possible, system);
+        let terms = self
+            .extension
+            .depends(visited, assignment, possible, system);
         let term_dep = visited.iter().flat_map(|&y| {
             let ty = system.definition(y);
             terms
@@ -53,5 +70,21 @@ pub trait LocalExtension<K: Hash + Eq + Copy, V: PartialOrd>:
             .copied()
             .chain(term_dep)
             .collect()
+    }
+}
+
+impl<
+    VarKey: Hash + Eq + Copy,
+    VarValue: PartialOrd,
+    TermKey: Copy + Eq,
+    S: TermSystem<VarKey, VarValue, TermKey>,
+    E: LocalExtension<VarKey, VarValue, TermKey = TermKey, System = S>,
+> From<E> for ExtensionOracle<VarKey, VarValue, TermKey, S, E>
+{
+    fn from(extension: E) -> Self {
+        Self {
+            extension,
+            _phantom_data: PhantomData,
+        }
     }
 }

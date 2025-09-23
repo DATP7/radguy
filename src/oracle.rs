@@ -20,9 +20,7 @@ pub trait LocalOracle<K: Hash + Eq + Copy, V: PartialOrd, S: System<K, V>> {
         ComposeLocal {
             outer: other,
             inner: self,
-            _k: PhantomData,
-            _v: PhantomData,
-            _s: PhantomData,
+            _phantom_data: PhantomData,
         }
     }
 
@@ -34,9 +32,7 @@ pub trait LocalOracle<K: Hash + Eq + Copy, V: PartialOrd, S: System<K, V>> {
         IntersectLocal {
             left: other,
             right: self,
-            _k: PhantomData,
-            _v: PhantomData,
-            _s: PhantomData,
+            _phantom_data: PhantomData,
         }
     }
 }
@@ -106,9 +102,7 @@ pub struct ComposeLocal<
 > {
     outer: T,
     inner: U,
-    _k: PhantomData<K>,
-    _v: PhantomData<V>,
-    _s: PhantomData<S>,
+    _phantom_data: PhantomData<(K, V, S)>,
 }
 
 impl<
@@ -145,9 +139,7 @@ pub struct IntersectLocal<
 > {
     left: T,
     right: U,
-    _k: PhantomData<K>,
-    _v: PhantomData<V>,
-    _s: PhantomData<S>,
+    _phantom_data: PhantomData<(K, V, S)>,
 }
 
 impl<

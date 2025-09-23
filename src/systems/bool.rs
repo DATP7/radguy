@@ -67,12 +67,7 @@ impl<V: Key + Hash, T: Key + Hash> BoolSystem<V, T> {
 impl<V: Key + Hash, T: Key + Hash> System<V, bool> for BoolSystem<V, T> {
     fn evaluate(&self, key: V, assignment: &dyn Assignment<V, bool>) -> bool {
         let term_key = self.definitions.get(key).expect("variable must be defined");
-        println!(
-            "evaluate {}",
-            self.names.get_value(key).expect("variable must be defined")
-        );
-        self.print_assignment(assignment);
-        dbg!(self.evaluate_term(*term_key, assignment))
+        self.evaluate_term(*term_key, assignment)
     }
 
     fn arguments(&self, key: V) -> HashSet<V> {
