@@ -159,3 +159,21 @@ impl<
         left.intersection(&right).copied().collect()
     }
 }
+
+pub struct TrivialOracle;
+
+impl<K: Hash + Eq + Copy, V: Maximal, S: System<K, V>> LocalOracle<K, V, S> for TrivialOracle {
+    fn approximate_flow(
+        &self,
+        _visited: &HashSet<K>,
+        assignment: &dyn Assignment<K, V>,
+        _possible: &HashSet<(K, K)>,
+        system: &S,
+    ) -> HashSet<(K, K)> {
+        iproduct!(
+            system.variables().iter().copied(),
+            system.variables().iter().copied()
+        )
+        .collect()
+    }
+}
