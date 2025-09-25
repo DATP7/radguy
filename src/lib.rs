@@ -1,4 +1,3 @@
-#![feature(negative_impls)]
 use itertools::iproduct;
 
 use crate::oracle::LocalOracle;
