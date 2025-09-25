@@ -64,28 +64,30 @@ impl<V: Key + Hash, T: Key + Hash> BoolSystem<V, T> {
     }
 }
 
-impl<V: Key + Hash, T: Key + Hash> System<V, bool> for BoolSystem<V, T> {
-    fn evaluate(&self, key: V, assignment: &dyn Assignment<V, bool>) -> bool {
+impl<VarKey: Key + Hash, TermKey: Key + Hash> System<VarKey, bool> for BoolSystem<VarKey, TermKey> {
+    fn evaluate(&self, key: VarKey, assignment: &dyn Assignment<VarKey, bool>) -> bool {
         let term_key = self.definitions.get(key).expect("variable must be defined");
         self.evaluate_term(*term_key, assignment)
     }
 
-    fn arguments(&self, key: V) -> HashSet<V> {
+    fn arguments(&self, key: VarKey) -> HashSet<VarKey> {
         let term_key = self.definitions.get(key).expect("variable must be defined");
         self.term_arguments(*term_key)
     }
 
-    fn variables(&self) -> HashSet<V> {
+    fn variables(&self) -> HashSet<VarKey> {
         self.definitions.keys().collect()
     }
 
-    fn bottom_assignment(&self) -> impl Assignment<V, bool> {
+    fn bottom_assignment(&self) -> impl Assignment<VarKey, bool> {
         HashMap::new()
     }
 }
 
-impl<V: Key + Hash, T: Key + Hash> TermSystem<V, bool, T> for BoolSystem<V, T> {
-    fn definition(&self, variable: V) -> T {
+impl<VarKey: Key + Hash, TermKey: Key + Hash> TermSystem<VarKey, bool, TermKey>
+    for BoolSystem<VarKey, TermKey>
+{
+    fn definition(&self, variable: VarKey) -> TermKey {
         *self
             .definitions
             .get(variable)

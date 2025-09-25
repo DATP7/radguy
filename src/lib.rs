@@ -1,4 +1,6 @@
 #![feature(negative_impls)]
+use itertools::iproduct;
+
 use crate::oracle::LocalOracle;
 use std::{
     collections::{HashMap, HashSet},
@@ -39,6 +41,7 @@ pub fn kleene_local<K: Clone + Copy + Hash + Eq, V: Eq + PartialOrd, S: System<K
     oracle: &dyn LocalOracle<K, V, S>,
 ) -> V {
     let mut assignment = system.bottom_assignment();
+    // TODO: Giovanni's implementation uses BDDs
     let mut visited = HashSet::from([target]);
     let mut todo = local_dependencies(target, &visited, &assignment, oracle, system);
 
@@ -66,21 +69,12 @@ fn local_dependencies<K: Clone + Copy + Hash + Eq, V: PartialOrd, S: System<K, V
     let d = oracle.approximate_flow(
         visited,
         assignment,
-        &cartesian(variables, variables),
+        &iproduct!(variables.iter().copied(), variables.iter().copied()).collect(),
         system,
     );
     d.into_iter()
         .filter_map(|(x, y)| if y == variable { Some(x) } else { None })
         .filter(|x| visited.contains(x))
-        .collect()
-}
-
-fn cartesian<T: Hash + Eq + Clone, U: Hash + Eq + Clone>(
-    a: &HashSet<T>,
-    b: &HashSet<U>,
-) -> HashSet<(T, U)> {
-    a.iter()
-        .flat_map(|x| b.iter().map(|y| (x.clone(), y.clone())).collect::<Vec<_>>())
         .collect()
 }
 

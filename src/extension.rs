@@ -1,5 +1,7 @@
 use std::{collections::HashSet, hash::Hash, marker::PhantomData};
 
+use itertools::iproduct;
+
 use crate::{Assignment, System, oracle::LocalOracle};
 
 pub trait TermSystem<VarKey: Copy, VarValue: PartialOrd, TermKey: Copy>:
@@ -8,17 +10,16 @@ pub trait TermSystem<VarKey: Copy, VarValue: PartialOrd, TermKey: Copy>:
     fn definition(&self, variable: VarKey) -> TermKey;
 }
 
-pub trait LocalExtension<K: Hash + Eq + Copy, V: PartialOrd> {
-    type TermKey: Copy;
-    type System: TermSystem<K, V, Self::TermKey>;
+pub trait LocalExtension<VarKey: Hash + Eq + Copy, VarValue: PartialOrd, TermKey: Copy> {
+    type System: TermSystem<VarKey, VarValue, TermKey>;
 
     fn depends(
         &self,
-        visited: &HashSet<K>,
-        assignment: &dyn Assignment<K, V>,
-        possible: &HashSet<(K, K)>,
+        visited: &HashSet<VarKey>,
+        assignment: &dyn Assignment<VarKey, VarValue>,
+        possible: &HashSet<(VarKey, VarKey)>,
         system: &Self::System,
-    ) -> HashSet<(K, Self::TermKey)>;
+    ) -> HashSet<(VarKey, TermKey)>;
 }
 
 pub struct ExtensionOracle<
@@ -26,7 +27,7 @@ pub struct ExtensionOracle<
     VarValue: PartialOrd,
     TermKey: Copy,
     S: TermSystem<VarKey, VarValue, TermKey>,
-    E: LocalExtension<VarKey, VarValue, TermKey = TermKey, System = S>,
+    E: LocalExtension<VarKey, VarValue, TermKey, System = S>,
 > {
     extension: E,
     _phantom_data: PhantomData<(VarKey, VarValue, TermKey)>,
@@ -37,7 +38,7 @@ impl<
     VarValue: PartialOrd,
     TermKey: Copy + Eq,
     S: TermSystem<VarKey, VarValue, TermKey>,
-    E: LocalExtension<VarKey, VarValue, TermKey = TermKey, System = S>,
+    E: LocalExtension<VarKey, VarValue, TermKey, System = S>,
 > LocalOracle<VarKey, VarValue, S> for ExtensionOracle<VarKey, VarValue, TermKey, S, E>
 {
     fn approximate_flow(
@@ -52,8 +53,12 @@ impl<
             .into_iter()
             .filter(|v| !visited.contains(v))
             .collect::<HashSet<_>>();
-        let unvisited_dep = crate::cartesian(&system.variables(), &unvisited);
-        let self_dep = visited.iter().map(|&x| (x, x)).collect();
+        let unvisited_dep = iproduct!(
+            system.variables().iter().copied(),
+            unvisited.iter().copied()
+        )
+        .collect();
+        let self_dep: HashSet<(_, _)> = visited.iter().map(|&x| (x, x)).collect();
         let terms = self
             .extension
             .depends(visited, assignment, possible, system);
@@ -65,8 +70,8 @@ impl<
                 .collect::<HashSet<_>>()
         });
 
-        unvisited_dep
-            .union(&self_dep)
+        self_dep
+            .union(&unvisited_dep)
             .copied()
             .chain(term_dep)
             .collect()
@@ -78,7 +83,7 @@ impl<
     VarValue: PartialOrd,
     TermKey: Copy + Eq,
     S: TermSystem<VarKey, VarValue, TermKey>,
-    E: LocalExtension<VarKey, VarValue, TermKey = TermKey, System = S>,
+    E: LocalExtension<VarKey, VarValue, TermKey, System = S>,
 > From<E> for ExtensionOracle<VarKey, VarValue, TermKey, S, E>
 {
     fn from(extension: E) -> Self {

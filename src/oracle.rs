@@ -1,4 +1,6 @@
-use crate::{Assignment, Maximal, System, cartesian};
+use itertools::iproduct;
+
+use crate::{Assignment, Maximal, System};
 use std::fmt::Debug;
 use std::{collections::HashSet, hash::Hash, marker::PhantomData};
 
@@ -52,26 +54,21 @@ impl<K: Hash + Eq + Copy + Debug, V: Maximal, S: System<K, V>> LocalOracle<K, V,
             .into_iter()
             .filter(|v| !visited.contains(v))
             .collect::<HashSet<_>>();
-        let unvisited_dep = crate::cartesian(&system.variables(), &unvisited);
-        let self_dep = visited.iter().map(|&x| (x, x)).collect();
+        let unvisited_dep = iproduct!(system.variables().into_iter(), unvisited.iter().copied());
+        let self_dep = visited.iter().map(|&x| (x, x));
         let max_dep = visited.iter().flat_map(|&y| {
             if system.evaluate(y, assignment).is_maximal() {
-                // TODO: is it correct to just include every `x` from variables?
-                // TODO: could probably be improved with smallvec
+                HashSet::new()
+            } else {
+                // TODO: Can this just be visited instead?
                 system
                     .variables()
                     .iter()
                     .map(|&x| (x, y))
                     .collect::<HashSet<_>>()
-            } else {
-                HashSet::new()
             }
         });
-        unvisited_dep
-            .union(&self_dep)
-            .copied()
-            .chain(max_dep)
-            .collect()
+        unvisited_dep.chain(self_dep).chain(max_dep).collect()
     }
 }
 
@@ -86,8 +83,7 @@ impl<K: Hash + Eq + Copy, V: Maximal, S: System<K, V>> LocalOracle<K, V, S> for 
         system: &S,
     ) -> HashSet<(K, K)> {
         let variables = system.variables();
-        cartesian(&variables, &variables)
-            .into_iter()
+        iproduct!(variables.iter().copied(), variables.iter().copied())
             .filter(|(x, y)| !assignment.get(x).is_maximal() && !assignment.get(y).is_maximal())
             .collect()
     }
