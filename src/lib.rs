@@ -71,6 +71,8 @@ fn local_dependencies<K: Clone + Copy + Hash + Eq, V: PartialOrd, S: System<K, V
         &iproduct!(variables.iter().copied(), variables.iter().copied()).collect(),
         system,
     );
+    // TODO: Is it more efficient to pass `variable` to the oracle, so it doesn't have to produce a
+    // bunch of pairs that we just discard anyway?
     d.into_iter()
         .filter_map(|(x, y)| if y == variable { Some(x) } else { None })
         .filter(|x| visited.contains(x))
