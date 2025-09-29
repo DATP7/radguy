@@ -7,6 +7,8 @@ use crate::bislotmap::BiSlotMap;
 use radguy::{Assignment, System, extension::TermSystem};
 use slotmap::{Key, SecondaryMap};
 
+pub mod extension;
+
 #[derive(Default, Debug)]
 pub struct BoolSystem<V: Key + Hash, T: Key + Hash> {
     // TODO: This lifetime needs to be better than 'static
