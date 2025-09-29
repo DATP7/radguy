@@ -58,7 +58,7 @@ pub fn kleene_local<K: Clone + Copy + Hash + Eq, V: Eq + PartialOrd, S: System<K
 }
 
 fn local_dependencies<K: Clone + Copy + Hash + Eq, V: PartialOrd, S: System<K, V>>(
-    variable: K,
+    target: K,
     visited: &HashSet<K>,
     assignment: &dyn Assignment<K, V>,
     oracle: &dyn LocalOracle<K, V, S>,
@@ -71,10 +71,10 @@ fn local_dependencies<K: Clone + Copy + Hash + Eq, V: PartialOrd, S: System<K, V
         &iproduct!(variables.iter().copied(), variables.iter().copied()).collect(),
         system,
     );
-    // TODO: Is it more efficient to pass `variable` to the oracle, so it doesn't have to produce a
+    // TODO: Is it more efficient to pass `target` to the oracle, so it doesn't have to produce a
     // bunch of pairs that we just discard anyway?
     d.into_iter()
-        .filter_map(|(x, y)| if y == variable { Some(x) } else { None })
+        .filter_map(|(x, y)| if y == target { Some(x) } else { None })
         .filter(|x| visited.contains(x))
         .collect()
 }
