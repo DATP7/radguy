@@ -121,7 +121,7 @@ impl<V: Key, T: Key> BoolTerm<V, T> {
                 (*sys.names.get_value(*k).expect("variable must have name")).to_owned()
             }
             Self::Or(lhs, rhs) => format!(
-                "{} || {}",
+                "({} || {})",
                 sys.terms
                     .get_value(*lhs)
                     .expect("lhs should exist")
@@ -132,7 +132,7 @@ impl<V: Key, T: Key> BoolTerm<V, T> {
                     .to_string(sys)
             ),
             Self::And(lhs, rhs) => format!(
-                "{} && {}",
+                "({} && {})",
                 sys.terms
                     .get_value(*lhs)
                     .expect("lhs should exist")
@@ -191,4 +191,81 @@ macro_rules! bool_system {
             system
         }
     };
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_bool_system_and_or() {
+        let sys = bool_system! {
+            x = (z || y);
+            z = (k && b);
+            y = ((z || x) && (k && a));
+            k = tt;
+            b = a;
+            a = tt;
+            h = (((z || x) && k) && a);
+        };
+        for (key, term) in &sys.definitions {
+            let var = *sys.names.get_value(key).expect("");
+            match var {
+                "x" => assert_eq!(
+                    sys.terms.get_value(*term).expect("").to_string(&sys),
+                    "(z || y)"
+                ),
+                "z" => assert_eq!(
+                    sys.terms.get_value(*term).expect("").to_string(&sys),
+                    "(k && b)"
+                ),
+                "y" => assert_eq!(
+                    sys.terms.get_value(*term).expect("").to_string(&sys),
+                    "((z || x) && (k && a))"
+                ),
+                "k" => assert_eq!(sys.terms.get_value(*term).expect("").to_string(&sys), "tt"),
+                "b" => assert_eq!(sys.terms.get_value(*term).expect("").to_string(&sys), "a"),
+                "a" => assert_eq!(sys.terms.get_value(*term).expect("").to_string(&sys), "tt"),
+                "h" => assert_eq!(
+                    sys.terms.get_value(*term).expect("").to_string(&sys),
+                    "(((z || x) && k) && a)"
+                ),
+                &_ => println!("variable not found"),
+            };
+        }
+    }
+
+    #[test]
+    fn test_bool_system_variables() {
+        let sys = bool_system! {
+            x = z;
+            z = y;
+            y = tt;
+        };
+        for (key, term) in &sys.definitions {
+            let var = *sys.names.get_value(key).expect("");
+            match var {
+                "x" => assert_eq!(sys.terms.get_value(*term).expect("").to_string(&sys), "z"),
+                "z" => assert_eq!(sys.terms.get_value(*term).expect("").to_string(&sys), "y"),
+                "y" => assert_eq!(sys.terms.get_value(*term).expect("").to_string(&sys), "tt"),
+                &_ => println!("variable not found"),
+            };
+        }
+    }
+
+    #[test]
+    fn test_bool_system_tt_ff() {
+        let sys = bool_system! {
+            x = tt;
+            y = ff;
+            z = tt;
+        };
+        for (key, term) in &sys.definitions {
+            let var = *sys.names.get_value(key).expect("");
+            match var {
+                "x" => assert_eq!(sys.terms.get_value(*term).expect("").to_string(&sys), "tt"),
+                "y" => assert_eq!(sys.terms.get_value(*term).expect("").to_string(&sys), "ff"),
+                "z" => assert_eq!(sys.terms.get_value(*term).expect("").to_string(&sys), "tt"),
+                &_ => println!("variable not found"),
+            };
+        }
+    }
 }
