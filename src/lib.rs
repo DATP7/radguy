@@ -1,4 +1,5 @@
 use itertools::iproduct;
+use std::fmt::Debug;
 
 use crate::oracle::LocalOracle;
 use std::{
@@ -9,11 +10,44 @@ use std::{
 pub mod extension;
 pub mod oracle;
 
-pub trait System<VarKey: Clone + Copy, VarValue: PartialOrd> {
+pub trait Set<T> {
+    #[must_use]
+    fn intersect(&self, other: Self) -> Self;
+    #[must_use]
+    fn union(&self, other: Self) -> Self;
+    #[must_use]
+    fn without(&self, _other: &Self) -> Self;
+    fn contains(&self, item: &T) -> bool;
+    fn is_subset(&self, other: &Self) -> bool;
+}
+
+pub trait Cartesian<Rhs = Self> {
+    type Output;
+    /// Returns the Cartesian product of two sets.
+    /// (a, b) for a in self, b in other.
+    fn cartesian(&self, other: &Rhs) -> Self::Output;
+}
+
+// TODO: Is <T> required could we use <Self as Set>::Item instead?
+pub trait IterSet: Set<Self::Item> {
+    type Item;
+    type Iter<'a>: Iterator<Item = &'a Self::Item>
+    where
+        Self: 'a;
+    fn iter(&self) -> Self::Iter<'_>;
+}
+
+pub trait System<
+    VarKey: Copy,
+    VarValue: PartialOrd,
+    PairSet: IterSet<Item = (VarKey, VarKey)>,
+    VarSet: IterSet<Item = VarKey>,
+>
+{
     fn evaluate(&self, key: VarKey, assignment: &dyn Assignment<VarKey, VarValue>) -> VarValue;
 
-    fn arguments(&self, key: VarKey) -> HashSet<VarKey>;
-    fn variables(&self) -> HashSet<VarKey>;
+    fn arguments(&self, key: VarKey) -> VarSet;
+    fn variables(&self) -> VarSet;
     fn bottom_assignment(&self) -> impl Assignment<VarKey, VarValue>;
 }
 
@@ -22,7 +56,50 @@ pub trait Assignment<K, V> {
     fn update(&mut self, key: K, value: V);
 }
 
-impl<K: Hash + Eq, V: Bottom + Clone, S: ::std::hash::BuildHasher> Assignment<K, V>
+impl<T: Eq + Hash + Copy> Set<T> for HashSet<T> {
+    fn intersect(&self, other: Self) -> Self {
+        self.intersection(&other).copied().collect()
+    }
+
+    fn union(&self, other: Self) -> Self {
+        self.union(&other).copied().collect()
+    }
+
+    fn is_subset(&self, other: &Self) -> bool {
+        self.is_subset(other)
+    }
+
+    fn contains(&self, item: &T) -> bool {
+        self.contains(item)
+    }
+
+    fn without(&self, other: &Self) -> Self {
+        self.difference(other).copied().collect()
+    }
+}
+
+impl<T: Eq + Hash + Copy> IterSet for HashSet<T> {
+    type Item = T;
+    type Iter<'a>
+        = std::collections::hash_set::Iter<'a, T>
+    where
+        T: 'a,
+        Self: 'a;
+
+    fn iter(&self) -> Self::Iter<'_> {
+        self.iter()
+    }
+}
+
+impl<T: Eq + Hash + Copy> Cartesian for HashSet<T> {
+    type Output = HashSet<(T, T)>;
+
+    fn cartesian(&self, other: &Self) -> Self::Output {
+        iproduct!(self.iter().copied(), other.iter().copied()).collect()
+    }
+}
+
+impl<K: Hash + Eq, V: Bottom + Clone, S: std::hash::BuildHasher> Assignment<K, V>
     for HashMap<K, V, S>
 {
     fn get(&self, key: &K) -> V {
@@ -34,47 +111,52 @@ impl<K: Hash + Eq, V: Bottom + Clone, S: ::std::hash::BuildHasher> Assignment<K,
     }
 }
 
-pub fn kleene_local<K: Clone + Copy + Hash + Eq, V: Eq + PartialOrd, S: System<K, V>>(
+pub fn kleene_local<
+    K: Copy + Hash + Eq + Debug,
+    V: Eq + PartialOrd,
+    PS: IterSet<Item = (K, K)>,
+    VS: IterSet<Item = K> + Cartesian<Output = PS> + FromIterator<K>,
+    S: System<K, V, PS, VS>,
+>(
     system: &S,
     target: K,
-    oracle: &dyn LocalOracle<K, V, S>,
+    oracle: &impl LocalOracle<K, V, PS, VS, S>,
 ) -> V {
     let mut assignment = system.bottom_assignment();
-    // TODO: Giovanni's implementation uses BDDs
-    let mut visited = HashSet::from([target]);
+    let mut visited = std::iter::once(target).collect();
     let mut todo = local_dependencies(target, &visited, &assignment, oracle, system);
-
-    while let Some(&x) = todo.iter().next() {
-        todo.remove(&x);
+    let mut iter = todo.iter();
+    while let Some(&x) = iter.next() {
         let evaluated = system.evaluate(x, &assignment);
         if assignment.get(&x) != evaluated || !system.arguments(x).is_subset(&visited) {
             assignment.update(x, evaluated);
-            visited = visited.union(&system.arguments(x)).copied().collect();
+            visited = visited.union(system.arguments(x));
             todo = local_dependencies(target, &visited, &assignment, oracle, system);
+            iter = todo.iter();
         }
     }
 
     assignment.get(&target)
 }
 
-fn local_dependencies<K: Clone + Copy + Hash + Eq, V: PartialOrd, S: System<K, V>>(
-    target: K,
-    visited: &HashSet<K>,
-    assignment: &dyn Assignment<K, V>,
-    oracle: &dyn LocalOracle<K, V, S>,
+fn local_dependencies<
+    K: Copy + Hash + Eq,
+    V: PartialOrd,
+    PS: IterSet<Item = (K, K)>,
+    VS: IterSet<Item = K> + Cartesian<Output = PS>,
+    S: System<K, V, PS, VS>,
+>(
+    variable: K,
+    visited: &VS,
+    assignment: &impl Assignment<K, V>,
+    oracle: &impl LocalOracle<K, V, PS, VS, S>,
     system: &S,
-) -> HashSet<K> {
-    let variables = &system.variables();
-    let d = oracle.approximate_flow(
-        visited,
-        assignment,
-        &iproduct!(variables.iter().copied(), variables.iter().copied()).collect(),
-        system,
-    );
-    // TODO: Is it more efficient to pass `target` to the oracle, so it doesn't have to produce a
-    // bunch of pairs that we just discard anyway?
-    d.into_iter()
-        .filter_map(|(x, y)| if y == target { Some(x) } else { None })
+) -> Vec<K> {
+    let product = &system.variables().cartesian(&system.variables());
+    let d = oracle.approximate_flow(visited, assignment, product, system);
+    d.iter()
+        .copied()
+        .filter_map(|(x, y)| if y == variable { Some(x) } else { None })
         .filter(|x| visited.contains(x))
         .collect()
 }

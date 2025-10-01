@@ -67,7 +67,10 @@ impl<V: Key + Hash, T: Key + Hash> BoolSystem<V, T> {
     }
 }
 
-impl<VarKey: Key + Hash, TermKey: Key + Hash> System<VarKey, bool> for BoolSystem<VarKey, TermKey> {
+impl<VarKey: Key + Hash, TermKey: Key + Hash>
+    System<VarKey, bool, HashSet<(VarKey, VarKey)>, HashSet<VarKey>>
+    for BoolSystem<VarKey, TermKey>
+{
     fn evaluate(&self, key: VarKey, assignment: &dyn Assignment<VarKey, bool>) -> bool {
         let term_key = self.definitions.get(key).expect("variable must be defined");
         self.evaluate_term(*term_key, assignment)
@@ -87,8 +90,14 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash> System<VarKey, bool> for BoolSyste
     }
 }
 
-impl<VarKey: Key + Hash, TermKey: Key + Hash> TermSystem<VarKey, bool, TermKey>
-    for BoolSystem<VarKey, TermKey>
+impl<VarKey: Key + Hash, TermKey: Key + Hash>
+    TermSystem<
+        VarKey,
+        bool,
+        TermKey,
+        HashSet<(VarKey, VarKey)>,
+        HashSet<VarKey>,
+    > for BoolSystem<VarKey, TermKey>
 {
     fn definition(&self, variable: VarKey) -> TermKey {
         *self
