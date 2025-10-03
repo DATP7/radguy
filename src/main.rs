@@ -22,38 +22,49 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use paste::paste;
-    use radguy::oracle::{SMax, TrivialOracle};
+    use radguy::oracle::{LocalMaxR, LocalOracle, SMax, TrivialOracle};
+
+    use crate::systems::bool::BoolSystem;
 
     use super::*;
 
+    fn test_system() -> (
+        BoolSystem<DefaultKey, DefaultKey>,
+        [&'static str; 13],
+        [bool; 13],
+    ) {
+        let sys = bool_system! {
+            x = (((y || z) && k) || j);
+            y = ((x || j) || (z && k));
+            z = (((a || b) || (c && d)) || ((e || f) && (g && h))) ;
+            k = tt;
+            j = (j || j);
+            a = j;
+            b = a;
+            c = k;
+            d = b;
+            e = c;
+            f = d;
+            g = e;
+            h = g;
+        };
+        let var_vector = [
+            "x", "y", "z", "k", "j", "a", "b", "c", "d", "e", "f", "g", "h",
+        ];
+        let goal_vector = [
+            true, true, true, true, false, false, false, true, false, true, false, true, true,
+        ];
+        (sys, var_vector, goal_vector)
+    }
+
     macro_rules! test_oracle {
-        ($name:ident) => {
-            paste! {
-                #[test]
-                fn [<test_kleene_local_$name:lower _system>]() {
-                    let oracle = $name;
-                    let mut sys = bool_system! {
-                        x = (((y || z) && k) || j);
-                        y = ((x || j) || (z && k));
-                        z = (((a || b) || (c && d)) || ((e || f) && (g && h))) ;
-                        k = tt;
-                        j = (j || j);
-                        a = j;
-                        b = a;
-                        c = k;
-                        d = b;
-                        e = c;
-                        f = d;
-                        g = e;
-                        h = g;
-                    };
-                    let var_vector = ["x", "y", "z", "k", "j", "a", "b", "c", "d", "e", "f", "g"];
-                    let goal_vector = [true, true, true, true, false, false, false, true, false, true, false, true, true];
-                    for (var, goal) in var_vector.into_iter().zip(goal_vector.into_iter()) {
-                        let start = sys.names.get_or_insert_key(var);
-                        assert_eq!(kleene_local(&sys, start, &oracle), goal);
-                    }
+        ($oracle:expr, $name:ident) => {
+            #[test]
+            fn $name() {
+                let (mut sys, var_vector, goal_vector) = test_system();
+                for (var, goal) in var_vector.into_iter().zip(goal_vector.into_iter()) {
+                    let start = sys.names.get_or_insert_key(var);
+                    assert_eq!(kleene_local(&sys, start, &$oracle), goal);
                 }
             }
         };
@@ -74,9 +85,9 @@ mod tests {
     }
 
     macro_rules! test_oracles {
-        ( $( $name:ident ),*) => {
+        ( $( $oracle:expr, $name:ident );*) => {
             $(
-                test_oracle!($name);
+                test_oracle!($oracle, $name);
             )*
         };
     }
@@ -160,5 +171,30 @@ mod tests {
         );
     }
 
-    test_oracles!(SMax, TrivialOracle);
+    test_oracles!(
+        SMax,
+        test_kleene_local_smax;
+        TrivialOracle,
+        test_kleene_local_trivialoracle;
+        LocalMaxR,
+        test_kleene_local_localmaxr;
+        TrivialOracle.and(SMax),
+        test_kleene_local_trivialoracle_and_smax;
+        LocalMaxR.and(SMax),
+        test_kleene_local_localmaxr_and_smax;
+        LocalMaxR.and(TrivialOracle),
+        test_kleene_local_localmaxr_and_trivialoracle;
+        TrivialOracle.then(SMax),
+        test_kleene_local_trivialoracle_then_smax;
+        TrivialOracle.then(LocalMaxR),
+        test_kleene_local_trivialoracle_then_localmaxr;
+        SMax.then(TrivialOracle),
+        test_kleene_local_smax_then_trivialoracle;
+        SMax.then(LocalMaxR),
+        test_kleene_local_smax_then_localmaxr;
+        LocalMaxR.then(SMax),
+        test_kleene_local_localmaxr_then_smax;
+        LocalMaxR.then(TrivialOracle),
+        test_kleene_local_localmaxr_then_trivialoracle
+    );
 }
