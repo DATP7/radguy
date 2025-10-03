@@ -9,8 +9,8 @@ pub struct BiSlotMap<K: Key, V: Hash + Eq + Clone> {
 }
 
 impl<K: Key, V: Hash + Eq + Clone> BiSlotMap<K, V> {
-    pub fn get_value(&self, key: K) -> Option<&'_ V> {
-        self.vals.get(key)
+    pub fn get_value(&self, key: K) -> &'_ V {
+        self.vals.get(key).expect("key should exist in bislotmap")
     }
     pub fn get_or_insert_key(&mut self, val: V) -> K {
         if let Some(key) = self.keys.get(&val) {
