@@ -61,10 +61,7 @@ fn collect_terms<VarKey: Key + Hash, TermKey: Key + Hash>(
     if current.contains(&(x, term_key)) {
         return;
     }
-    let term = system
-        .terms
-        .get_value(term_key)
-        .expect("term should be defined");
+    let term = system.terms.get_value(term_key);
     match *term {
         BoolTerm::True | BoolTerm::False => (),
         BoolTerm::Variable(y) => {
