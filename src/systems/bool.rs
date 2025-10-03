@@ -17,7 +17,7 @@ pub struct BoolSystem<V: Key + Hash, T: Key + Hash> {
     pub terms: BiSlotMap<T, BoolTerm<V, T>>,
 }
 
-#[allow(warnings)]
+#[allow(dead_code)]
 impl<V: Key + Hash, T: Key + Hash> BoolSystem<V, T> {
     pub fn print_assignment(&self, a: &dyn Assignment<V, bool>) {
         for (key, &name) in self.names.iter() {
@@ -103,7 +103,7 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash>
 }
 
 #[derive(Hash, PartialEq, Eq, Clone, Debug)]
-#[allow(warnings)]
+#[allow(dead_code)]
 pub enum BoolTerm<V: Key, T: Key> {
     True,
     False,
