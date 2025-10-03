@@ -1,2 +1,6 @@
 /target
 .direnv
+ccs_examples
+.ignoreme
+.vscode
+.gitignore

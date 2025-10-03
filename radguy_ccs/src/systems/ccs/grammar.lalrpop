@@ -1,0 +1,95 @@
+use std::collections::{BTreeMap, BTreeSet};
+use crate::systems::ccs::ast::{Binding, Process, Action};
+use lalrpop_util::ParseError;
+
+grammar;
+
+pub Program: Vec<Binding<'input>> = (<Binding> ";")*;
+
+
+Binding: Binding<'input> = {
+  <name:Id> "=" <value:State> => Binding { name, value },
+}
+
+pub State: Process<'input> = StateSummation;
+
+StateSummation: Process<'input> = {
+  <l:StateComposition> "+" <r:StateSummation> => Process::Sum(Box::new(l), Box::new(r)),
+  StateComposition,
+}
+
+StateComposition: Process<'input> = {
+  <l:ActionPrefix> "|" <r:StateComposition> => Process::Compose(Box::new(l), Box::new(r)),
+  ActionPrefix,
+}
+
+ActionPrefix: Process<'input> = {
+  <action:Action> "." <process:ActionPrefix> => Process::ActionPrefix {action, process: Box::new(process)},
+  StateRelabelling,
+}
+
+StateRelabelling: Process<'input> = {
+  <process:StateRelabelling> "[" <labels:Comma<Relabelling>> "]" =>? if labels.iter().any(|(l, r)| *l == "tau" || *r == "tau") {
+    Err(ParseError::User {
+      error: "cannot relabel tau"
+    })
+  } else {
+    Ok(Process::Relabelling {
+      process: Box::new(process),
+      // The syntax for relabelling is [to/from]
+      labels: BTreeMap::from_iter(labels.into_iter().map(|(l, r)| (r, l))),
+    })
+  },
+
+  StateRestriction,
+}
+
+StateRestriction: Process<'input> = {
+  <process:StateParen> "\\" <restriction:LabelSet> => Process::Restriction {
+      process: Box::new(process),
+      restriction,
+    },
+  StateParen
+}
+
+StateParen: Process<'input> = {
+  "(" <State> ")",
+  "0" => Process::Nil,
+  <Id> => Process::Named(<>),
+}
+
+Relabelling: (&'input str, &'input str) = <Label> "/" <Label>;
+
+LabelSet: BTreeSet<&'input str> = {
+  "{" <labels:Comma<Label>> "}" =>? if labels.iter().any(|l| *l == "tau") {
+    Err(ParseError::User {
+      error: "tau is not allowed in label set"
+    })
+  } else {
+    Ok(BTreeSet::from_iter(labels.into_iter()))
+  },
+}
+
+pub Action: Action<'input> = {
+  <tick:"'"?> <name:Label> => match name {
+    "tau" => Action::Tau,
+    name => Action::Label {
+      name,
+      is_complement: tick.is_some(),
+    },
+  },
+}
+
+Label: &'input str = <r"[a-z][A-Za-z0-9?!_'\-#^]*">;
+
+Id: &'input str = <r"[A-Z][A-Za-z0-9?!_'\-#^]*">;
+
+Comma<T>: Vec<T> = {
+    <mut v:(<T> ",")*> <e:T?> => match e {
+        None => v,
+        Some(e) => {
+            v.push(e);
+            v
+        }
+    }
+};

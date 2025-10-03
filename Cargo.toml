@@ -1,15 +1,6 @@
-[package]
-name = "radguy"
-version = "0.1.0"
-edition = "2024"
+[workspace]
+members = ["radguy", "radguy_ccs"]
+resolver = "3"
 
-[dependencies]
-itertools = "0.14.0"
-slotmap = "1.0.7"
-
-[lints.clippy]
-pedantic = { level = "deny", priority = -1 }
-nursery = { level = "deny", priority = -1 }
-unwrap_used = { level = "deny" }
-missing_panics_doc = { level = "allow" }
-too_many_lines = { level = "allow" }
+[workspace.dependencies]
+radguy = {path = "radguy"}

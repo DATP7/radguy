@@ -1,0 +1,22 @@
+[package]
+name = "radguy-ccs"
+version = "0.1.0"
+edition = "2024"
+build = "build_lalrpop.rs"
+
+[dependencies]
+itertools = "0.14.0"
+lalrpop-util = {version = "0.22.2", features=["lexer"]}
+slotmap = "1.0.7"
+radguy = {workspace = true}
+
+
+[lints.clippy]
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+unwrap_used = { level = "deny" }
+missing_panics_doc = { level = "allow" }
+too_many_lines = { level = "allow" }
+
+[build-dependencies]
+lalrpop = "0.22.2"
