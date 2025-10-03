@@ -28,7 +28,6 @@ pub trait Cartesian<Rhs = Self> {
     fn cartesian(&self, other: &Rhs) -> Self::Output;
 }
 
-// TODO: Is <T> required could we use <Self as Set>::Item instead?
 pub trait IterSet: Set<Self::Item> {
     type Item;
     type Iter<'a>: Iterator<Item = &'a Self::Item>
@@ -56,7 +55,7 @@ pub trait Assignment<K, V> {
     fn update(&mut self, key: K, value: V);
 }
 
-impl<T: Eq + Hash + Copy> Set<T> for HashSet<T> {
+impl<T: Eq + Hash + Copy, S: ::std::hash::BuildHasher + Default> Set<T> for HashSet<T, S> {
     fn intersect(&self, other: Self) -> Self {
         self.intersection(&other).copied().collect()
     }
@@ -78,7 +77,7 @@ impl<T: Eq + Hash + Copy> Set<T> for HashSet<T> {
     }
 }
 
-impl<T: Eq + Hash + Copy> IterSet for HashSet<T> {
+impl<T: Eq + Hash + Copy, S: ::std::hash::BuildHasher + Default> IterSet for HashSet<T, S> {
     type Item = T;
     type Iter<'a>
         = std::collections::hash_set::Iter<'a, T>
@@ -91,7 +90,7 @@ impl<T: Eq + Hash + Copy> IterSet for HashSet<T> {
     }
 }
 
-impl<T: Eq + Hash + Copy> Cartesian for HashSet<T> {
+impl<T: Eq + Hash + Copy, S: ::std::hash::BuildHasher> Cartesian for HashSet<T, S> {
     type Output = HashSet<(T, T)>;
 
     fn cartesian(&self, other: &Self) -> Self::Output {

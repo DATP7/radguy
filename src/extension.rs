@@ -1,4 +1,4 @@
-use std::{hash::Hash, marker::PhantomData};
+use std::{collections::HashSet, hash::Hash, marker::PhantomData};
 
 use crate::{Assignment, Cartesian, IterSet, System, oracle::LocalOracle};
 
@@ -13,6 +13,33 @@ pub trait TermToKey<
 >
 {
     fn term_to_key(&self, visited: &VarSet, system: &S) -> PairSet;
+}
+
+impl<
+    VarKey: Copy + Hash + Eq,
+    VarValue: PartialOrd,
+    TermKey: Copy + Eq + Hash,
+    S: TermSystem<VarKey, VarValue, TermKey, HashSet<(VarKey, VarKey)>, HashSet<VarKey>>,
+    H: ::std::hash::BuildHasher + Default,
+> TermToKey<VarKey, VarValue, TermKey, HashSet<(VarKey, VarKey)>, HashSet<VarKey>, Self, S>
+    for HashSet<(VarKey, TermKey), H>
+{
+    fn term_to_key(&self, visited: &HashSet<VarKey>, system: &S) -> HashSet<(VarKey, VarKey)> {
+        visited
+            .iter()
+            .flat_map(|&y| {
+                self.iter()
+                    .filter_map(|(x, ty)| {
+                        if system.definition(y) == *ty {
+                            Some((*x, y))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<HashSet<(VarKey, VarKey)>>()
+            })
+            .collect()
+    }
 }
 
 pub trait TermSystem<

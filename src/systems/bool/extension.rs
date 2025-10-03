@@ -11,8 +11,15 @@ use crate::systems::bool::{BoolSystem, BoolTerm};
 #[derive(Default)]
 pub struct BoolExtension<TermKey: Key + Hash>(PhantomData<TermKey>);
 
-impl<VarKey: Key + Hash, TermKey: Key + Hash> LocalExtension<VarKey, bool, TermKey>
-    for BoolExtension<TermKey>
+impl<VarKey: Key + Hash, TermKey: Key + Hash>
+    LocalExtension<
+        VarKey,
+        bool,
+        TermKey,
+        HashSet<(VarKey, VarKey)>,
+        HashSet<VarKey>,
+        HashSet<(VarKey, TermKey)>,
+    > for BoolExtension<TermKey>
 {
     type System = BoolSystem<VarKey, TermKey>;
 
