@@ -13,4 +13,3 @@ nursery = { level = "deny", priority = -1 }
 unwrap_used = { level = "deny" }
 missing_panics_doc = { level = "allow" }
 too_many_lines = { level = "allow" }
-implicit_hasher = { level = "allow" }

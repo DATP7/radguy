@@ -91,13 +91,8 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash>
 }
 
 impl<VarKey: Key + Hash, TermKey: Key + Hash>
-    TermSystem<
-        VarKey,
-        bool,
-        TermKey,
-        HashSet<(VarKey, VarKey)>,
-        HashSet<VarKey>,
-    > for BoolSystem<VarKey, TermKey>
+    TermSystem<VarKey, bool, TermKey, HashSet<(VarKey, VarKey)>, HashSet<VarKey>>
+    for BoolSystem<VarKey, TermKey>
 {
     fn definition(&self, variable: VarKey) -> TermKey {
         *self
