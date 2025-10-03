@@ -21,7 +21,7 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash>
         HashSet<(VarKey, TermKey)>,
     > for BoolExtension<TermKey>
 {
-    type System = BoolSystem<VarKey, TermKey>;
+    type System = BoolSystem<VarKey, TermKey, &'static str>;
 
     fn depends(
         &self,
@@ -53,7 +53,7 @@ fn collect_terms<VarKey: Key + Hash, TermKey: Key + Hash>(
     term_key: TermKey,
     assignment: &dyn Assignment<VarKey, bool>,
     possible: &HashSet<(VarKey, VarKey)>,
-    system: &BoolSystem<VarKey, TermKey>,
+    system: &BoolSystem<VarKey, TermKey, &'static str>,
     current: &mut HashSet<(VarKey, TermKey)>,
 ) {
     // TODO: This caching could probably be a bit smarter by also keeping track of what we know to

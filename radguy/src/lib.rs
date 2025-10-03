@@ -7,6 +7,7 @@ use std::{
     hash::Hash,
 };
 
+pub mod bislotmap;
 pub mod extension;
 pub mod oracle;
 

@@ -1,41 +1,26 @@
 use std::{
     collections::{HashMap, HashSet},
+    fmt::{Debug, Display},
     hash::Hash,
 };
 
-use crate::bislotmap::BiSlotMap;
+use radguy::bislotmap::BiSlotMap;
 use radguy::{Assignment, System, extension::TermSystem};
 use slotmap::{Key, SecondaryMap};
 
 pub mod extension;
 
 #[derive(Default, Debug)]
-pub struct BoolSystem<V: Key + Hash, T: Key + Hash> {
+pub struct BoolSystem<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone> {
     // TODO: This lifetime needs to be better than 'static
-    pub names: BiSlotMap<V, &'static str>,
+    pub names: BiSlotMap<V, N>,
     pub definitions: SecondaryMap<V, T>,
     pub terms: BiSlotMap<T, BoolTerm<V, T>>,
 }
 
 #[allow(dead_code)]
-impl<V: Key + Hash, T: Key + Hash> BoolSystem<V, T> {
-    pub fn print_assignment(&self, a: &dyn Assignment<V, bool>) {
-        for (key, &name) in self.names.iter() {
-            println!("{name} = {}", a.get(&key));
-        }
-    }
-
-    pub fn print_definitions(&self) {
-        for (var, term) in &self.definitions {
-            println!(
-                "{} = {}",
-                self.names.get_value(var),
-                self.terms.get_value(*term).to_string(self)
-            );
-        }
-    }
-
-    fn evaluate_term(&self, term_key: T, assignment: &dyn Assignment<V, bool>) -> bool {
+impl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone> BoolSystem<V, T, N> {
+    pub fn evaluate_term(&self, term_key: T, assignment: &dyn Assignment<V, bool>) -> bool {
         match self.terms.get_value(term_key) {
             BoolTerm::True => true,
             BoolTerm::False => false,
@@ -49,7 +34,7 @@ impl<V: Key + Hash, T: Key + Hash> BoolSystem<V, T> {
         }
     }
 
-    fn term_arguments(&self, term_key: T) -> HashSet<V> {
+    pub fn term_arguments(&self, term_key: T) -> HashSet<V> {
         match self.terms.get_value(term_key) {
             BoolTerm::False | BoolTerm::True => HashSet::new(),
             BoolTerm::Variable(k) => HashSet::from_iter([*k]),
@@ -62,9 +47,27 @@ impl<V: Key + Hash, T: Key + Hash> BoolSystem<V, T> {
     }
 }
 
-impl<VarKey: Key + Hash, TermKey: Key + Hash>
+impl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone + Debug> BoolSystem<V, T, N> {
+    pub fn print_assignment(&self, a: &dyn Assignment<V, bool>) {
+        for (key, name) in self.names.iter() {
+            println!("{name:?} = {:?}", a.get(&key));
+        }
+    }
+
+    pub fn print_definitions(&self) {
+        for (var, term) in &self.definitions {
+            println!(
+                "{:?} = {:?}",
+                self.names.get_value(var),
+                self.terms.get_value(*term).to_string_debug(self)
+            );
+        }
+    }
+}
+
+impl<VarKey: Key + Hash, TermKey: Key + Hash, VarIdentifyer: Hash + Eq + Clone>
     System<VarKey, bool, HashSet<(VarKey, VarKey)>, HashSet<VarKey>>
-    for BoolSystem<VarKey, TermKey>
+    for BoolSystem<VarKey, TermKey, VarIdentifyer>
 {
     fn evaluate(&self, key: VarKey, assignment: &dyn Assignment<VarKey, bool>) -> bool {
         let term_key = self.definitions.get(key).expect("variable must be defined");
@@ -85,9 +88,9 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash>
     }
 }
 
-impl<VarKey: Key + Hash, TermKey: Key + Hash>
+impl<VarKey: Key + Hash, TermKey: Key + Hash, VarIdentifyer: Hash + Eq + Clone>
     TermSystem<VarKey, bool, TermKey, HashSet<(VarKey, VarKey)>, HashSet<VarKey>>
-    for BoolSystem<VarKey, TermKey>
+    for BoolSystem<VarKey, TermKey, VarIdentifyer>
 {
     fn definition(&self, variable: VarKey) -> TermKey {
         *self
@@ -108,11 +111,32 @@ pub enum BoolTerm<V: Key, T: Key> {
 }
 
 impl<V: Key, T: Key> BoolTerm<V, T> {
-    pub fn to_string(&self, sys: &BoolSystem<V, T>) -> String {
+    pub fn to_string_debug<N: Hash + Clone + Eq + Debug>(
+        &self,
+        sys: &BoolSystem<V, T, N>,
+    ) -> String {
         match self {
             Self::True => "tt".to_owned(),
             Self::False => "ff".to_owned(),
-            Self::Variable(k) => (*sys.names.get_value(*k)).to_owned(),
+            Self::Variable(k) => format!("{:?}", *sys.names.get_value(*k)),
+            Self::Or(lhs, rhs) => format!(
+                "({} || {})",
+                sys.terms.get_value(*lhs).to_string_debug(sys),
+                sys.terms.get_value(*rhs).to_string_debug(sys)
+            ),
+            Self::And(lhs, rhs) => format!(
+                "({} && {})",
+                sys.terms.get_value(*lhs).to_string_debug(sys),
+                sys.terms.get_value(*rhs).to_string_debug(sys)
+            ),
+        }
+    }
+
+    pub fn to_string<N: Hash + Clone + Eq + Display>(&self, sys: &BoolSystem<V, T, N>) -> String {
+        match self {
+            Self::True => "tt".to_owned(),
+            Self::False => "ff".to_owned(),
+            Self::Variable(k) => format!("{}", *sys.names.get_value(*k)),
             Self::Or(lhs, rhs) => format!(
                 "({} || {})",
                 sys.terms.get_value(*lhs).to_string(sys),
@@ -165,7 +189,7 @@ macro_rules! bool_def {
 macro_rules! bool_system {
     ($($id:ident = $def:tt;)*) => {
         {
-            let mut system = $crate::systems::bool::BoolSystem::<slotmap::DefaultKey, slotmap::DefaultKey>::default();
+            let mut system = $crate::systems::bool::BoolSystem::<slotmap::DefaultKey, slotmap::DefaultKey, &str>::default();
             $(
                 bool_def!($id = $def; system);
             )*

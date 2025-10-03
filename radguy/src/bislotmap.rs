@@ -26,6 +26,14 @@ impl<K: Key, V: Hash + Eq + Clone> BiSlotMap<K, V> {
     pub fn iter(&self) -> impl Iterator<Item = (K, &V)> {
         self.vals.iter()
     }
+
+    pub fn keys(&self) -> impl Iterator<Item = K> {
+        self.vals.keys()
+    }
+
+    pub fn contains_value(&self, val: &V) -> bool {
+        self.keys.contains_key(val)
+    }
 }
 
 impl<K: Key, V: Hash + Eq + Clone> Default for BiSlotMap<K, V> {
