@@ -12,13 +12,11 @@ pub mod extension;
 
 #[derive(Default, Debug)]
 pub struct BoolSystem<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone> {
-    // TODO: This lifetime needs to be better than 'static
     pub names: BiSlotMap<V, N>,
     pub definitions: SecondaryMap<V, T>,
     pub terms: BiSlotMap<T, BoolTerm<V, T>>,
 }
 
-#[allow(dead_code)]
 impl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone> BoolSystem<V, T, N> {
     pub fn evaluate_term(&self, term_key: T, assignment: &dyn Assignment<V, bool>) -> bool {
         match self.terms.get_value(term_key) {
@@ -65,9 +63,9 @@ impl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone + Debug> BoolSystem<V, T
     }
 }
 
-impl<VarKey: Key + Hash, TermKey: Key + Hash, VarIdentifyer: Hash + Eq + Clone>
+impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
     System<VarKey, bool, HashSet<(VarKey, VarKey)>, HashSet<VarKey>>
-    for BoolSystem<VarKey, TermKey, VarIdentifyer>
+    for BoolSystem<VarKey, TermKey, VarName>
 {
     fn evaluate(&self, key: VarKey, assignment: &dyn Assignment<VarKey, bool>) -> bool {
         let term_key = self.definitions.get(key).expect("variable must be defined");
@@ -88,9 +86,9 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarIdentifyer: Hash + Eq + Clone>
     }
 }
 
-impl<VarKey: Key + Hash, TermKey: Key + Hash, VarIdentifyer: Hash + Eq + Clone>
+impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
     TermSystem<VarKey, bool, TermKey, HashSet<(VarKey, VarKey)>, HashSet<VarKey>>
-    for BoolSystem<VarKey, TermKey, VarIdentifyer>
+    for BoolSystem<VarKey, TermKey, VarName>
 {
     fn definition(&self, variable: VarKey) -> TermKey {
         *self
@@ -101,7 +99,6 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarIdentifyer: Hash + Eq + Clone>
 }
 
 #[derive(Hash, PartialEq, Eq, Clone, Debug)]
-#[allow(dead_code)]
 pub enum BoolTerm<V: Key, T: Key> {
     True,
     False,

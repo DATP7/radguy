@@ -23,10 +23,12 @@ pub enum FlatProcess<'a, K: Key> {
     },
     Restriction {
         process: K,
+        // PERF: Make this Rc or borrowed so we don't clone as much
         restrictions: BTreeSet<&'a str>,
     },
     Relabelling {
         process: K,
+        // PERF: Make this Rc or borrowed so we don't clone as much
         labels: BTreeMap<&'a str, &'a str>,
     },
     Sum(K, K),
@@ -55,6 +57,7 @@ impl<'a> StrongBisimulationSystem<'a> {
 
         let mut local_pairs = HashSet::<(DefaultKey, DefaultKey)>::new();
 
+        // Dummy set placed here to allocate once. unwrap_or_else cannot return a borrowed value
         let empty_set = HashSet::new();
         for (action, left_processes) in left_transitions {
             let right_processes = right_transitions.get(&action).unwrap_or(&empty_set);
@@ -90,6 +93,7 @@ impl<'a> StrongBisimulationSystem<'a> {
         }
     }
 
+    /// TODO: this can and probably should be cached (CAAL does it)
     fn get_transitions(&self, process_key: DefaultKey) -> HashMap<Action<'a>, HashSet<DefaultKey>> {
         let process = self
             .process_bindings
@@ -97,7 +101,8 @@ impl<'a> StrongBisimulationSystem<'a> {
             .get_value(process_key)
             .clone();
 
-        let empty_set = HashSet::<DefaultKey>::new();
+        // Dummy set placed here to allocate once. unwrap_or_else cannot return a borrowed value
+        let empty_set = HashSet::new();
 
         match process {
             FlatProcess::Nil => HashMap::new(),
@@ -141,13 +146,10 @@ impl<'a> StrongBisimulationSystem<'a> {
             FlatProcess::Sum(left, right) => {
                 let left_transitions = self.get_transitions(left);
                 let right_transitions = self.get_transitions(right);
-                let keys: HashSet<Action> = left_transitions
+                left_transitions
                     .keys()
                     .chain(right_transitions.keys())
                     .copied()
-                    .collect();
-
-                keys.into_iter()
                     .map(|action| {
                         (
                             action,
@@ -168,7 +170,7 @@ impl<'a> StrongBisimulationSystem<'a> {
                 let mut successors = HashMap::<Action, HashSet<DefaultKey>>::new();
 
                 for (left_action, left_processes) in left_transitions {
-                    let mut current_succesors_processes = HashSet::<DefaultKey>::new();
+                    let mut current_succesors_processes = HashSet::new();
                     for left_successor in left_processes {
                         let composed_process = FlatProcess::Compose(left_successor, right);
                         let composed_process_key = self
@@ -187,20 +189,18 @@ impl<'a> StrongBisimulationSystem<'a> {
                                     name,
                                     is_complement: !is_complement,
                                 };
-                                let mut current_sync_processes = HashSet::<DefaultKey>::new();
                                 if let Some(right_successors) = right_tansitions.get(&co_action) {
-                                    for right_successor in right_successors {
-                                        let composed_process =
-                                            FlatProcess::Compose(left_successor, *right_successor);
-                                        let composed_process_key = self
-                                            .process_bindings
-                                            .borrow_mut()
-                                            .get_or_insert_key(composed_process);
-                                        current_sync_processes.insert(composed_process_key);
-                                    }
-                                }
+                                    let current_sync_processes =
+                                        right_successors.iter().map(|right_successor| {
+                                            let composed_process = FlatProcess::Compose(
+                                                left_successor,
+                                                *right_successor,
+                                            );
+                                            self.process_bindings
+                                                .borrow_mut()
+                                                .get_or_insert_key(composed_process)
+                                        });
 
-                                if !current_sync_processes.is_empty() {
                                     successors
                                         .entry(Action::Tau)
                                         .or_default()
@@ -218,15 +218,13 @@ impl<'a> StrongBisimulationSystem<'a> {
                 }
 
                 for (right_action, right_processes) in right_tansitions {
-                    let mut current_succesors_processes = HashSet::<DefaultKey>::new();
-                    for right_successor in right_processes {
-                        let composed_process = FlatProcess::Compose(left, right_successor);
-                        let composed_process_key = self
-                            .process_bindings
-                            .borrow_mut()
-                            .get_or_insert_key(composed_process);
-                        current_succesors_processes.insert(composed_process_key);
-                    }
+                    let current_succesors_processes =
+                        right_processes.iter().map(|right_successor| {
+                            let composed_process = FlatProcess::Compose(left, *right_successor);
+                            self.process_bindings
+                                .borrow_mut()
+                                .get_or_insert_key(composed_process)
+                        });
                     successors
                         .entry(right_action)
                         .or_default()
@@ -303,6 +301,8 @@ impl<'a> StrongBisimulationSystem<'a> {
         }
     }
 
+    /// Creates a key for a pair of variables, which can be used to tell the system which processes
+    /// to check for strong bisimulation.
     pub fn specify_comparison(&mut self, left_process: &str, right_process: &str) -> DefaultKey {
         let left_key = *self
             .process_names
@@ -356,6 +356,8 @@ impl<'a> StrongBisimulationSystem<'a> {
             let left_processes = left_transitions.get(&action).unwrap_or(&empty_set);
             let right_processes = right_transitions.get(&action).unwrap_or(&empty_set);
 
+            // TODO: Move condition logic into new function on self. Then we can just chain
+            // flatmaps
             let bisimulation_left_condition =
                 self.construct_disjunction(left_processes.iter().map(|left_process| {
                     self.construct_conjunction(right_processes.iter().map(|right_process| {
@@ -397,6 +399,7 @@ impl<'a> StrongBisimulationSystem<'a> {
             .insert(var_key, term_key);
     }
 
+    /// Logical And (because Markus gets confused)
     fn construct_conjunction(&self, mut elements: impl Iterator<Item = DefaultKey>) -> DefaultKey {
         let Some(left_term_key) = elements.next() else {
             return self
@@ -415,6 +418,7 @@ impl<'a> StrongBisimulationSystem<'a> {
     }
 
     // TODO: this is repeditive
+    /// Logical Or (because Markus gets confused)
     fn construct_disjunction(&self, mut elements: impl Iterator<Item = DefaultKey>) -> DefaultKey {
         let Some(left_term_key) = elements.next() else {
             return self
@@ -473,10 +477,4 @@ impl System<DefaultKey, bool, HashSet<(DefaultKey, DefaultKey)>, HashSet<Default
     fn bottom_assignment(&self) -> impl Assignment<DefaultKey, bool> {
         HashMap::new()
     }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test_load_ast() {}
 }
