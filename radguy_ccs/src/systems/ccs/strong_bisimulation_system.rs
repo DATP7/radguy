@@ -11,7 +11,7 @@ use slotmap::Key;
 
 use crate::systems::{
     bool::{BoolSystem, BoolTerm},
-    ccs::{ast::Action, strong_transition_generator::TransitionSystem},
+    ccs::{ast::Action, transition_system::TransitionSystem},
 };
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]

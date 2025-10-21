@@ -9,6 +9,7 @@ use slotmap::{Key, SecondaryMap};
 use crate::systems::ccs::{
     ast::{Action, Binding, Process},
     strong_bisimulation_system::FlatProcess,
+    transition_system::TransitionSystem,
 };
 
 type TransitionMap<'a, ProcKey> = HashMap<Action<'a>, HashSet<ProcKey>>;
@@ -18,12 +19,6 @@ pub struct StrongTransitionSystem<'a, ProcKey: Key> {
     process_names: HashMap<&'a str, ProcKey>,
     process_bindings: RefCell<BiSlotMap<ProcKey, FlatProcess<'a, ProcKey>>>,
     transition_cache: RefCell<SecondaryMap<ProcKey, TransitionMap<'a, ProcKey>>>,
-}
-
-pub trait TransitionSystem<'a, ProcKey: Key> {
-    fn get_transitions(&self, process_key: ProcKey) -> TransitionMap<'a, ProcKey>;
-    fn load_ast(&mut self, ast: Vec<Binding<'a>>);
-    fn lookup_process_key(&self, name: &str) -> Option<&ProcKey>;
 }
 
 impl<'a, ProcKey: Key> StrongTransitionSystem<'a, ProcKey> {
