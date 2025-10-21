@@ -92,3 +92,51 @@ fn test_strong_bisimulation() {
         ";
     };
 }
+
+#[ignore = "performance too bad for ci"]
+#[test]
+fn test_strong_bisimulation_large_protocol() {
+    bisim_test! {
+        // Big
+        "Protocol", "ZProtocol" => true in r"
+        Send0 = acc.Sending0;
+        Sending0 = 'left0.Sending0 + leftAck0.Send1 + leftAck1.Sending0;
+        Send1 = acc.Sending1;
+        Sending1 = 'left1.Sending1 + leftAck1.Send0 + leftAck0.Sending1;
+        
+        Received0 = 'del.RecvAck1;
+        Received1 = 'del.RecvAck0;
+        RecvAck0 = right0.Received0 + right1.RecvAck0 + 'rightAck1.RecvAck0;
+        RecvAck1 = right1.Received1 + right0.RecvAck1 + 'rightAck0.RecvAck1;
+        
+        Med = MedTop | MedBot;
+        MedBot = left0.MedBotRep0 + left1.MedBotRep1;
+        MedBotRep0 = 'right0.MedBotRep0 + tau.MedBot;
+        MedBotRep1 = 'right1.MedBotRep1 + tau.MedBot;
+        MedTop = rightAck0.MedTopRep0 + rightAck1.MedTopRep1;
+        MedTopRep0 = 'leftAck0.MedTopRep0 + tau.MedTop;
+        MedTopRep1 = 'leftAck1.MedTopRep1 + tau.MedTop;
+        
+        ZSend0 = acc.ZSending0;
+        ZSending0 = 'left0.ZSending0 + leftAck0.ZSend1 + leftAck1.ZSending0;
+        ZSend1 = acc.ZSending1;
+        ZSending1 = 'left1.ZSending1 + leftAck1.ZSend0 + leftAck0.ZSending1;
+        
+        ZReceived0 = 'del.ZRecvAck1;
+        ZReceived1 = 'del.ZRecvAck0;
+        ZRecvAck0 = right0.ZReceived0 + right1.ZRecvAck0 + 'rightAck1.ZRecvAck0;
+        ZRecvAck1 = right1.ZReceived1 + right0.ZRecvAck1 + 'rightAck0.ZRecvAck1;
+        
+        ZMed = ZMedTop | ZMedBot;
+        ZMedBot = left0.ZMedBotRep0 + left1.ZMedBotRep1;
+        ZMedBotRep0 = 'right0.ZMedBotRep0 + tau.ZMedBot;
+        ZMedBotRep1 = 'right1.ZMedBotRep1 + tau.ZMedBot;
+        ZMedTop = rightAck0.ZMedTopRep0 + rightAck1.ZMedTopRep1;
+        ZMedTopRep0 = 'leftAck0.ZMedTopRep0 + tau.ZMedTop;
+        ZMedTopRep1 = 'leftAck1.ZMedTopRep1 + tau.ZMedTop;
+        
+        Protocol = (Send0 | Med | RecvAck0) \ {left0, left1, right0, right1, leftAck0, leftAck1, rightAck0, rightAck1};
+        ZProtocol = (ZSend0 | ZMed | ZRecvAck0) \ {left0, left1, right0, right1, leftAck0, leftAck1, rightAck0, rightAck1};
+        ";
+    }
+}
