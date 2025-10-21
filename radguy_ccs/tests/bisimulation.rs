@@ -1,7 +1,10 @@
 use radguy::kleene_local;
 use radguy::oracle::SMax;
 use radguy_ccs::systems::ccs::grammar::ProgramParser;
-use radguy_ccs::systems::ccs::strong_bisimulation_system::StrongBisimulationSystem;
+use radguy_ccs::systems::ccs::strong_bisimulation_system::BisimulationSystem;
+use radguy_ccs::systems::ccs::strong_transition_generator::StrongTransitionSystem;
+use radguy_ccs::systems::ccs::strong_transition_generator::TransitionSystem;
+use slotmap::DefaultKey;
 
 macro_rules! bisim_test {
         ($($left:expr, $right:expr => $eq:literal in $ccs:expr;)*) => {
@@ -11,8 +14,10 @@ macro_rules! bisim_test {
                     let program_ast = parser
                         .parse(&$ccs)
                         .expect("Failed to parse CCS program content.");
-                    let mut sys = StrongBisimulationSystem::default();
-                    sys.load_ast(program_ast);
+                    let mut strong_transition_system = StrongTransitionSystem::<DefaultKey>::default();
+                    strong_transition_system.load_ast(program_ast);
+
+                    let mut sys = BisimulationSystem::<DefaultKey, DefaultKey, DefaultKey, StrongTransitionSystem<DefaultKey>>::new(strong_transition_system);
                     let start = sys.specify_comparison($left, $right);
 
 
