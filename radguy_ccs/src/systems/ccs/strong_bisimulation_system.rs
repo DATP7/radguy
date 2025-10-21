@@ -2,15 +2,16 @@ use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     hash::Hash,
+    marker::PhantomData,
 };
 
 use itertools::iproduct;
-use radguy::{Assignment, System, bislotmap::BiSlotMap};
-use slotmap::{DefaultKey, Key};
+use radguy::{Assignment, System};
+use slotmap::Key;
 
 use crate::systems::{
     bool::{BoolSystem, BoolTerm},
-    ccs::ast::{Action, Binding, Process},
+    ccs::{ast::Action, strong_transition_generator::TransitionSystem},
 };
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
@@ -36,32 +37,48 @@ pub enum FlatProcess<'a, K: Key> {
 }
 
 #[derive(Default, Debug)]
-pub struct StrongBisimulationSystem<'a> {
-    bool_system: RefCell<BoolSystem<DefaultKey, DefaultKey, (DefaultKey, DefaultKey)>>,
-    process_names: HashMap<&'a str, DefaultKey>,
-    process_bindings: RefCell<BiSlotMap<DefaultKey, FlatProcess<'a, DefaultKey>>>,
+pub struct BisimulationSystem<
+    'a,
+    ProcKey: Key,
+    VarKey: Key,
+    TermKey: Key,
+    T: TransitionSystem<'a, ProcKey>,
+> {
+    bool_system: RefCell<BoolSystem<VarKey, TermKey, (ProcKey, ProcKey)>>,
+    transition_system: T,
+    _lifetime: PhantomData<&'a ()>,
 }
 
-impl<'a> StrongBisimulationSystem<'a> {
+impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKey>>
+    BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
+{
+    pub fn new(transition_generator: T) -> Self {
+        Self {
+            bool_system: RefCell::default(),
+            transition_system: transition_generator,
+            _lifetime: PhantomData,
+        }
+    }
+
     pub fn print_definitions(&self) {
         self.bool_system.borrow().print_definitions();
     }
 
     fn generate_next_variables(
         &self,
-        left_key: DefaultKey,
-        right_key: DefaultKey,
-    ) -> HashSet<(DefaultKey, DefaultKey)> {
-        let left_transitions = self.get_transitions(left_key);
-        let right_transitions = self.get_transitions(right_key);
+        left_key: ProcKey,
+        right_key: ProcKey,
+    ) -> HashSet<(ProcKey, ProcKey)> {
+        let left_transitions = self.transition_system.get_transitions(left_key);
+        let right_transitions = self.transition_system.get_transitions(right_key);
 
-        let mut local_pairs = HashSet::<(DefaultKey, DefaultKey)>::new();
+        let mut local_pairs = HashSet::<(ProcKey, ProcKey)>::new();
 
         // Dummy set placed here to allocate once. unwrap_or_else cannot return a borrowed value
         let empty_set = HashSet::new();
         for (action, left_processes) in left_transitions {
             let right_processes = right_transitions.get(&action).unwrap_or(&empty_set);
-            let combinations: HashSet<(DefaultKey, DefaultKey)> =
+            let combinations: HashSet<(ProcKey, ProcKey)> =
                 iproduct!(left_processes.into_iter(), right_processes.iter().copied())
                     .filter(|val| !self.bool_system.borrow().names.contains_value(val))
                     .collect();
@@ -72,7 +89,7 @@ impl<'a> StrongBisimulationSystem<'a> {
         local_pairs
     }
 
-    fn load_variables(&mut self, left_key: DefaultKey, right_key: DefaultKey) {
+    fn load_variables(&mut self, left_key: ProcKey, right_key: ProcKey) {
         if self
             .bool_system
             .borrow_mut()
@@ -93,224 +110,14 @@ impl<'a> StrongBisimulationSystem<'a> {
         }
     }
 
-    /// TODO: this can and probably should be cached (CAAL does it)
-    fn get_transitions(&self, process_key: DefaultKey) -> HashMap<Action<'a>, HashSet<DefaultKey>> {
-        let process = self
-            .process_bindings
-            .borrow_mut()
-            .get_value(process_key)
-            .clone();
-
-        // Dummy set placed here to allocate once. unwrap_or_else cannot return a borrowed value
-        let empty_set = HashSet::new();
-
-        match process {
-            FlatProcess::Nil => HashMap::new(),
-            FlatProcess::Named(name) => self.get_transitions(
-                *self
-                    .process_names
-                    .get(name)
-                    .expect("name should be defined"),
-            ),
-            FlatProcess::ActionPrefix { action, process } => {
-                HashMap::from([(action, HashSet::from([process]))])
-            }
-            FlatProcess::Restriction {
-                process,
-                restrictions,
-            } => self
-                .get_transitions(process)
-                .into_iter()
-                .filter(|(action, _)| match action {
-                    Action::Label { name, .. } => !restrictions.contains(name),
-                    Action::Tau => true,
-                })
-                .collect(),
-            FlatProcess::Relabelling { process, labels } => self
-                .get_transitions(process)
-                .into_iter()
-                .map(|(action, process)| match action {
-                    Action::Label {
-                        name,
-                        is_complement,
-                    } => (
-                        Action::Label {
-                            name: labels.get(name).unwrap_or(&name),
-                            is_complement,
-                        },
-                        process,
-                    ),
-                    Action::Tau => (action, process),
-                })
-                .collect(),
-            FlatProcess::Sum(left, right) => {
-                let left_transitions = self.get_transitions(left);
-                let right_transitions = self.get_transitions(right);
-                left_transitions
-                    .keys()
-                    .chain(right_transitions.keys())
-                    .copied()
-                    .map(|action| {
-                        (
-                            action,
-                            left_transitions
-                                .get(&action)
-                                .unwrap_or(&empty_set)
-                                .union(right_transitions.get(&action).unwrap_or(&empty_set))
-                                .copied()
-                                .collect(),
-                        )
-                    })
-                    .collect()
-            }
-            FlatProcess::Compose(left, right) => {
-                let left_transitions = self.get_transitions(left);
-                let right_tansitions = self.get_transitions(right);
-
-                let mut successors = HashMap::<Action, HashSet<DefaultKey>>::new();
-
-                for (left_action, left_processes) in left_transitions {
-                    let mut current_succesors_processes = HashSet::new();
-                    for left_successor in left_processes {
-                        let composed_process = FlatProcess::Compose(left_successor, right);
-                        let composed_process_key = self
-                            .process_bindings
-                            .borrow_mut()
-                            .get_or_insert_key(composed_process);
-                        current_succesors_processes.insert(composed_process_key);
-
-                        // find sync actions
-                        match left_action {
-                            Action::Label {
-                                name,
-                                is_complement,
-                            } => {
-                                let co_action = Action::Label {
-                                    name,
-                                    is_complement: !is_complement,
-                                };
-                                if let Some(right_successors) = right_tansitions.get(&co_action) {
-                                    let current_sync_processes =
-                                        right_successors.iter().map(|right_successor| {
-                                            let composed_process = FlatProcess::Compose(
-                                                left_successor,
-                                                *right_successor,
-                                            );
-                                            self.process_bindings
-                                                .borrow_mut()
-                                                .get_or_insert_key(composed_process)
-                                        });
-
-                                    successors
-                                        .entry(Action::Tau)
-                                        .or_default()
-                                        .extend(current_sync_processes);
-                                }
-                            }
-                            Action::Tau => {}
-                        }
-                    }
-
-                    successors
-                        .entry(left_action)
-                        .or_default()
-                        .extend(current_succesors_processes);
-                }
-
-                for (right_action, right_processes) in right_tansitions {
-                    let current_succesors_processes =
-                        right_processes.iter().map(|right_successor| {
-                            let composed_process = FlatProcess::Compose(left, *right_successor);
-                            self.process_bindings
-                                .borrow_mut()
-                                .get_or_insert_key(composed_process)
-                        });
-                    successors
-                        .entry(right_action)
-                        .or_default()
-                        .extend(current_succesors_processes);
-                }
-
-                successors
-            }
-        }
-    }
-
-    pub fn load_ast(&mut self, ast: Vec<Binding<'a>>) {
-        // Loop over each binding
-        for binding in ast {
-            let process_key = self.get_process_key(&binding.value);
-            self.process_names.insert(binding.name, process_key);
-        }
-    }
-
-    fn get_process_key(&self, process: &Process<'a>) -> DefaultKey {
-        match process {
-            Process::Nil => self
-                .process_bindings
-                .borrow_mut()
-                .get_or_insert_key(FlatProcess::Nil),
-            Process::Named(name) => self
-                .process_bindings
-                .borrow_mut()
-                .get_or_insert_key(FlatProcess::Named(name)),
-            Process::ActionPrefix { action, process } => {
-                let flat_process_key = self.get_process_key(process);
-                self.process_bindings
-                    .borrow_mut()
-                    .get_or_insert_key(FlatProcess::ActionPrefix {
-                        action: *action,
-                        process: flat_process_key,
-                    })
-            }
-            Process::Restriction {
-                process,
-                restriction,
-            } => {
-                let flat_process_key = self.get_process_key(process);
-                self.process_bindings
-                    .borrow_mut()
-                    .get_or_insert_key(FlatProcess::Restriction {
-                        process: flat_process_key,
-                        restrictions: restriction.clone(),
-                    })
-            }
-            Process::Relabelling { process, labels } => {
-                let flat_process_key = self.get_process_key(process);
-                self.process_bindings
-                    .borrow_mut()
-                    .get_or_insert_key(FlatProcess::Relabelling {
-                        process: flat_process_key,
-                        labels: labels.clone(),
-                    })
-            }
-            Process::Sum(left, right) => {
-                let left_key = self.get_process_key(left);
-                let right_key = self.get_process_key(right);
-                self.process_bindings
-                    .borrow_mut()
-                    .get_or_insert_key(FlatProcess::Sum(left_key, right_key))
-            }
-            Process::Compose(left, right) => {
-                let left_key = self.get_process_key(left);
-                let right_key = self.get_process_key(right);
-                self.process_bindings
-                    .borrow_mut()
-                    .get_or_insert_key(FlatProcess::Compose(left_key, right_key))
-            }
-        }
-    }
-
-    /// Creates a key for a pair of variables, which can be used to tell the system which processes
-    /// to check for strong bisimulation.
-    pub fn specify_comparison(&mut self, left_process: &str, right_process: &str) -> DefaultKey {
+    pub fn specify_comparison(&mut self, left_process: &str, right_process: &str) -> VarKey {
         let left_key = *self
-            .process_names
-            .get(left_process)
+            .transition_system
+            .lookup_process_key(left_process)
             .expect("s must be defined");
         let right_key = *self
-            .process_names
-            .get(right_process)
+            .transition_system
+            .lookup_process_key(right_process)
             .expect("t must be defined");
 
         self.load_variables(left_key, right_key);
@@ -321,9 +128,9 @@ impl<'a> StrongBisimulationSystem<'a> {
             .get_or_insert_key((left_key, right_key))
     }
 
-    fn expand(&self, (left_key, right_key): &(DefaultKey, DefaultKey)) {
-        let left_transitions = self.get_transitions(*left_key);
-        let right_transitions = self.get_transitions(*right_key);
+    fn expand(&self, (left_key, right_key): &(ProcKey, ProcKey)) {
+        let left_transitions = self.transition_system.get_transitions(*left_key);
+        let right_transitions = self.transition_system.get_transitions(*right_key);
 
         let left_actions = left_transitions.keys().copied().collect::<HashSet<_>>();
         let right_actions = right_transitions.keys().copied().collect::<HashSet<_>>();
@@ -399,8 +206,7 @@ impl<'a> StrongBisimulationSystem<'a> {
             .insert(var_key, term_key);
     }
 
-    /// Logical And (because Markus gets confused)
-    fn construct_conjunction(&self, mut elements: impl Iterator<Item = DefaultKey>) -> DefaultKey {
+    fn construct_conjunction(&self, mut elements: impl Iterator<Item = TermKey>) -> TermKey {
         let Some(left_term_key) = elements.next() else {
             return self
                 .bool_system
@@ -418,8 +224,7 @@ impl<'a> StrongBisimulationSystem<'a> {
     }
 
     // TODO: this is repeditive
-    /// Logical Or (because Markus gets confused)
-    fn construct_disjunction(&self, mut elements: impl Iterator<Item = DefaultKey>) -> DefaultKey {
+    fn construct_disjunction(&self, mut elements: impl Iterator<Item = TermKey>) -> TermKey {
         let Some(left_term_key) = elements.next() else {
             return self
                 .bool_system
@@ -437,10 +242,11 @@ impl<'a> StrongBisimulationSystem<'a> {
     }
 }
 
-impl System<DefaultKey, bool, HashSet<(DefaultKey, DefaultKey)>, HashSet<DefaultKey>>
-    for StrongBisimulationSystem<'_>
+impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKey>>
+    System<VarKey, bool, HashSet<(VarKey, VarKey)>, HashSet<VarKey>>
+    for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
 {
-    fn evaluate(&self, var_key: DefaultKey, assignment: &dyn Assignment<DefaultKey, bool>) -> bool {
+    fn evaluate(&self, var_key: VarKey, assignment: &dyn Assignment<VarKey, bool>) -> bool {
         let term_key = {
             let sys = self.bool_system.borrow();
             sys.definitions.get(var_key).copied()
@@ -457,7 +263,7 @@ impl System<DefaultKey, bool, HashSet<(DefaultKey, DefaultKey)>, HashSet<Default
         self.bool_system.borrow().evaluate(var_key, assignment)
     }
 
-    fn arguments(&self, var_key: DefaultKey) -> HashSet<DefaultKey> {
+    fn arguments(&self, var_key: VarKey) -> HashSet<VarKey> {
         let term_key = {
             let sys = self.bool_system.borrow();
             sys.definitions.get(var_key).copied()
@@ -470,11 +276,11 @@ impl System<DefaultKey, bool, HashSet<(DefaultKey, DefaultKey)>, HashSet<Default
         self.bool_system.borrow().arguments(var_key)
     }
 
-    fn variables(&self) -> HashSet<DefaultKey> {
+    fn variables(&self) -> HashSet<VarKey> {
         self.bool_system.borrow().names.keys().collect()
     }
 
-    fn bottom_assignment(&self) -> impl Assignment<DefaultKey, bool> {
+    fn bottom_assignment(&self) -> impl Assignment<VarKey, bool> {
         HashMap::new()
     }
 }
