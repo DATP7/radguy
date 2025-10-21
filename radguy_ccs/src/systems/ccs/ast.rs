@@ -36,18 +36,18 @@ pub enum Action<'a> {
 impl Action<'_> {
     #[must_use]
     pub fn can_syncronize(&self, other: &Action) -> bool {
-        match self {
-            Action::Tau => false,
-            Action::Label {
-                name,
-                is_complement,
-            } => match other {
-                Action::Tau => false,
+        match (self, other) {
+            (Action::Tau, _) | (_, Action::Tau) => false,
+            (
+                Action::Label {
+                    name,
+                    is_complement,
+                },
                 Action::Label {
                     name: other_name,
                     is_complement: other_is_complement,
-                } => *name == *other_name && *is_complement != *other_is_complement,
-            },
+                },
+            ) => *name == *other_name && *is_complement != *other_is_complement,
         }
     }
 }

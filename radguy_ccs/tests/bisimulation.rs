@@ -17,7 +17,7 @@ macro_rules! bisim_test {
 
 
                     let result = !kleene_local(&sys, start, &SMax);
-                    assert_eq!($eq, result, "processes should{} be bisimilar", if !$eq { " not" } else {""});
+                    assert_eq!($eq, result, "{} and {} should{} be bisimilar in{}", $left, $right, if !$eq { " not" } else {""}, $ccs);
                 }
             )*
         };

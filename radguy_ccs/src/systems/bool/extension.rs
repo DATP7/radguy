@@ -9,9 +9,11 @@ use std::{collections::HashSet, hash::Hash, marker::PhantomData};
 use crate::systems::bool::{BoolSystem, BoolTerm};
 
 #[derive(Default)]
-pub struct BoolExtension<TermKey: Key + Hash>(PhantomData<TermKey>);
+pub struct BoolExtension<TermKey: Key + Hash, VarName: Hash + Eq + Clone>(
+    PhantomData<(TermKey, VarName)>,
+);
 
-impl<VarKey: Key + Hash, TermKey: Key + Hash>
+impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
     LocalExtension<
         VarKey,
         bool,
@@ -19,9 +21,9 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash>
         HashSet<(VarKey, VarKey)>,
         HashSet<VarKey>,
         HashSet<(VarKey, TermKey)>,
-    > for BoolExtension<TermKey>
+    > for BoolExtension<TermKey, VarName>
 {
-    type System = BoolSystem<VarKey, TermKey, &'static str>;
+    type System = BoolSystem<VarKey, TermKey, VarName>;
 
     fn depends(
         &self,
@@ -48,12 +50,12 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash>
     }
 }
 
-fn collect_terms<VarKey: Key + Hash, TermKey: Key + Hash>(
+fn collect_terms<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>(
     x: VarKey,
     term_key: TermKey,
     assignment: &dyn Assignment<VarKey, bool>,
     possible: &HashSet<(VarKey, VarKey)>,
-    system: &BoolSystem<VarKey, TermKey, &'static str>,
+    system: &BoolSystem<VarKey, TermKey, VarName>,
     current: &mut HashSet<(VarKey, TermKey)>,
 ) {
     // TODO: This caching could probably be a bit smarter by also keeping track of what we know to
