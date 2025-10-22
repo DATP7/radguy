@@ -25,9 +25,8 @@ impl<'a, ProcKey: Key> TransitionSystem<'a, ProcKey> for WeakTransitionSystem<'a
     fn get_transitions(&self, process_key: ProcKey) -> HashMap<Action<'a>, HashSet<ProcKey>> {
         let mut transitions = self.strong_transition_system.get_transitions(process_key);
 
-        let tau_processes = match transitions.remove(&Action::Tau) {
-            Some(set) => set.clone(),
-            None => return transitions,
+        let Some(tau_processes) = transitions.remove(&Action::Tau) else {
+            return transitions;
         };
 
         for tau_process in tau_processes {

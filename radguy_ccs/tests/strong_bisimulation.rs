@@ -82,8 +82,8 @@ fn test_strong_bisimulation() {
             T = tau.0;
         ";
         "S", "T" => false in r"
-            S = (a.0 | 'a.0) \ {a};
-            T = tau.0 + a.'a.0 + 'a.a.0;
+            S = (a.0 | b.0)\{a};
+            T = a.0 + b.0;
         ";
 
         // Relabling
@@ -94,6 +94,10 @@ fn test_strong_bisimulation() {
          "S", "T" => false in r"
             S = (a.0)[b/a];
             T = a.0;
+        ";
+        "S", "T" => true in r"
+            S = (a.b.c.0)[b/a][c/b];
+            T = c.c.c.0;
         ";
     };
 }
