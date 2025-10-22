@@ -83,7 +83,8 @@ impl<'a, ProcKey: Key> StrongTransitionSystem<'a, ProcKey> {
             }
         }
     }
-    fn get_normalized_process(&self, key: ProcKey) -> ProcKey {
+    pub fn get_normalized_process(&self, key: ProcKey) -> ProcKey {
+        // TODO potentially cache this
         let process = self.get_process(key);
         match process {
             FlatProcess::Nil | FlatProcess::Named(..) => key,
@@ -135,7 +136,6 @@ impl<'a, ProcKey: Key> StrongTransitionSystem<'a, ProcKey> {
         process: ProcKey,
         labels: std::collections::BTreeMap<&'a str, &'a str>,
     ) -> ProcKey {
-        // TODO potentially cache this
         let inner_normalized = self.get_normalized_process(process);
         if labels.is_empty() {
             inner_normalized
@@ -271,8 +271,8 @@ impl<'a, ProcKey: Key> TransitionSystem<'a, ProcKey> for StrongTransitionSystem<
     }
 
     fn get_transitions(&self, process_key: ProcKey) -> TransitionMap<'a, ProcKey> {
-        let normalized_key = self.get_normalized_process(process_key);
-        if let Some(transitions) = self.transition_cache.borrow().get(normalized_key) {
+        let process_key = self.get_normalized_process(process_key);
+        if let Some(transitions) = self.transition_cache.borrow().get(process_key) {
             return transitions.clone(); // PERF: Remove this damn clone
         }
 

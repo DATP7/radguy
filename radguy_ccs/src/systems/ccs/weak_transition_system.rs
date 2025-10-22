@@ -56,7 +56,10 @@ impl<'a, ProcKey: Key + Copy> TransitionSystem<'a, ProcKey> for WeakTransitionSy
         self.strong_transition_system.load_ast(ast);
     }
 
-    fn get_transitions(&self, process_key: ProcKey) -> TransitionMap<'a, ProcKey> {
+    fn get_transitions(&self, mut process_key: ProcKey) -> TransitionMap<'a, ProcKey> {
+        process_key = self
+            .strong_transition_system
+            .get_normalized_process(process_key);
         if let Some(transitions) = self.transition_cache.borrow().get(process_key) {
             // PERF: Rc
             return transitions.clone();

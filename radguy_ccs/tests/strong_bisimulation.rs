@@ -101,6 +101,21 @@ fn strong_bisimulation() {
             T = d.e.f.0 \ {a, b};
         ";
 
+        "S", "T" => true in r"
+            S = (a.b.0 + c.d.0) \ {a};
+            T = c.d.0;
+        ";
+
+        "S", "T" => true in r"
+            S = ((a.0 + b.0 + c.0) \ {a}) \ {b};
+            T = (a.0 + b.0 + c.0) \ {a,b};
+        ";
+
+        "S", "T" => true in r"
+            S = ((a.b.c.0 | d.e.f.0) \ {a}) \ {b};
+            T = d.e.f.0 \ {a, b};
+        ";
+
         // Relabelling
         "S", "T" => true in r"
             S = (a.0)[b/a];
@@ -143,6 +158,11 @@ fn restriction_preserved() {
             S = (a.a.a.0 | b.0) \ {b};
             T = a.a.a.0;
         ";
+        "S", "T" => true in r"
+            S = ((a.b.c.0)[b/a])[c/b];
+            T = c.c.c.0;
+        ";
+
     };
 }
 
