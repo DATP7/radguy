@@ -86,12 +86,27 @@ fn strong_bisimulation() {
             T = a.0 + b.0;
         ";
 
+        "S", "T" => true in r"
+            S = (a.b.0 + c.d.0) \ {a};
+            T = c.d.0;
+        ";
+
+        "S", "T" => true in r"
+            S = ((a.0 + b.0 + c.0) \ {a}) \ {b};
+            T = (a.0 + b.0 + c.0) \ {a,b};
+        ";
+
+        "S", "T" => true in r"
+            S = ((a.b.c.0 | d.e.f.0) \ {a}) \ {b};
+            T = d.e.f.0 \ {a, b};
+        ";
+
         // Relabelling
         "S", "T" => true in r"
             S = (a.0)[b/a];
             T = b.0;
         ";
-         "S", "T" => false in r"
+        "S", "T" => false in r"
             S = (a.0)[b/a];
             T = a.0;
         ";
@@ -103,6 +118,11 @@ fn strong_bisimulation() {
         "S", "S" => true in r"
             S = a.b.0 | a.c.0 | b.c.0;
         ";
+        "S", "T" => true in r"
+            S = ((a.b.c.0)[b/a])[c/b];
+            T = c.c.c.0;
+        ";
+
     };
 }
 

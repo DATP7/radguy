@@ -142,18 +142,19 @@ impl<'a, ProcKey: Key> StrongTransitionSystem<'a, ProcKey> {
         } else {
             match self.get_process(inner_normalized) {
                 FlatProcess::Nil => inner_normalized,
-                FlatProcess::Relabelling { process, labels } => {
+                FlatProcess::Relabelling {
+                    process,
+                    labels: labels_inner,
+                } => {
                     // we want to clone the actual map here not just the reference, so we specifically use the clone on BTreeMap,
                     // so we get an error when we change to RC
-                    let mut new_labels = BTreeMap::clone(&labels);
-                    for (key, value) in &labels {
-                        if let Some(new_value) = new_labels.get(value) {
-                            new_labels.insert(key, new_value);
-                        }
-                    }
+                    let new_labels = relabelling_logic(&labels_inner, &labels);
                     self.process_bindings
                         .borrow_mut()
-                        .get_or_insert_key(FlatProcess::Relabelling { process, labels })
+                        .get_or_insert_key(FlatProcess::Relabelling {
+                            process,
+                            labels: new_labels,
+                        })
                 }
                 FlatProcess::Sum(a, b) => {
                     let a = self.get_normalized_process(a);
@@ -243,6 +244,20 @@ impl<'a, ProcKey: Key> StrongTransitionSystem<'a, ProcKey> {
     }
 }
 
+fn relabelling_logic<'a>(
+    labels1: &BTreeMap<&'a str, &'a str>,
+    labels2: &BTreeMap<&'a str, &'a str>,
+) -> BTreeMap<&'a str, &'a str> {
+    let mut new_labels1 = BTreeMap::clone(labels1);
+    for (key, value) in labels1 {
+        if let Some(new_value) = labels2.get(value) {
+            new_labels1.insert(key, new_value);
+        }
+    }
+    new_labels1.append(&mut labels2.clone());
+    new_labels1
+}
+
 impl<'a, ProcKey: Key> TransitionSystem<'a, ProcKey> for StrongTransitionSystem<'a, ProcKey> {
     fn lookup_process_key(&self, name: &str) -> Option<&ProcKey> {
         self.process_names.get(name)
@@ -270,7 +285,7 @@ impl<'a, ProcKey: Key> TransitionSystem<'a, ProcKey> for StrongTransitionSystem<
             FlatProcess::Named(name) => self.get_transitions(
                 *self
                     .lookup_process_key(name)
-                    .expect("all process names should have been maped"),
+                    .expect("all process names should have been mapped"),
             ),
             FlatProcess::ActionPrefix { action, process } => {
                 HashMap::from([(action, HashSet::from([process]))])
@@ -440,6 +455,7 @@ impl<'a, ProcKey: Key> TransitionSystem<'a, ProcKey> for StrongTransitionSystem<
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::systems::ccs::grammar::ProgramParser;
     use crate::systems::ccs::strong_transition_system::Action;
     use crate::systems::ccs::strong_transition_system::Process;
@@ -448,6 +464,28 @@ mod tests {
     use crate::systems::ccs::transition_system::TransitionSystem;
     use slotmap::DefaultKey;
     use std::collections::HashMap;
+
+    macro_rules! test_compose_labels {
+        ($($first:expr, $second:expr => $result:expr;)*) => {
+            $(
+                assert_eq!(
+                    relabelling_logic(&BTreeMap::from($first), &BTreeMap::from($second)),
+                    BTreeMap::from($result)
+                );
+            )*
+        };
+    }
+
+    #[test]
+    fn test_compose_labels() {
+        test_compose_labels! {
+            [("a", "b")], [("b", "c")] => [("a", "c"), ("b", "c")];
+            [("a", "d")], [("b", "c")] => [("a", "d"), ("b", "c")];
+            [("a", "b"), ("d", "c")], [("b", "c")] => [("a", "c"), ("b", "c"), ("d", "c")];
+            [("a", "b")], [("b", "c"), ("d", "c")] => [("a", "c"), ("b", "c"), ("d", "c")];
+            [("a", "b"), ("b", "c")], [("c", "d")] => [("a", "b"), ("b", "d"), ("c", "d")];
+        };
+    }
 
     macro_rules! transition_set {
         ($lts:expr;) => {HashMap::new()};
