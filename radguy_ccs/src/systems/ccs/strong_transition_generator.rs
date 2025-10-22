@@ -4,21 +4,24 @@ use std::{
 };
 
 use radguy::bislotmap::BiSlotMap;
-use slotmap::Key;
+use slotmap::{Key, SecondaryMap};
 
 use crate::systems::ccs::{
     ast::{Action, Binding, Process},
     strong_bisimulation_system::FlatProcess,
 };
 
+type TransitionMap<'a, ProcKey> = HashMap<Action<'a>, HashSet<ProcKey>>;
+
 #[derive(Default, Debug)]
 pub struct StrongTransitionSystem<'a, ProcKey: Key> {
     process_names: HashMap<&'a str, ProcKey>,
     process_bindings: RefCell<BiSlotMap<ProcKey, FlatProcess<'a, ProcKey>>>,
+    transition_cache: RefCell<SecondaryMap<ProcKey, TransitionMap<'a, ProcKey>>>,
 }
 
 pub trait TransitionSystem<'a, ProcKey: Key> {
-    fn get_transitions(&self, process_key: ProcKey) -> HashMap<Action<'a>, HashSet<ProcKey>>;
+    fn get_transitions(&self, process_key: ProcKey) -> TransitionMap<'a, ProcKey>;
     fn load_ast(&mut self, ast: Vec<Binding<'a>>);
     fn lookup_process_key(&self, name: &str) -> Option<&ProcKey>;
 }
@@ -101,12 +104,16 @@ impl<'a, ProcKey: Key> TransitionSystem<'a, ProcKey> for StrongTransitionSystem<
         }
     }
 
-    fn get_transitions(&self, process_key: ProcKey) -> HashMap<Action<'a>, HashSet<ProcKey>> {
+    fn get_transitions(&self, process_key: ProcKey) -> TransitionMap<'a, ProcKey> {
+        if let Some(transitions) = self.transition_cache.borrow().get(process_key) {
+            return transitions.clone(); // PERF: Remove this damn clone
+        }
+
         let process = self.get_process(process_key);
 
         let empty_set = HashSet::<ProcKey>::new();
 
-        match process {
+        let result = match process {
             FlatProcess::Nil => HashMap::new(),
             FlatProcess::Named(name) => self.get_transitions(
                 *self
@@ -171,7 +178,7 @@ impl<'a, ProcKey: Key> TransitionSystem<'a, ProcKey> for StrongTransitionSystem<
                 let left_transitions = self.get_transitions(left);
                 let right_tansitions = self.get_transitions(right);
 
-                let mut successors = HashMap::<Action, HashSet<ProcKey>>::new();
+                let mut successors = TransitionMap::new();
 
                 for (left_action, left_processes) in left_transitions {
                     let mut current_succesors_processes = HashSet::<ProcKey>::new();
@@ -242,6 +249,10 @@ impl<'a, ProcKey: Key> TransitionSystem<'a, ProcKey> for StrongTransitionSystem<
 
                 successors
             }
-        }
+        };
+        self.transition_cache
+            .borrow_mut()
+            .insert(process_key, result.clone());
+        result
     }
 }
