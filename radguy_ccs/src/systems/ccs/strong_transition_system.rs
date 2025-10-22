@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
 };
 
 use radguy::bislotmap::BiSlotMap;
@@ -83,6 +83,164 @@ impl<'a, ProcKey: Key> StrongTransitionSystem<'a, ProcKey> {
             }
         }
     }
+    fn get_normalized_process(&self, key: ProcKey) -> ProcKey {
+        let process = self.get_process(key);
+        match process {
+            FlatProcess::Nil | FlatProcess::Named(..) => key,
+            FlatProcess::ActionPrefix {
+                action,
+                process: inner_key,
+            } => {
+                let inner_normalized = self.get_normalized_process(inner_key);
+                let new_process = FlatProcess::ActionPrefix {
+                    action,
+                    process: inner_normalized,
+                };
+                self.process_bindings
+                    .borrow_mut()
+                    .get_or_insert_key(new_process)
+            }
+            FlatProcess::Restriction {
+                process,
+                restrictions,
+            } => self.normalize_restriction(process, restrictions),
+            FlatProcess::Relabelling { process, labels } => {
+                self.normalize_relabelling(process, labels)
+            }
+            FlatProcess::Sum(a, b) => {
+                let a = self.get_normalized_process(a);
+                let b = self.get_normalized_process(b);
+                let new = if a < b {
+                    FlatProcess::Sum(a, b)
+                } else {
+                    FlatProcess::Sum(b, a)
+                };
+                self.process_bindings.borrow_mut().get_or_insert_key(new)
+            }
+            FlatProcess::Compose(a, b) => {
+                let a = self.get_normalized_process(a);
+                let b = self.get_normalized_process(b);
+                let new = if a < b {
+                    FlatProcess::Compose(a, b)
+                } else {
+                    FlatProcess::Compose(b, a)
+                };
+                self.process_bindings.borrow_mut().get_or_insert_key(new)
+            }
+        }
+    }
+
+    fn normalize_relabelling(
+        &self,
+        process: ProcKey,
+        labels: std::collections::BTreeMap<&'a str, &'a str>,
+    ) -> ProcKey {
+        // TODO potentially cache this
+        let inner_normalized = self.get_normalized_process(process);
+        if labels.is_empty() {
+            inner_normalized
+        } else {
+            match self.get_process(inner_normalized) {
+                FlatProcess::Nil => inner_normalized,
+                FlatProcess::Relabelling { process, labels } => {
+                    // we want to clone the actual map here not just the reference, so we specifically use the clone on BTreeMap,
+                    // so we get an error when we change to RC
+                    let mut new_labels = BTreeMap::clone(&labels);
+                    for (key, value) in &labels {
+                        if let Some(new_value) = new_labels.get(value) {
+                            new_labels.insert(key, new_value);
+                        }
+                    }
+                    self.process_bindings
+                        .borrow_mut()
+                        .get_or_insert_key(FlatProcess::Relabelling { process, labels })
+                }
+                FlatProcess::Sum(a, b) => {
+                    let a = self.get_normalized_process(a);
+                    let b = self.get_normalized_process(b);
+                    let a_relabeled = self.process_bindings.borrow_mut().get_or_insert_key(
+                        FlatProcess::Relabelling {
+                            process: a,
+                            labels: labels.clone(),
+                        },
+                    );
+                    let b_relabeled = self
+                        .process_bindings
+                        .borrow_mut()
+                        .get_or_insert_key(FlatProcess::Relabelling { process: b, labels });
+                    self.process_bindings
+                        .borrow_mut()
+                        .get_or_insert_key(FlatProcess::Sum(a_relabeled, b_relabeled))
+                }
+                FlatProcess::Named(..)
+                | FlatProcess::ActionPrefix { .. }
+                | FlatProcess::Compose(..)
+                | FlatProcess::Restriction { .. } => self
+                    .process_bindings
+                    .borrow_mut()
+                    .get_or_insert_key(FlatProcess::Relabelling {
+                        process: inner_normalized,
+                        labels,
+                    }),
+            }
+        }
+    }
+
+    fn normalize_restriction(
+        &self,
+        process: ProcKey,
+        restrictions: std::collections::BTreeSet<&'a str>,
+    ) -> ProcKey {
+        let inner_normalized = self.get_normalized_process(process);
+        if restrictions.is_empty() {
+            inner_normalized
+        } else {
+            match self.get_process(inner_normalized) {
+                FlatProcess::Nil => inner_normalized,
+                FlatProcess::Restriction {
+                    process,
+                    restrictions: inner_restriction,
+                } => {
+                    self.process_bindings
+                        .borrow_mut()
+                        .get_or_insert_key(FlatProcess::Restriction {
+                            process,
+                            restrictions: restrictions.union(&inner_restriction).copied().collect(),
+                        })
+                }
+                FlatProcess::Sum(a, b) => {
+                    let a = self.get_normalized_process(a);
+                    let b = self.get_normalized_process(b);
+                    let a_restricted = self.process_bindings.borrow_mut().get_or_insert_key(
+                        FlatProcess::Restriction {
+                            process: a,
+                            restrictions: restrictions.clone(),
+                        },
+                    );
+                    let b_restricted = self.process_bindings.borrow_mut().get_or_insert_key(
+                        FlatProcess::Restriction {
+                            process: b,
+                            restrictions,
+                        },
+                    );
+                    self.process_bindings
+                        .borrow_mut()
+                        .get_or_insert_key(FlatProcess::Sum(a_restricted, b_restricted))
+                }
+                FlatProcess::Named(..)
+                | FlatProcess::ActionPrefix { .. }
+                | FlatProcess::Relabelling { .. }
+                | FlatProcess::Compose(..) => {
+                    self.process_bindings
+                        .borrow_mut()
+                        .get_or_insert_key(FlatProcess::Restriction {
+                            process: inner_normalized,
+                            restrictions,
+                        })
+                }
+            }
+        }
+    }
 }
 
 impl<'a, ProcKey: Key> TransitionSystem<'a, ProcKey> for StrongTransitionSystem<'a, ProcKey> {
@@ -98,7 +256,8 @@ impl<'a, ProcKey: Key> TransitionSystem<'a, ProcKey> for StrongTransitionSystem<
     }
 
     fn get_transitions(&self, process_key: ProcKey) -> TransitionMap<'a, ProcKey> {
-        if let Some(transitions) = self.transition_cache.borrow().get(process_key) {
+        let normalized_key = self.get_normalized_process(process_key);
+        if let Some(transitions) = self.transition_cache.borrow().get(normalized_key) {
             return transitions.clone(); // PERF: Remove this damn clone
         }
 

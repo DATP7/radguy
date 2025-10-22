@@ -86,7 +86,7 @@ fn strong_bisimulation() {
             T = a.0 + b.0;
         ";
 
-        // Relabling
+        // Relabelling
         "S", "T" => true in r"
             S = (a.0)[b/a];
             T = b.0;
