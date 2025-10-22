@@ -133,6 +133,20 @@ impl<'a, ProcKey: Key> TransitionSystem<'a, ProcKey> for StrongTransitionSystem<
                     Action::Label { name, .. } => !restrictions.contains(name),
                     Action::Tau => true,
                 })
+                .map(|(action, targets)| {
+                    (
+                        action,
+                        targets
+                            .into_iter()
+                            .map(|process| {
+                                self.insert_process(FlatProcess::Restriction {
+                                    process,
+                                    restrictions: restrictions.clone(),
+                                })
+                            })
+                            .collect(),
+                    )
+                })
                 .collect(),
             FlatProcess::Relabelling { process, labels } => self
                 .get_transitions(process)
@@ -149,6 +163,20 @@ impl<'a, ProcKey: Key> TransitionSystem<'a, ProcKey> for StrongTransitionSystem<
                         process,
                     ),
                     Action::Tau => (action, process),
+                })
+                .map(|(action, targets)| {
+                    (
+                        action,
+                        targets
+                            .into_iter()
+                            .map(|process| {
+                                self.insert_process(FlatProcess::Relabelling {
+                                    process,
+                                    labels: labels.clone(),
+                                })
+                            })
+                            .collect(),
+                    )
                 })
                 .collect(),
             FlatProcess::Sum(left, right) => {

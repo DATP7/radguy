@@ -98,6 +98,26 @@ fn test_strong_bisimulation() {
     };
 }
 
+#[test]
+fn relabelling_preserved() {
+    bisim_test! {
+        "S", "T" => true in r"
+            S = (a.a.a.0)[b/a];
+            T = b.b.b.0;
+        ";
+    };
+}
+
+#[test]
+fn restriction_preserved() {
+    bisim_test! {
+        "S", "T" => true in r"
+            S = (a.a.a.0 | b.0) \ {b};
+            T = a.a.a.0;
+        ";
+    };
+}
+
 #[ignore = "performance too bad for ci"]
 #[test]
 fn test_strong_bisimulation_large_protocol() {
