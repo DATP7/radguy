@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
+    collections::{HashMap, HashSet},
 };
 
 use radguy::bislotmap::BiSlotMap;
@@ -9,10 +9,8 @@ use slotmap::{Key, SecondaryMap};
 use crate::systems::ccs::{
     ast::{Action, Binding, Process},
     strong_bisimulation_system::FlatProcess,
-    transition_system::TransitionSystem,
+    transition_system::{TransitionMap, TransitionSystem},
 };
-
-type TransitionMap<'a, ProcKey> = HashMap<Action<'a>, HashSet<ProcKey>>;
 
 #[derive(Default, Debug)]
 pub struct StrongTransitionSystem<'a, ProcKey: Key> {
@@ -85,38 +83,6 @@ impl<'a, ProcKey: Key> StrongTransitionSystem<'a, ProcKey> {
             }
         }
     }
-
-    fn apply_restrictions(
-        &self,
-        processes: HashSet<ProcKey>,
-        restrictions: &BTreeSet<&'a str>,
-    ) -> HashSet<ProcKey> {
-        processes
-            .iter()
-            .map(|&process| {
-                self.insert_process(FlatProcess::Restriction {
-                    process,
-                    restrictions: restrictions.clone(),
-                })
-            })
-            .collect()
-    }
-
-    fn apply_relabelling(
-        &self,
-        processes: HashSet<ProcKey>,
-        labels: &BTreeMap<&'a str, &'a str>,
-    ) -> HashSet<ProcKey> {
-        processes
-            .iter()
-            .map(|&process| {
-                self.insert_process(FlatProcess::Relabelling {
-                    process,
-                    labels: labels.clone(),
-                })
-            })
-            .collect()
-    }
 }
 
 impl<'a, ProcKey: Key> TransitionSystem<'a, ProcKey> for StrongTransitionSystem<'a, ProcKey> {
@@ -156,16 +122,9 @@ impl<'a, ProcKey: Key> TransitionSystem<'a, ProcKey> for StrongTransitionSystem<
             } => self
                 .get_transitions(process)
                 .into_iter()
-                .filter_map(|(action, processes)| match action {
-                    Action::Label { name, .. } => {
-                        if restrictions.contains(name) {
-                            return None;
-                        }
-                        Some((action, self.apply_restrictions(processes, &restrictions)))
-                    }
-                    Action::Tau => {
-                        Some((action, self.apply_restrictions(processes, &restrictions)))
-                    }
+                .filter(|(action, _)| match action {
+                    Action::Label { name, .. } => !restrictions.contains(name),
+                    Action::Tau => true,
                 })
                 .map(|(action, targets)| {
                     (
@@ -185,7 +144,7 @@ impl<'a, ProcKey: Key> TransitionSystem<'a, ProcKey> for StrongTransitionSystem<
             FlatProcess::Relabelling { process, labels } => self
                 .get_transitions(process)
                 .into_iter()
-                .map(|(action, processes)| match action {
+                .map(|(action, targets)| match action {
                     Action::Label {
                         name,
                         is_complement,
@@ -194,9 +153,9 @@ impl<'a, ProcKey: Key> TransitionSystem<'a, ProcKey> for StrongTransitionSystem<
                             name: labels.get(name).unwrap_or(&name),
                             is_complement,
                         },
-                        self.apply_relabelling(processes, &labels),
+                        targets,
                     ),
-                    Action::Tau => (action, self.apply_relabelling(processes, &labels)),
+                    Action::Tau => (action, targets),
                 })
                 .map(|(action, targets)| {
                     (
@@ -315,6 +274,7 @@ impl<'a, ProcKey: Key> TransitionSystem<'a, ProcKey> for StrongTransitionSystem<
         self.transition_cache
             .borrow_mut()
             .insert(process_key, result.clone());
+
         result
     }
 }

@@ -6,7 +6,7 @@ use radguy_ccs::systems::ccs::strong_transition_system::StrongTransitionSystem;
 use radguy_ccs::systems::ccs::transition_system::TransitionSystem;
 use slotmap::DefaultKey;
 
-macro_rules! bisim_test {
+macro_rules! strong_bisim_test {
         ($($left:expr, $right:expr => $eq:literal in $ccs:expr;)*) => {
             $(
                 {
@@ -29,8 +29,8 @@ macro_rules! bisim_test {
     }
 
 #[test]
-fn test_strong_bisimulation() {
-    bisim_test! {
+fn strong_bisimulation() {
+    strong_bisim_test! {
         "S", "T" => true in r"
             S = a.b.S2;
             S2 = b.S2;
@@ -99,12 +99,16 @@ fn test_strong_bisimulation() {
             S = (a.b.c.0)[b/a][c/b];
             T = c.c.c.0;
         ";
+
+        "S", "S" => true in r"
+            S = a.b.0 | a.c.0 | b.c.0;
+        ";
     };
 }
 
 #[test]
 fn relabelling_preserved() {
-    bisim_test! {
+    strong_bisim_test! {
         "S", "T" => true in r"
             S = (a.a.a.0)[b/a];
             T = b.b.b.0;
@@ -114,7 +118,7 @@ fn relabelling_preserved() {
 
 #[test]
 fn restriction_preserved() {
-    bisim_test! {
+    strong_bisim_test! {
         "S", "T" => true in r"
             S = (a.a.a.0 | b.0) \ {b};
             T = a.a.a.0;
@@ -124,8 +128,8 @@ fn restriction_preserved() {
 
 #[ignore = "performance too bad for ci"]
 #[test]
-fn test_strong_bisimulation_large_protocol() {
-    bisim_test! {
+fn strong_bisimulation_large_protocol() {
+    strong_bisim_test! {
         // Big
         "Protocol", "ZProtocol" => true in r"
         Send0 = acc.Sending0;
