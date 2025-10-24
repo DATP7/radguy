@@ -11,7 +11,7 @@ use slotmap::Key;
 
 use crate::systems::{
     bool::{BoolSystem, BoolTerm},
-    ccs::{ast::Action, strong_transition_generator::TransitionSystem},
+    ccs::{ast::Action, transition_system::TransitionSystem},
 };
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
@@ -129,6 +129,27 @@ impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKe
     }
 
     fn expand(&self, (left_key, right_key): &(ProcKey, ProcKey)) {
+        let var_key = self
+            .bool_system
+            .borrow_mut()
+            .names
+            .get_or_insert_key((*left_key, *right_key));
+
+        if left_key == right_key {
+            let term_key = self
+                .bool_system
+                .borrow_mut()
+                .terms
+                .get_or_insert_key(BoolTerm::False);
+
+            self.bool_system
+                .borrow_mut()
+                .definitions
+                .insert(var_key, term_key);
+
+            return;
+        }
+
         let left_transitions = self.transition_system.get_transitions(*left_key);
         let right_transitions = self.transition_system.get_transitions(*right_key);
 
@@ -136,12 +157,6 @@ impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKe
         let right_actions = right_transitions.keys().copied().collect::<HashSet<_>>();
 
         let empty_set = HashSet::new();
-
-        let var_key = self
-            .bool_system
-            .borrow_mut()
-            .names
-            .get_or_insert_key((*left_key, *right_key));
 
         // If avalible actions for the two processes do not match they are trivilay non bisimilar
         if left_actions != right_actions {

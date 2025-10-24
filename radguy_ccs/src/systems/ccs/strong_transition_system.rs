@@ -9,21 +9,14 @@ use slotmap::{Key, SecondaryMap};
 use crate::systems::ccs::{
     ast::{Action, Binding, Process},
     strong_bisimulation_system::FlatProcess,
+    transition_system::{TransitionMap, TransitionSystem},
 };
-
-type TransitionMap<'a, ProcKey> = HashMap<Action<'a>, HashSet<ProcKey>>;
 
 #[derive(Default, Debug)]
 pub struct StrongTransitionSystem<'a, ProcKey: Key> {
     process_names: HashMap<&'a str, ProcKey>,
     process_bindings: RefCell<BiSlotMap<ProcKey, FlatProcess<'a, ProcKey>>>,
     transition_cache: RefCell<SecondaryMap<ProcKey, TransitionMap<'a, ProcKey>>>,
-}
-
-pub trait TransitionSystem<'a, ProcKey: Key> {
-    fn get_transitions(&self, process_key: ProcKey) -> TransitionMap<'a, ProcKey>;
-    fn load_ast(&mut self, ast: Vec<Binding<'a>>);
-    fn lookup_process_key(&self, name: &str) -> Option<&ProcKey>;
 }
 
 impl<'a, ProcKey: Key> StrongTransitionSystem<'a, ProcKey> {
@@ -33,7 +26,7 @@ impl<'a, ProcKey: Key> StrongTransitionSystem<'a, ProcKey> {
             .get_or_insert_key(process)
     }
 
-    fn get_process(&self, process_key: ProcKey) -> FlatProcess<'a, ProcKey> {
+    pub fn get_process(&self, process_key: ProcKey) -> FlatProcess<'a, ProcKey> {
         self.process_bindings
             .borrow()
             .get_value(process_key)
@@ -151,7 +144,7 @@ impl<'a, ProcKey: Key> TransitionSystem<'a, ProcKey> for StrongTransitionSystem<
             FlatProcess::Relabelling { process, labels } => self
                 .get_transitions(process)
                 .into_iter()
-                .map(|(action, process)| match action {
+                .map(|(action, targets)| match action {
                     Action::Label {
                         name,
                         is_complement,
@@ -160,9 +153,9 @@ impl<'a, ProcKey: Key> TransitionSystem<'a, ProcKey> for StrongTransitionSystem<
                             name: labels.get(name).unwrap_or(&name),
                             is_complement,
                         },
-                        process,
+                        targets,
                     ),
-                    Action::Tau => (action, process),
+                    Action::Tau => (action, targets),
                 })
                 .map(|(action, targets)| {
                     (
@@ -281,6 +274,7 @@ impl<'a, ProcKey: Key> TransitionSystem<'a, ProcKey> for StrongTransitionSystem<
         self.transition_cache
             .borrow_mut()
             .insert(process_key, result.clone());
+
         result
     }
 }
