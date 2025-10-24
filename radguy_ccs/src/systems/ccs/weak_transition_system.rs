@@ -38,6 +38,10 @@ impl<'a, ProcKey: Key> TransitionSystem<'a, ProcKey> for WeakTransitionSystem<'a
         let mut transitions = self.strong_transition_system.get_transitions(process_key);
 
         let Some(tau_processes) = transitions.remove(&Action::Tau) else {
+            self.transition_cache
+                .borrow_mut()
+                .insert(process_key, transitions.clone());
+
             return transitions;
         };
 
@@ -53,6 +57,10 @@ impl<'a, ProcKey: Key> TransitionSystem<'a, ProcKey> for WeakTransitionSystem<'a
                     .or_insert(successors);
             }
         }
+
+        self.transition_cache
+            .borrow_mut()
+            .insert(process_key, transitions.clone());
 
         transitions
     }

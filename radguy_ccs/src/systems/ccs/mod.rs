@@ -8,7 +8,7 @@ lalrpop_mod!(
 );
 
 pub mod ast;
-pub mod strong_bisimulation_system;
+pub mod bisimulation_system;
 pub mod strong_transition_system;
 pub mod transition_system;
 pub mod weak_transition_system;

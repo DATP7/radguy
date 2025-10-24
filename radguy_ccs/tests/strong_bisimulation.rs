@@ -1,7 +1,7 @@
 use radguy::kleene_local;
 use radguy::oracle::SMax;
+use radguy_ccs::systems::ccs::bisimulation_system::BisimulationSystem;
 use radguy_ccs::systems::ccs::grammar::ProgramParser;
-use radguy_ccs::systems::ccs::strong_bisimulation_system::BisimulationSystem;
 use radguy_ccs::systems::ccs::strong_transition_system::StrongTransitionSystem;
 use radguy_ccs::systems::ccs::transition_system::TransitionSystem;
 use slotmap::DefaultKey;
