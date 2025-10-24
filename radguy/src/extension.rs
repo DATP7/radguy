@@ -54,19 +54,19 @@ pub trait LocalExtension<
     VarSet,
     PairSet,
     TermSet,
+    System: TermSystem<VarKey, VarValue, TermKey>,
 >
 {
-    type System: TermSystem<VarKey, VarValue, TermKey>;
-
     fn depends(
         &self,
         visited: &VarSet,
         assignment: &dyn Assignment<VarKey, VarValue>,
         possible: &PairSet,
-        system: &Self::System,
+        system: &System,
     ) -> TermSet;
 }
 
+#[allow(clippy::type_complexity)]
 pub struct ExtensionOracle<
     K: Hash + Eq + Copy,
     V: PartialOrd,
@@ -75,11 +75,11 @@ pub struct ExtensionOracle<
     PS,
     TS,
     S: TermSystem<K, V, T>,
-    E: LocalExtension<K, V, T, VS, PS, TS, System = S>,
+    E: LocalExtension<K, V, T, VS, PS, TS, S>,
     U,
 > {
     extension: E,
-    _phantom_data: PhantomData<(K, V, T, VS, PS, TS, U)>,
+    _phantom_data: PhantomData<(K, V, T, VS, PS, TS, S, U)>,
 }
 
 impl<
@@ -90,7 +90,7 @@ impl<
     PS: Union + FromIterator<(K, K)>,
     TS: TermToKey<K, V, T, VS, PS, S>,
     S: TermSystem<K, V, T> + Universe<U>,
-    E: LocalExtension<K, V, T, VS, PS, TS, System = S>,
+    E: LocalExtension<K, V, T, VS, PS, TS, S>,
     U: Without<VS> + Cartesian<Output = PS>,
 > LocalOracle<K, V, VS, PS, S> for ExtensionOracle<K, V, T, VS, PS, TS, S, E, U>
 where
@@ -101,7 +101,7 @@ where
         visited: &VS,
         assignment: &impl Assignment<K, V>,
         possible: &PS,
-        system: &E::System,
+        system: &S,
     ) -> PS {
         let unvisited = system.universe().without(visited);
         let unvisited_dep = system.universe().cartesian(&unvisited);
@@ -119,12 +119,12 @@ impl<
     K: Hash + Eq + Copy,
     V: PartialOrd,
     T: Copy + Eq,
-    PS: FromIterator<(K, K)>,
-    VS,
-    TS,
-    S: TermSystem<K, V, T>,
-    E: LocalExtension<K, V, T, VS, PS, TS, System = S>,
-    U,
+    VS: Cartesian<Output = PS> + Without,
+    PS: Union + FromIterator<(K, K)>,
+    TS: TermToKey<K, V, T, VS, PS, S>,
+    S: TermSystem<K, V, T> + Universe<U>,
+    E: LocalExtension<K, V, T, VS, PS, TS, S>,
+    U: Without<VS> + Cartesian<Output = PS>,
 > From<E> for ExtensionOracle<K, V, T, VS, PS, TS, S, E, U>
 {
     fn from(extension: E) -> Self {

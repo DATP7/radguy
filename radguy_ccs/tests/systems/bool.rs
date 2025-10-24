@@ -1,10 +1,8 @@
-use radguy_ccs::bool_system;
+use radguy_ccs::{bool_system, systems::bool::BoolSystemImpl};
 use slotmap::DefaultKey;
 
-use radguy_ccs::systems::bool::BoolSystem;
-
 pub struct SystemSpec {
-    pub system: BoolSystem<DefaultKey, DefaultKey, &'static str>,
+    pub system: BoolSystemImpl<DefaultKey, DefaultKey, &'static str>,
     pub variables: Vec<&'static str>,
     pub goal: Vec<bool>,
 }
