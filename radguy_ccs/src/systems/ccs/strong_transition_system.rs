@@ -8,7 +8,7 @@ use slotmap::{Key, SecondaryMap};
 
 use crate::systems::ccs::{
     ast::{Action, Binding, Process},
-    strong_bisimulation_system::FlatProcess,
+    bisimulation_system::FlatProcess,
     transition_system::{TransitionMap, TransitionSystem},
 };
 

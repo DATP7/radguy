@@ -1,7 +1,7 @@
 use radguy::kleene_local;
 use radguy::oracle::SMax;
+use radguy_ccs::systems::ccs::bisimulation_system::BisimulationSystem;
 use radguy_ccs::systems::ccs::grammar::ProgramParser;
-use radguy_ccs::systems::ccs::strong_bisimulation_system::BisimulationSystem;
 use radguy_ccs::systems::ccs::transition_system::TransitionSystem;
 use radguy_ccs::systems::ccs::weak_transition_system::WeakTransitionSystem;
 use slotmap::DefaultKey;
@@ -19,7 +19,6 @@ macro_rules! weak_bisim_test {
 
                     let mut sys = BisimulationSystem::<DefaultKey, DefaultKey, DefaultKey, WeakTransitionSystem<DefaultKey>>::new(weak_transition_system);
                     let start = sys.specify_comparison($left, $right);
-
 
                     let result = !kleene_local(&sys, start, &SMax);
                     assert_eq!($eq, result, "{} and {} should{} be bisimilar in{}", $left, $right, if !$eq { " not" } else {""}, $ccs);
@@ -95,6 +94,197 @@ fn orchard() {
             AppleTree = shake.('greenapple.AppleTree + 'redapple.AppleTree);
             Orchard = (AppleTree | Man) \ {shake, redapple, greenapple};
             Spec = walk.Spec;
+        ";
+    };
+}
+
+#[test]
+fn leader_election_bad_6() {
+    weak_bisim_test! {
+        "Spec", "Ring" => false in r"
+            P1 = 'm6r1.P1 + m1r1.leader.0 + m1r2.P1_2 + m1r3.P1_3 + m1r4.P1_4 + m1r5.P1_5 + m1r6.P1_6;
+            P1_2 = 'm6r2.P1_2 + m1r1.leader.0 + m1r2.P1_2 + m1r3.P1_3 + m1r4.P1_4 + m1r5.P1_5 + m1r6.P1_6;
+            P1_3 = 'm6r3.P1_3 + m1r1.leader.0 + m1r2.P1_3 + m1r3.P1_3 + m1r4.P1_4 + m1r5.P1_5 + m1r6.P1_6;
+            P1_4 = 'm6r4.P1_4 + m1r1.leader.0 + m1r2.P1_4 + m1r3.P1_4 + m1r4.P1_4 + m1r5.P1_5 + m1r6.P1_6;
+            P1_5 = 'm6r5.P1_5 + m1r1.leader.0 + m1r2.P1_5 + m1r3.P1_5 + m1r4.P1_5 + m1r5.P1_5 + m1r6.P1_6;
+            P1_6 = 'm6r6.P1_6 + m1r1.leader.0 + m1r2.P1_6 + m1r3.P1_6 + m1r4.P1_6 + m1r5.P1_6 + m1r6.P1_6;
+
+            P2 = 'm1r2.P2 + m2r1.P2 + m2r2.leader.0 + m2r3.P2_3 + m2r4.P2_4 + m2r5.P2_5 + m2r6.P2_6;
+            P2_3 = 'm1r3.P2_3 + m2r2.leader.0 + m2r1.P2_3 + m2r3.P2_3 + m2r4.P2_4 + m2r5.P2_5 + m2r6.P2_6;
+            P2_4 = 'm1r4.P2_4 + m2r2.leader.0 + m2r1.P2_4 + m2r3.P2_4 + m2r4.P2_4 + m2r5.P2_5 + m2r6.P2_6;
+            P2_5 = 'm1r5.P2_5 + m2r2.leader.0 + m2r1.P2_5 + m2r3.P2_5 + m2r4.P2_5 + m2r5.P2_5 + m2r6.P2_6;
+            P2_6 = 'm1r6.P2_6 + m2r2.leader.0 + m2r1.P2_6 + m2r3.P2_6 + m2r4.P2_6 + m2r5.P2_6 + m2r6.P2_6;
+
+            P3 = 'm2r3.P3 + m3r1.P3 + m3r2.P3 + m3r3.leader.0 + m3r4.P3_4 + m3r5.P3_5 + m3r6.P3_6;
+            P3_4 = 'm2r4.P3_4 + m3r3.leader.0 + m3r1.P3_4 + m3r2.P3_4 + m3r4.P3_4 + m3r5.P3_5 + m3r6.P3_6;
+            P3_5 = 'm2r5.P3_5 + m3r3.leader.0 + m3r1.P3_5 + m3r2.P3_5 + m3r4.P3_5 + m3r5.P3_5 + m3r6.P3_6;
+            P3_6 = 'm2r6.P3_6 + m3r3.leader.0 + m3r1.P3_6 + m3r2.P3_6 + m3r4.P3_6 + m3r5.P3_6 + m3r6.P3_6;
+
+            P4 = 'm3r4.P4 + m4r1.P4 + m4r2.P4 + m4r3.P4 + m4r4.leader.0 + m4r5.P4_5 + m4r6.P4_6;
+            P4_5 = 'm3r5.P4_5 + m4r4.leader.0 + m4r1.P4_5 + m4r2.P4_5 + m4r3.P4_5 + m4r5.P4_5 + m4r6.P4_6;
+            P4_6 = 'm3r6.P4_6 + m4r4.leader.0 + m4r1.P4_6 + m4r2.P4_6 + m4r3.P4_6 + m4r5.P4_6 + m4r6.P4_6;
+
+            P5 = 'm4r5.P5 + m5r1.P5 + m5r2.P5 + m5r3.P5 + m5r4.P5 + m5r5.leader.0 + m5r6.P5_6;
+            P5_6 = 'm4r6.P5_6 + m5r5.leader.0 + m5r1.P5_6 + m5r2.P5_6 + m5r3.P5_6 + m5r4.P5_6 + m5r6.leader.0;
+
+            P6 = 'm5r6.P6 + m6r1.P6 + m6r2.P6 + m6r3.P6 + m6r4.P6 + m6r5.P6 + m6r6.leader.0;
+
+            Ring = (P1 | P2 | P3 | P4 | P5 | P6)
+                    \ {m1r1, m1r2, m1r3, m1r4, m1r5, m1r6, m2r1, m2r2, m2r3, m2r4, m2r5, m2r6, m3r1, m3r2, m3r3, m3r4, m3r5, m3r6, m4r1, m4r2, m4r3, m4r4, m4r5, m4r6, m5r1, m5r2, m5r3, m5r4, m5r5, m5r6, m6r1, m6r2, m6r3, m6r4, m6r5, m6r6};
+
+            Spec = leader.0;
+        ";
+    };
+}
+
+#[test]
+fn leader_election_ok_6() {
+    weak_bisim_test! {
+        "Spec", "Ring" => true in r"
+            P1 = 'm6r1.P1 + m1r1.leader.0 + m1r2.P1_2 + m1r3.P1_3 + m1r4.P1_4 + m1r5.P1_5 + m1r6.P1_6;
+            P1_2 = 'm6r2.P1_2 + m1r1.leader.0 + m1r2.P1_2 + m1r3.P1_3 + m1r4.P1_4 + m1r5.P1_5 + m1r6.P1_6;
+            P1_3 = 'm6r3.P1_3 + m1r1.leader.0 + m1r2.P1_3 + m1r3.P1_3 + m1r4.P1_4 + m1r5.P1_5 + m1r6.P1_6;
+            P1_4 = 'm6r4.P1_4 + m1r1.leader.0 + m1r2.P1_4 + m1r3.P1_4 + m1r4.P1_4 + m1r5.P1_5 + m1r6.P1_6;
+            P1_5 = 'm6r5.P1_5 + m1r1.leader.0 + m1r2.P1_5 + m1r3.P1_5 + m1r4.P1_5 + m1r5.P1_5 + m1r6.P1_6;
+            P1_6 = 'm6r6.P1_6 + m1r1.leader.0 + m1r2.P1_6 + m1r3.P1_6 + m1r4.P1_6 + m1r5.P1_6 + m1r6.P1_6;
+
+            P2 = 'm1r2.P2 + m2r1.P2 + m2r2.leader.0 + m2r3.P2_3 + m2r4.P2_4 + m2r5.P2_5 + m2r6.P2_6;
+            P2_3 = 'm1r3.P2_3 + m2r2.leader.0 + m2r1.P2_3 + m2r3.P2_3 + m2r4.P2_4 + m2r5.P2_5 + m2r6.P2_6;
+            P2_4 = 'm1r4.P2_4 + m2r2.leader.0 + m2r1.P2_4 + m2r3.P2_4 + m2r4.P2_4 + m2r5.P2_5 + m2r6.P2_6;
+            P2_5 = 'm1r5.P2_5 + m2r2.leader.0 + m2r1.P2_5 + m2r3.P2_5 + m2r4.P2_5 + m2r5.P2_5 + m2r6.P2_6;
+            P2_6 = 'm1r6.P2_6 + m2r2.leader.0 + m2r1.P2_6 + m2r3.P2_6 + m2r4.P2_6 + m2r5.P2_6 + m2r6.P2_6;
+
+            P3 = 'm2r3.P3 + m3r1.P3 + m3r2.P3 + m3r3.leader.0 + m3r4.P3_4 + m3r5.P3_5 + m3r6.P3_6;
+            P3_4 = 'm2r4.P3_4 + m3r3.leader.0 + m3r1.P3_4 + m3r2.P3_4 + m3r4.P3_4 + m3r5.P3_5 + m3r6.P3_6;
+            P3_5 = 'm2r5.P3_5 + m3r3.leader.0 + m3r1.P3_5 + m3r2.P3_5 + m3r4.P3_5 + m3r5.P3_5 + m3r6.P3_6;
+            P3_6 = 'm2r6.P3_6 + m3r3.leader.0 + m3r1.P3_6 + m3r2.P3_6 + m3r4.P3_6 + m3r5.P3_6 + m3r6.P3_6;
+
+            P4 = 'm3r4.P4 + m4r1.P4 + m4r2.P4 + m4r3.P4 + m4r4.leader.0 + m4r5.P4_5 + m4r6.P4_6;
+            P4_5 = 'm3r5.P4_5 + m4r4.leader.0 + m4r1.P4_5 + m4r2.P4_5 + m4r3.P4_5 + m4r5.P4_5 + m4r6.P4_6;
+            P4_6 = 'm3r6.P4_6 + m4r4.leader.0 + m4r1.P4_6 + m4r2.P4_6 + m4r3.P4_6 + m4r5.P4_6 + m4r6.P4_6;
+
+            P5 = 'm4r5.P5 + m5r1.P5 + m5r2.P5 + m5r3.P5 + m5r4.P5 + m5r5.leader.0 + m5r6.P5_6;
+            P5_6 = 'm4r6.P5_6 + m5r5.leader.0 + m5r1.P5_6 + m5r2.P5_6 + m5r3.P5_6 + m5r4.P5_6 + m5r6.P5_6;
+
+            P6 = 'm5r6.P6 + m6r1.P6 + m6r2.P6 + m6r3.P6 + m6r4.P6 + m6r5.P6 + m6r6.leader.0;
+
+            Ring = (P1 | P2 | P3 | P4 | P5 | P6) \ {m1r1, m1r2, m1r3, m1r4, m1r5, m1r6, m2r1, m2r2, m2r3, m2r4, m2r5, m2r6, m3r1, m3r2, m3r3, m3r4, m3r5, m3r6, m4r1, m4r2, m4r3, m4r4, m4r5, m4r6, m5r1, m5r2, m5r3, m5r4, m5r5, m5r6, m6r1, m6r2, m6r3, m6r4, m6r5, m6r6};
+
+            Spec = leader.0;
+        ";
+    };
+}
+
+#[ignore = "performance too bad for ci"]
+#[test]
+fn leader_election_ok_8() {
+    weak_bisim_test! {
+        "Spec", "Ring" => true in r"
+            P1 = 'm8r1.P1 + m1r1.leader.0 + m1r2.P1_2 + m1r3.P1_3 + m1r4.P1_4 + m1r5.P1_5 + m1r6.P1_6 + m1r7.P1_7 + m1r8.P1_8;
+            P1_2 = 'm8r2.P1_2 + m1r1.leader.0 + m1r2.P1_2 + m1r3.P1_3 + m1r4.P1_4 + m1r5.P1_5 + m1r6.P1_6 + m1r7.P1_7 + m1r8.P1_8;
+            P1_3 = 'm8r3.P1_3 + m1r1.leader.0 + m1r2.P1_3 + m1r3.P1_3 + m1r4.P1_4 + m1r5.P1_5 + m1r6.P1_6 + m1r7.P1_7 + m1r8.P1_8;
+            P1_4 = 'm8r4.P1_4 + m1r1.leader.0 + m1r2.P1_4 + m1r3.P1_4 + m1r4.P1_4 + m1r5.P1_5 + m1r6.P1_6 + m1r7.P1_7 + m1r8.P1_8;
+            P1_5 = 'm8r5.P1_5 + m1r1.leader.0 + m1r2.P1_5 + m1r3.P1_5 + m1r4.P1_5 + m1r5.P1_5 + m1r6.P1_6 + m1r7.P1_7 + m1r8.P1_8;
+            P1_6 = 'm8r6.P1_6 + m1r1.leader.0 + m1r2.P1_6 + m1r3.P1_6 + m1r4.P1_6 + m1r5.P1_6 + m1r6.P1_6 + m1r7.P1_7 + m1r8.P1_8;
+            P1_7 = 'm8r7.P1_7 + m1r1.leader.0 + m1r2.P1_7 + m1r3.P1_7 + m1r4.P1_7 + m1r5.P1_7 + m1r6.P1_7 + m1r7.P1_7 + m1r8.P1_8;
+            P1_8 = 'm8r8.P1_8 + m1r1.leader.0 + m1r2.P1_8 + m1r3.P1_8 + m1r4.P1_8 + m1r5.P1_8 + m1r6.P1_8 + m1r7.P1_8 + m1r8.P1_8;
+
+            P2 = 'm1r2.P2 + m2r1.P2 + m2r2.leader.0 + m2r3.P2_3 + m2r4.P2_4 + m2r5.P2_5 + m2r6.P2_6 + m2r7.P2_7 + m2r8.P2_8;
+            P2_3 = 'm1r3.P2_3 + m2r2.leader.0 + m2r1.P2_3 + m2r3.P2_3 + m2r4.P2_4 + m2r5.P2_5 + m2r6.P2_6 + m2r7.P2_7 + m2r8.P2_8;
+            P2_4 = 'm1r4.P2_4 + m2r2.leader.0 + m2r1.P2_4 + m2r3.P2_4 + m2r4.P2_4 + m2r5.P2_5 + m2r6.P2_6 + m2r7.P2_7 + m2r8.P2_8;
+            P2_5 = 'm1r5.P2_5 + m2r2.leader.0 + m2r1.P2_5 + m2r3.P2_5 + m2r4.P2_5 + m2r5.P2_5 + m2r6.P2_6 + m2r7.P2_7 + m2r8.P2_8;
+            P2_6 = 'm1r6.P2_6 + m2r2.leader.0 + m2r1.P2_6 + m2r3.P2_6 + m2r4.P2_6 + m2r5.P2_6 + m2r6.P2_6 + m2r7.P2_7 + m2r8.P2_8;
+            P2_7 = 'm1r7.P2_7 + m2r2.leader.0 + m2r1.P2_7 + m2r3.P2_7 + m2r4.P2_7 + m2r5.P2_7 + m2r6.P2_7 + m2r7.P2_7 + m2r8.P2_8;
+            P2_8 = 'm1r8.P2_8 + m2r2.leader.0 + m2r1.P2_8 + m2r3.P2_8 + m2r4.P2_8 + m2r5.P2_8 + m2r6.P2_8 + m2r7.P2_8 + m2r8.P2_8;
+
+            P3 = 'm2r3.P3 + m3r1.P3 + m3r2.P3 + m3r3.leader.0 + m3r4.P3_4 + m3r5.P3_5 + m3r6.P3_6 + m3r7.P3_7 + m3r8.P3_8;
+            P3_4 = 'm2r4.P3_4 + m3r3.leader.0 + m3r1.P3_4 + m3r2.P3_4 + m3r4.P3_4 + m3r5.P3_5 + m3r6.P3_6 + m3r7.P3_7 + m3r8.P3_8;
+            P3_5 = 'm2r5.P3_5 + m3r3.leader.0 + m3r1.P3_5 + m3r2.P3_5 + m3r4.P3_5 + m3r5.P3_5 + m3r6.P3_6 + m3r7.P3_7 + m3r8.P3_8;
+            P3_6 = 'm2r6.P3_6 + m3r3.leader.0 + m3r1.P3_6 + m3r2.P3_6 + m3r4.P3_6 + m3r5.P3_6 + m3r6.P3_6 + m3r7.P3_7 + m3r8.P3_8;
+            P3_7 = 'm2r7.P3_7 + m3r3.leader.0 + m3r1.P3_7 + m3r2.P3_7 + m3r4.P3_7 + m3r5.P3_7 + m3r6.P3_7 + m3r7.P3_7 + m3r8.P3_8;
+            P3_8 = 'm2r8.P3_8 + m3r3.leader.0 + m3r1.P3_8 + m3r2.P3_8 + m3r4.P3_8 + m3r5.P3_8 + m3r6.P3_8 + m3r7.P3_8 + m3r8.P3_8;
+
+            P4 = 'm3r4.P4 + m4r1.P4 + m4r2.P4 + m4r3.P4 + m4r4.leader.0 + m4r5.P4_5 + m4r6.P4_6 + m4r7.P4_7 + m4r8.P4_8;
+            P4_5 = 'm3r5.P4_5 + m4r4.leader.0 + m4r1.P4_5 + m4r2.P4_5 + m4r3.P4_5 + m4r5.P4_5 + m4r6.P4_6 + m4r7.P4_7 + m4r8.P4_8;
+            P4_6 = 'm3r6.P4_6 + m4r4.leader.0 + m4r1.P4_6 + m4r2.P4_6 + m4r3.P4_6 + m4r5.P4_6 + m4r6.P4_6 + m4r7.P4_7 + m4r8.P4_8;
+            P4_7 = 'm3r7.P4_7 + m4r4.leader.0 + m4r1.P4_7 + m4r2.P4_7 + m4r3.P4_7 + m4r5.P4_7 + m4r6.P4_7 + m4r7.P4_7 + m4r8.P4_8;
+            P4_8 = 'm3r8.P4_8 + m4r4.leader.0 + m4r1.P4_8 + m4r2.P4_8 + m4r3.P4_8 + m4r5.P4_8 + m4r6.P4_8 + m4r7.P4_8 + m4r8.P4_8;
+
+            P5 = 'm4r5.P5 + m5r1.P5 + m5r2.P5 + m5r3.P5 + m5r4.P5 + m5r5.leader.0 + m5r6.P5_6 + m5r7.P5_7 + m5r8.P5_8;
+            P5_6 = 'm4r6.P5_6 + m5r5.leader.0 + m5r1.P5_6 + m5r2.P5_6 + m5r3.P5_6 + m5r4.P5_6 + m5r6.P5_6 + m5r7.P5_7 + m5r8.P5_8;
+            P5_7 = 'm4r7.P5_7 + m5r5.leader.0 + m5r1.P5_7 + m5r2.P5_7 + m5r3.P5_7 + m5r4.P5_7 + m5r6.P5_7 + m5r7.P5_7 + m5r8.P5_8;
+            P5_8 = 'm4r8.P5_8 + m5r5.leader.0 + m5r1.P5_8 + m5r2.P5_8 + m5r3.P5_8 + m5r4.P5_8 + m5r6.P5_8 + m5r7.P5_8 + m5r8.P5_8;
+
+            P6 = 'm5r6.P6 + m6r1.P6 + m6r2.P6 + m6r3.P6 + m6r4.P6 + m6r5.P6 + m6r6.leader.0 + m6r7.P6_7 + m6r8.P6_8;
+            P6_7 = 'm5r7.P6_7 + m6r6.leader.0 + m6r1.P6_7 + m6r2.P6_7 + m6r3.P6_7 + m6r4.P6_7 + m6r5.P6_7 + m6r7.P6_7 + m6r8.P6_8;
+            P6_8 = 'm5r8.P6_8 + m6r6.leader.0 + m6r1.P6_8 + m6r2.P6_8 + m6r3.P6_8 + m6r4.P6_8 + m6r5.P6_8 + m6r7.P6_8 + m6r8.P6_8;
+
+            P7 = 'm6r7.P7 + m7r1.P7 + m7r2.P7 + m7r3.P7 + m7r4.P7 + m7r5.P7 + m7r6.P7 + m7r7.leader.0 + m7r8.P7_8;
+            P7_8 = 'm6r8.P7_8 + m7r7.leader.0 + m7r1.P7_8 + m7r2.P7_8 + m7r3.P7_8 + m7r4.P7_8 + m7r5.P7_8 + m7r6.P7_8 + m7r8.P7_8;
+
+            P8 = 'm7r8.P8 + m8r1.P8 + m8r2.P8 + m8r3.P8 + m8r4.P8 + m8r5.P8 + m8r6.P8 + m8r7.P8 + m8r8.leader.0;
+
+            Ring = (P1 | P2 | P3 | P4 | P5 | P6 | P7 | P8)
+                \ {m1r1, m1r2, m1r3, m1r4, m1r5, m1r6, m1r7, m1r8, m2r1, m2r2, m2r3, m2r4, m2r5, m2r6, m2r7, m2r8, m3r1, m3r2, m3r3, m3r4, m3r5, m3r6, m3r7, m3r8, m4r1, m4r2, m4r3, m4r4, m4r5, m4r6, m4r7, m4r8, m5r1, m5r2, m5r3, m5r4, m5r5, m5r6, m5r7, m5r8, m6r1, m6r2, m6r3, m6r4, m6r5, m6r6, m6r7, m6r8, m7r1, m7r2, m7r3, m7r4, m7r5, m7r6, m7r7, m7r8, m8r1, m8r2, m8r3, m8r4, m8r5, m8r6, m8r7, m8r8};
+
+            Spec = leader.0;
+        ";
+    };
+}
+
+#[ignore = "performance too bad for ci"]
+#[test]
+fn leader_election_bad_8() {
+    weak_bisim_test! {
+        "Spec", "Ring" => false in r"
+            P1 = 'm8r1.P1 + m1r1.leader.0 + m1r2.P1_2 + m1r3.P1_3 + m1r4.P1_4 + m1r5.P1_5 + m1r6.P1_6 + m1r7.P1_7 + m1r8.P1_8;
+            P1_2 = 'm8r2.P1_2 + m1r1.leader.0 + m1r2.P1_2 + m1r3.P1_3 + m1r4.P1_4 + m1r5.P1_5 + m1r6.P1_6 + m1r7.P1_7 + m1r8.P1_8;
+            P1_3 = 'm8r3.P1_3 + m1r1.leader.0 + m1r2.P1_3 + m1r3.P1_3 + m1r4.P1_4 + m1r5.P1_5 + m1r6.P1_6 + m1r7.P1_7 + m1r8.P1_8;
+            P1_4 = 'm8r4.P1_4 + m1r1.leader.0 + m1r2.P1_4 + m1r3.P1_4 + m1r4.P1_4 + m1r5.P1_5 + m1r6.P1_6 + m1r7.P1_7 + m1r8.P1_8;
+            P1_5 = 'm8r5.P1_5 + m1r1.leader.0 + m1r2.P1_5 + m1r3.P1_5 + m1r4.P1_5 + m1r5.P1_5 + m1r6.P1_6 + m1r7.P1_7 + m1r8.P1_8;
+            P1_6 = 'm8r6.P1_6 + m1r1.leader.0 + m1r2.P1_6 + m1r3.P1_6 + m1r4.P1_6 + m1r5.P1_6 + m1r6.P1_6 + m1r7.P1_7 + m1r8.P1_8;
+            P1_7 = 'm8r7.P1_7 + m1r1.leader.0 + m1r2.P1_7 + m1r3.P1_7 + m1r4.P1_7 + m1r5.P1_7 + m1r6.P1_7 + m1r7.P1_7 + m1r8.P1_8;
+            P1_8 = 'm8r8.P1_8 + m1r1.leader.0 + m1r2.P1_8 + m1r3.P1_8 + m1r4.P1_8 + m1r5.P1_8 + m1r6.P1_8 + m1r7.P1_8 + m1r8.P1_8;
+
+            P2 = 'm1r2.P2 + m2r1.P2 + m2r2.leader.0 + m2r3.P2_3 + m2r4.P2_4 + m2r5.P2_5 + m2r6.P2_6 + m2r7.P2_7 + m2r8.P2_8;
+            P2_3 = 'm1r3.P2_3 + m2r2.leader.0 + m2r1.P2_3 + m2r3.P2_3 + m2r4.P2_4 + m2r5.P2_5 + m2r6.P2_6 + m2r7.P2_7 + m2r8.P2_8;
+            P2_4 = 'm1r4.P2_4 + m2r2.leader.0 + m2r1.P2_4 + m2r3.P2_4 + m2r4.P2_4 + m2r5.P2_5 + m2r6.P2_6 + m2r7.P2_7 + m2r8.P2_8;
+            P2_5 = 'm1r5.P2_5 + m2r2.leader.0 + m2r1.P2_5 + m2r3.P2_5 + m2r4.P2_5 + m2r5.P2_5 + m2r6.P2_6 + m2r7.P2_7 + m2r8.P2_8;
+            P2_6 = 'm1r6.P2_6 + m2r2.leader.0 + m2r1.P2_6 + m2r3.P2_6 + m2r4.P2_6 + m2r5.P2_6 + m2r6.P2_6 + m2r7.P2_7 + m2r8.P2_8;
+            P2_7 = 'm1r7.P2_7 + m2r2.leader.0 + m2r1.P2_7 + m2r3.P2_7 + m2r4.P2_7 + m2r5.P2_7 + m2r6.P2_7 + m2r7.P2_7 + m2r8.P2_8;
+            P2_8 = 'm1r8.P2_8 + m2r2.leader.0 + m2r1.P2_8 + m2r3.P2_8 + m2r4.P2_8 + m2r5.P2_8 + m2r6.P2_8 + m2r7.P2_8 + m2r8.P2_8;
+
+            P3 = 'm2r3.P3 + m3r1.P3 + m3r2.P3 + m3r3.leader.0 + m3r4.P3_4 + m3r5.P3_5 + m3r6.P3_6 + m3r7.P3_7 + m3r8.P3_8;
+            P3_4 = 'm2r4.P3_4 + m3r3.leader.0 + m3r1.P3_4 + m3r2.P3_4 + m3r4.P3_4 + m3r5.P3_5 + m3r6.P3_6 + m3r7.P3_7 + m3r8.P3_8;
+            P3_5 = 'm2r5.P3_5 + m3r3.leader.0 + m3r1.P3_5 + m3r2.P3_5 + m3r4.P3_5 + m3r5.P3_5 + m3r6.P3_6 + m3r7.P3_7 + m3r8.P3_8;
+            P3_6 = 'm2r6.P3_6 + m3r3.leader.0 + m3r1.P3_6 + m3r2.P3_6 + m3r4.P3_6 + m3r5.P3_6 + m3r6.P3_6 + m3r7.P3_7 + m3r8.P3_8;
+            P3_7 = 'm2r7.P3_7 + m3r3.leader.0 + m3r1.P3_7 + m3r2.P3_7 + m3r4.P3_7 + m3r5.P3_7 + m3r6.P3_7 + m3r7.P3_7 + m3r8.P3_8;
+            P3_8 = 'm2r8.P3_8 + m3r3.leader.0 + m3r1.P3_8 + m3r2.P3_8 + m3r4.P3_8 + m3r5.P3_8 + m3r6.P3_8 + m3r7.P3_8 + m3r8.P3_8;
+
+            P4 = 'm3r4.P4 + m4r1.P4 + m4r2.P4 + m4r3.P4 + m4r4.leader.0 + m4r5.P4_5 + m4r6.P4_6 + m4r7.P4_7 + m4r8.P4_8;
+            P4_5 = 'm3r5.P4_5 + m4r4.leader.0 + m4r1.P4_5 + m4r2.P4_5 + m4r3.P4_5 + m4r5.P4_5 + m4r6.P4_6 + m4r7.P4_7 + m4r8.P4_8;
+            P4_6 = 'm3r6.P4_6 + m4r4.leader.0 + m4r1.P4_6 + m4r2.P4_6 + m4r3.P4_6 + m4r5.P4_6 + m4r6.P4_6 + m4r7.P4_7 + m4r8.P4_8;
+            P4_7 = 'm3r7.P4_7 + m4r4.leader.0 + m4r1.P4_7 + m4r2.P4_7 + m4r3.P4_7 + m4r5.P4_7 + m4r6.P4_7 + m4r7.P4_7 + m4r8.P4_8;
+            P4_8 = 'm3r8.P4_8 + m4r4.leader.0 + m4r1.P4_8 + m4r2.P4_8 + m4r3.P4_8 + m4r5.P4_8 + m4r6.P4_8 + m4r7.P4_8 + m4r8.P4_8;
+
+            P5 = 'm4r5.P5 + m5r1.P5 + m5r2.P5 + m5r3.P5 + m5r4.P5 + m5r5.leader.0 + m5r6.P5_6 + m5r7.P5_7 + m5r8.P5_8;
+            P5_6 = 'm4r6.P5_6 + m5r5.leader.0 + m5r1.P5_6 + m5r2.P5_6 + m5r3.P5_6 + m5r4.P5_6 + m5r6.P5_6 + m5r7.P5_7 + m5r8.P5_8;
+            P5_7 = 'm4r7.P5_7 + m5r5.leader.0 + m5r1.P5_7 + m5r2.P5_7 + m5r3.P5_7 + m5r4.P5_7 + m5r6.P5_7 + m5r7.P5_7 + m5r8.P5_8;
+            P5_8 = 'm4r8.P5_8 + m5r5.leader.0 + m5r1.P5_8 + m5r2.P5_8 + m5r3.P5_8 + m5r4.P5_8 + m5r6.P5_8 + m5r7.P5_8 + m5r8.P5_8;
+
+            P6 = 'm5r6.P6 + m6r1.P6 + m6r2.P6 + m6r3.P6 + m6r4.P6 + m6r5.P6 + m6r6.leader.0 + m6r7.P6_7 + m6r8.P6_8;
+            P6_7 = 'm5r7.P6_7 + m6r6.leader.0 + m6r1.P6_7 + m6r2.P6_7 + m6r3.P6_7 + m6r4.P6_7 + m6r5.P6_7 + m6r7.P6_7 + m6r8.P6_8;
+            P6_8 = 'm5r8.P6_8 + m6r6.leader.0 + m6r1.P6_8 + m6r2.P6_8 + m6r3.P6_8 + m6r4.P6_8 + m6r5.P6_8 + m6r7.P6_8 + m6r8.P6_8;
+
+            P7 = 'm6r7.P7 + m7r1.P7 + m7r2.P7 + m7r3.P7 + m7r4.P7 + m7r5.P7 + m7r6.P7 + m7r7.leader.0 + m7r8.P7_8;
+            P7_8 = 'm6r8.P7_8 + m7r7.leader.0 + m7r1.P7_8 + m7r2.P7_8 + m7r3.P7_8 + m7r4.P7_8 + m7r5.P7_8 + m7r6.P7_8 + m7r8.leader.0;
+
+            P8 = 'm7r8.P8 + m8r1.P8 + m8r2.P8 + m8r3.P8 + m8r4.P8 + m8r5.P8 + m8r6.P8 + m8r7.P8 + m8r8.leader.0;
+
+            Ring = (P1 | P2 | P3 | P4 | P5 | P6 | P7 | P8)
+                \ {m1r1, m1r2, m1r3, m1r4, m1r5, m1r6, m1r7, m1r8, m2r1, m2r2, m2r3, m2r4, m2r5, m2r6, m2r7, m2r8, m3r1, m3r2, m3r3, m3r4, m3r5, m3r6, m3r7, m3r8, m4r1, m4r2, m4r3, m4r4, m4r5, m4r6, m4r7, m4r8, m5r1, m5r2, m5r3, m5r4, m5r5, m5r6, m5r7, m5r8, m6r1, m6r2, m6r3, m6r4, m6r5, m6r6, m6r7, m6r8, m7r1, m7r2, m7r3, m7r4, m7r5, m7r6, m7r7, m7r8, m8r1, m8r2, m8r3, m8r4, m8r5, m8r6, m8r7, m8r8};
+
+            Spec = leader.0;
         ";
     };
 }
