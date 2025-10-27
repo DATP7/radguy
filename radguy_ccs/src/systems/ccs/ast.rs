@@ -22,6 +22,7 @@ pub enum Process<'a> {
     Compose(Box<Process<'a>>, Box<Process<'a>>),
 }
 
+#[derive(Clone, Debug)]
 pub struct Binding<'a> {
     pub name: &'a str,
     pub value: Process<'a>,
