@@ -22,6 +22,18 @@ pub enum Process<'a> {
     Compose(Box<Process<'a>>, Box<Process<'a>>),
 }
 
+impl<'a> Process<'a> {
+    /// Parse a CCS process
+    ///
+    /// # Panics
+    /// Panics if the process cannot be parsed
+    #[must_use]
+    pub fn parse(ccs: &'a str) -> Self {
+        let parser = super::grammar::StateParser::new();
+        parser.parse(ccs).expect("process should parse")
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Binding<'a> {
     pub name: &'a str,
@@ -34,7 +46,7 @@ pub enum Action<'a> {
     Label { name: &'a str, is_complement: bool },
 }
 
-impl Action<'_> {
+impl<'a> Action<'a> {
     #[must_use]
     pub fn can_syncronize(&self, other: &Action) -> bool {
         match (self, other) {
@@ -50,5 +62,15 @@ impl Action<'_> {
                 },
             ) => *name == *other_name && *is_complement != *other_is_complement,
         }
+    }
+
+    /// Parse an action
+    ///
+    /// # Panics
+    /// Panics if the action cannot be parsed
+    #[must_use]
+    pub fn parse(ccs: &'a str) -> Self {
+        let parser = super::grammar::ActionParser::new();
+        parser.parse(ccs).expect("action should parse")
     }
 }
