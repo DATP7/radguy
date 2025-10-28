@@ -8,7 +8,7 @@ pub Program: Vec<Binding<'input>> = (<Binding> ";")*;
 
 
 Binding: Binding<'input> = {
-  <name:Id> "=" <value:State> => Binding { name, value },
+  "agent"? <name:Id> "=" <value:State> => Binding { name, value },
 }
 
 pub State: Process<'input> = StateSummation;
@@ -93,3 +93,10 @@ Comma<T>: Vec<T> = {
         }
     }
 };
+
+
+match {
+    r"\s*" => {}, // whitespace
+    r"\*[^\n\r]*[\n\r]*" => {}, // `* comments`
+    _
+}
