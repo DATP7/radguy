@@ -28,13 +28,68 @@ macro_rules! weak_bisim_test {
     }
 
 #[test]
-fn infinete_tau_loop() {
+fn abp_ok_small() {
+    let ccs = include_str!("../systems/ccs/abp_ok.ccs");
+    weak_bisim_test! {
+        "SPEC", "ABP" => true in ccs;
+    };
+}
+
+#[test]
+fn abpl_ok_small() {
+    let ccs = include_str!("../systems/ccs/abp_ok.ccs");
+    weak_bisim_test! {
+        "SPEC", "ABPl" => true in ccs;
+        "SPEC", "ABPl_2" => true in ccs;
+    };
+}
+
+#[test]
+fn abp_bad_small() {
+    let ccs = include_str!("../systems/ccs/abp_bad.ccs");
+    weak_bisim_test! {
+        "SPEC", "ABP" => true in ccs;
+    };
+}
+
+#[test]
+fn abpl_bad_small() {
+    let ccs = include_str!("../systems/ccs/abp_bad.ccs");
+    weak_bisim_test! {
+        "SPEC", "ABPl_2" => false in ccs;
+        "SPEC", "ABPl_3" => false in ccs;
+    };
+}
+
+#[test]
+fn simple_infinite_tau_loop() {
     weak_bisim_test! {
         "S", "T" => true in r"
             S = tau.S;
             T = 0;
         ";
     };
+}
+
+#[test]
+fn dual_tau_loop() {
+    weak_bisim_test! {
+        "A", "B" => true in r"
+            A = tau.B + a.0;
+            B = tau.A + b.0;
+            Spec = a.0 + b.0;
+        ";
+    };
+}
+
+#[test]
+fn tau_prefix() {
+    weak_bisim_test! {
+        "S", "T" => false in r"
+            S = tau.(a.0 + b.0);
+            T = tau.a.0 + tau.b.0;
+        ";
+    }
 }
 
 #[test]
