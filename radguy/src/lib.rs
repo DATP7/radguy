@@ -124,14 +124,15 @@ pub fn kleene_local<
 ) -> V {
     let mut assignment = system.bottom_assignment();
     let mut visited = std::iter::once(target).collect();
-    let mut todo = local_dependencies(target, &visited, &assignment, oracle, system);
+    let mut rel = system.variables().cartesian(&system.variables());
+    let mut todo = local_dependencies(target, &visited, &assignment, oracle, system, &mut rel);
     let mut iter = todo.iter();
     while let Some(&x) = iter.next() {
         let evaluated = system.evaluate(x, &assignment);
         if assignment.get(&x) != evaluated || !system.arguments(x).is_subset(&visited) {
             assignment.update(x, evaluated);
             visited = visited.union(system.arguments(x));
-            todo = local_dependencies(target, &visited, &assignment, oracle, system);
+            todo = local_dependencies(target, &visited, &assignment, oracle, system, &mut rel);
             iter = todo.iter();
         }
     }
@@ -151,10 +152,10 @@ fn local_dependencies<
     assignment: &impl Assignment<K, V>,
     oracle: &impl LocalOracle<K, V, PS, VS, S>,
     system: &S,
+    rel: &mut PS,
 ) -> Vec<K> {
-    let product = &system.variables().cartesian(&system.variables());
-    let d = oracle.approximate_flow(visited, assignment, product, system);
-    d.iter()
+    *rel = oracle.approximate_flow(visited, assignment, rel, system);
+    rel.iter()
         .copied()
         .filter_map(|(x, y)| if y == variable { Some(x) } else { None })
         .filter(|x| visited.contains(x))
