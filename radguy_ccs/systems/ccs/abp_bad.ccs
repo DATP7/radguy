@@ -1,0 +1,105 @@
+agent Send_0 = accept.Send_out_0;
+agent Send_1 = accept.Send_out_1;
+
+agent Send_out_0 = 'send_0.Send_wait_0;
+agent Send_out_1 = 'send_1.Send_wait_1;
+
+agent Send_wait_0 = Send_out_0 + dack_0.Send_1 + dack_1.Send_wait_0;
+agent Send_wait_1 = Send_out_1 + dack_1.Send_0 + dack_0.Send_wait_1;
+
+***  Receive 
+
+agent Receive_0 = dsend_0.Receive_ack_0 + dsend_1.'ack_1.Receive_0;
+agent Receive_1 = dsend_1.Receive_ack_1 + dsend_0.'ack_0.Receive_1;
+
+agent Receive_ack_0 = 'deliver.'ack_0.Receive_1;
+agent Receive_ack_1 = 'deliver.'ack_1.Receive_0;
+
+*** Medium (perfect)
+
+agent Medium_send = send_0.'dsend_0.Medium_send + send_1.'dsend_1.Medium_send;
+agent Medium_ack = ack_0.'dack_0.Medium_ack + ack_1.'dack_1.Medium_ack;
+
+*** Medium (lossy)
+
+agent Mediuml_send = send_0.Mediuml_send_0 + send_1.Mediuml_send_1;
+agent Mediuml_send_0 = 'dsend_0.Mediuml_send + Mediuml_send;
+agent Mediuml_send_1 = 'dsend_1.Mediuml_send + Mediuml_send;
+
+agent Mediuml_ack = ack_0.Mediuml_ack_0 + ack_1.Mediuml_ack_1;
+agent Mediuml_ack_0 = 'dack_0.Mediuml_ack + Mediuml_ack;
+agent Mediuml_ack_1 = 'dack_1.Mediuml_ack + Mediuml_ack;
+
+****** ------------- Buffered version of lossy and not lossy medium ----------------
+* Buffer - perfect
+* BufferL - lossy, may drop any bit, at any place, at any time.
+*   not entirely as original, since they require synchronization in order to drop or not.
+agent Medium_send_B = Buffer1 [send_0/in_0, dsend_0/out_0, send_1/in_1, dsend_1/out_1];
+agent Medium_ack_B = Buffer1 [ack_0/in_0, dack_0/out_0, ack_1/in_1, dack_1/out_1];
+agent Mediuml_send_B = Buffer1L [send_0/in_0, dsend_0/out_0, send_1/in_1, dsend_1/out_1];
+agent Mediuml_ack_B = Buffer1L [ack_0/in_0, dack_0/out_0, ack_1/in_1, dack_1/out_1];
+
+*** The alternating bit protocol - Implementation
+
+
+agent SPEC = accept.'deliver.SPEC;
+agent ABP = (Send_0|Receive_0|Medium_send_B|Medium_ack_B) \ { send_0, send_1, ack_0, ack_1, 
+                  dsend_0, dsend_1, dack_0, dack_1 };
+agent ABPl = (Send_0|Receive_0|Mediuml_send_B|Mediuml_ack_B) \ { send_0, send_1, ack_0, ack_1, 
+                  dsend_0, dsend_1, dack_0, dack_1 };
+
+******** Sequential buffer
+
+* Perfect
+agent Buffer1 = in_0.'out_0.Buffer1 + in_1.'out_1.Buffer1;
+agent Buffer2 = ((Buffer1 [shift_0/out_0, shift_1/out_1]) | (Buffer1 [shift_0/in_0, shift_1/in_1])) \ {shift_0, shift_1};
+agent Buffer3 = ((Buffer1 [shift_0/out_0, shift_1/out_1]) | (Buffer2 [shift_0/in_0, shift_1/in_1])) \ {shift_0, shift_1};
+agent Buffer4 = ((Buffer2 [shift_0/out_0, shift_1/out_1]) | (Buffer2 [shift_0/in_0, shift_1/in_1])) \ {shift_0, shift_1};
+agent Buffer5 = ((Buffer2 [shift_0/out_0, shift_1/out_1]) | (Buffer3 [shift_0/in_0, shift_1/in_1])) \ {shift_0, shift_1};
+agent Buffer6 = ((Buffer4 [shift_0/out_0, shift_1/out_1]) | (Buffer2 [shift_0/in_0, shift_1/in_1])) \ {shift_0, shift_1};
+agent Buffer8 = ((Buffer4 [shift_0/out_0, shift_1/out_1]) | (Buffer4 [shift_0/in_0, shift_1/in_1])) \ {shift_0, shift_1};
+
+* Lossy
+agent Buffer1L = in_0.('out_0.Buffer1L + tau.Buffer1L) + in_1.('out_1.Buffer1L + tau.Buffer1L);
+agent Buffer2L = ((Buffer1L [shift_0/out_0, shift_1/out_1]) | (Buffer1L [shift_0/in_0, shift_1/in_1])) \ {shift_0, shift_1};
+agent Buffer3L = ((Buffer1L [shift_0/out_0, shift_1/out_1]) | (Buffer2L [shift_0/in_0, shift_1/in_1])) \ {shift_0, shift_1};
+agent Buffer4L = ((Buffer2L [shift_0/out_0, shift_1/out_1]) | (Buffer2L [shift_0/in_0, shift_1/in_1])) \ {shift_0, shift_1};
+agent Buffer5L = ((Buffer2L [shift_0/out_0, shift_1/out_1]) | (Buffer3L [shift_0/in_0, shift_1/in_1])) \ {shift_0, shift_1};
+agent Buffer6L = ((Buffer4L [shift_0/out_0, shift_1/out_1]) | (Buffer2L [shift_0/in_0, shift_1/in_1])) \ {shift_0, shift_1};
+agent Buffer8L = ((Buffer4L [shift_0/out_0, shift_1/out_1]) | (Buffer4L [shift_0/in_0, shift_1/in_1])) \ {shift_0, shift_1};
+
+
+agent Buffer2LBad = ((Buffer1L [shift_1/out_0, shift_0/out_1]) | (Buffer1L [shift_0/in_0, shift_1/in_1])) \ {shift_0, shift_1};
+agent Buffer3LBad = ((Buffer1L [shift_0/out_0, shift_1/out_1]) | (Buffer2LBad [shift_0/in_0, shift_1/in_1])) \ {shift_0, shift_1};
+agent Buffer4LBad = ((Buffer2L [shift_0/out_0, shift_1/out_1]) | (Buffer2LBad [shift_0/in_0, shift_1/in_1])) \ {shift_0, shift_1};
+agent Buffer5LBad = ((Buffer2L [shift_0/out_0, shift_1/out_1]) | (Buffer3LBad [shift_0/in_0, shift_1/in_1])) \ {shift_0, shift_1};
+agent Buffer6LBad = ((Buffer4L [shift_0/out_0, shift_1/out_1]) | (Buffer2LBad [shift_0/in_0, shift_1/in_1])) \ {shift_0, shift_1};
+
+
+******** Buffers end
+
+
+* Convenience
+
+agent ABP_2 = (Send_0|Receive_0 | (Buffer2 [send_0/in_0, dsend_0/out_0, send_1/in_1, dsend_1/out_1]) | (Buffer2 [ack_0/in_0, dack_0/out_0, ack_1/in_1, dack_1/out_1])) \ { send_0, send_1, ack_0, ack_1, 
+                  dsend_0, dsend_1, dack_0, dack_1 };
+agent ABP_3 = (Send_0|Receive_0 | (Buffer3 [send_0/in_0, dsend_0/out_0, send_1/in_1, dsend_1/out_1]) | (Buffer3 [ack_0/in_0, dack_0/out_0, ack_1/in_1, dack_1/out_1])) \ { send_0, send_1, ack_0, ack_1, 
+                  dsend_0, dsend_1, dack_0, dack_1 };
+agent ABP_4 = (Send_0|Receive_0 | (Buffer4 [send_0/in_0, dsend_0/out_0, send_1/in_1, dsend_1/out_1]) | (Buffer4 [ack_0/in_0, dack_0/out_0, ack_1/in_1, dack_1/out_1])) \ { send_0, send_1, ack_0, ack_1, 
+                  dsend_0, dsend_1, dack_0, dack_1 };
+agent ABP_5 = (Send_0|Receive_0 | (Buffer5 [send_0/in_0, dsend_0/out_0, send_1/in_1, dsend_1/out_1]) | (Buffer5 [ack_0/in_0, dack_0/out_0, ack_1/in_1, dack_1/out_1])) \ { send_0, send_1, ack_0, ack_1, 
+                  dsend_0, dsend_1, dack_0, dack_1 };
+agent ABP_6 = (Send_0|Receive_0 | (Buffer6 [send_0/in_0, dsend_0/out_0, send_1/in_1, dsend_1/out_1]) | (Buffer6 [ack_0/in_0, dack_0/out_0, ack_1/in_1, dack_1/out_1])) \ { send_0, send_1, ack_0, ack_1, 
+                  dsend_0, dsend_1, dack_0, dack_1 };
+
+agent ABPl_2 = (Send_0|Receive_0 | (Buffer2LBad [send_0/in_0, dsend_0/out_0, send_1/in_1, dsend_1/out_1]) | (Buffer2L [ack_0/in_0, dack_0/out_0, ack_1/in_1, dack_1/out_1])) \ { send_0, send_1, ack_0, ack_1, 
+                  dsend_0, dsend_1, dack_0, dack_1 };
+agent ABPl_3 = (Send_0|Receive_0 | (Buffer3LBad [send_0/in_0, dsend_0/out_0, send_1/in_1, dsend_1/out_1]) | (Buffer3L [ack_0/in_0, dack_0/out_0, ack_1/in_1, dack_1/out_1])) \ { send_0, send_1, ack_0, ack_1, 
+                  dsend_0, dsend_1, dack_0, dack_1 };
+agent ABPl_4 = (Send_0|Receive_0 | (Buffer4LBad [send_0/in_0, dsend_0/out_0, send_1/in_1, dsend_1/out_1]) | (Buffer4L [ack_0/in_0, dack_0/out_0, ack_1/in_1, dack_1/out_1])) \ { send_0, send_1, ack_0, ack_1, 
+                  dsend_0, dsend_1, dack_0, dack_1 };
+agent ABPl_5 = (Send_0|Receive_0 | (Buffer5LBad [send_0/in_0, dsend_0/out_0, send_1/in_1, dsend_1/out_1]) | (Buffer5L [ack_0/in_0, dack_0/out_0, ack_1/in_1, dack_1/out_1])) \ { send_0, send_1, ack_0, ack_1, 
+                  dsend_0, dsend_1, dack_0, dack_1 };
+agent ABPl_6 = (Send_0|Receive_0 | (Buffer6LBad [send_0/in_0, dsend_0/out_0, send_1/in_1, dsend_1/out_1]) | (Buffer6L [ack_0/in_0, dack_0/out_0, ack_1/in_1, dack_1/out_1])) \ { send_0, send_1, ack_0, ack_1, 
+                  dsend_0, dsend_1, dack_0, dack_1 };
+

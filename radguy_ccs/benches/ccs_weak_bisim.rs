@@ -34,6 +34,14 @@ macro_rules! bisim_bench_suite {
     };
 }
 
+bisim_bench_suite! {
+    abp_ok: "SPEC", "ABP" => true in include_str!("../systems/ccs/abp_ok.ccs");
+    abpl_ok: "SPEC", "ABPl" => true in include_str!("../systems/ccs/abp_ok.ccs");
+    abpl_ok_2: "SPEC", "ABPl_2" => true in include_str!("../systems/ccs/abp_ok.ccs");
+    abpl_bad_2: "SPEC", "ABPl_2" => false in include_str!("../systems/ccs/abp_bad.ccs");
+    abpl_bad_3: "SPEC", "ABPl_3" => false in include_str!("../systems/ccs/abp_bad.ccs");
+}
+
 // TODO: Parameterize on size of leader election?
 bisim_bench_suite! {
     leader_election_bad_6: "Spec", "Ring" => false in r"
@@ -132,6 +140,11 @@ bisim_bench_suite! {
 
 criterion_group!(
     benches,
+    abp_ok,
+    abpl_ok,
+    abpl_ok_2,
+    abpl_bad_2,
+    abpl_bad_3,
     leader_election_bad_6,
     leader_election_ok_6,
     dekker_mutual_exclusion
