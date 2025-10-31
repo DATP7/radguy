@@ -6,7 +6,10 @@ use std::{
 };
 
 use itertools::iproduct;
-use radguy::{Arguments, Assignment, PairUniverse, System, Universe};
+use radguy::{
+    Arguments, Assignment, PairUniverse, System, Universe,
+    ordered::strategy::{InitialStrategy, Strategy},
+};
 use slotmap::Key;
 
 use crate::systems::{
@@ -314,5 +317,23 @@ impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKe
 {
     fn pair_universe(&self) -> HashSet<(VarKey, VarKey)> {
         self.bool_system.borrow().pair_universe()
+    }
+}
+
+impl<
+    'a,
+    ProcKey: Key,
+    VarKey: Key + Hash + Clone,
+    TermKey: Key + Hash,
+    T: TransitionSystem<'a, ProcKey>,
+    OutStrategy: Strategy<(VarKey, VarKey)>,
+> InitialStrategy<VarKey, bool, HashSet<(VarKey, VarKey)>, HashSet<VarKey>, OutStrategy>
+    for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
+where
+    BoolSystem<VarKey, TermKey, (ProcKey, ProcKey)>:
+        InitialStrategy<VarKey, bool, HashSet<(VarKey, VarKey)>, HashSet<VarKey>, OutStrategy>,
+{
+    fn get_initial_strategy(&self) -> OutStrategy {
+        self.bool_system.borrow().get_initial_strategy()
     }
 }

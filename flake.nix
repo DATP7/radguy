@@ -24,6 +24,7 @@
           buildInputs = with pkgs; [
             (rust-bin.selectLatestNightlyWith
               (toolchain: toolchain.default))
+            samply
           ];
         };
       }

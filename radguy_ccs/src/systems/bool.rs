@@ -111,6 +111,22 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
     }
 }
 
+impl<VarKey: Key + Hash + Clone, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
+    InitialStrategy<
+        VarKey,
+        bool,
+        HashSet<(VarKey, VarKey)>,
+        HashSet<VarKey>,
+        StrategyHeap<(VarKey, VarKey)>,
+    > for BoolSystem<VarKey, TermKey, VarName>
+{
+    fn get_initial_strategy(&self) -> StrategyHeap<(VarKey, VarKey)> {
+        iproduct!(self.names.keys(), self.names.keys())
+            .map(|(x, y)| StrategyItem::infinite((x, y)).reversed())
+            .collect()
+    }
+}
+
 #[derive(Hash, PartialEq, Eq, Clone, Debug)]
 pub enum BoolTerm<V: Key, T: Key> {
     True,
@@ -174,13 +190,13 @@ macro_rules! bool_term {
             $system.terms.get_or_insert_key($crate::systems::bool::BoolTerm::Variable(var_key))
     }};
     (($lhs:tt || $rhs:tt); $system:expr) => {{
-        let lhs = bool_term!($lhs; $system);
-        let rhs = bool_term!($rhs; $system);
+        let lhs = $crate::bool_term!($lhs; $system);
+        let rhs = $crate::bool_term!($rhs; $system);
         $system.terms.get_or_insert_key($crate::systems::bool::BoolTerm::Or(lhs, rhs))
         }};
     (($lhs:tt && $rhs:tt); $system:expr) => {{
-        let lhs = bool_term!($lhs; $system);
-        let rhs = bool_term!($rhs; $system);
+        let lhs = $crate::bool_term!($lhs; $system);
+        let rhs = $crate::bool_term!($rhs; $system);
         $system.terms.get_or_insert_key($crate::systems::bool::BoolTerm::And(lhs, rhs))
     }};
 }
@@ -188,7 +204,7 @@ macro_rules! bool_term {
 #[macro_export]
 macro_rules! bool_def {
     ($id:ident = $def:tt; $system:expr) => {{
-        {let term = bool_term!($def; $system);
+        {let term = $crate::bool_term!($def; $system);
         let key = $system.names.get_or_insert_key(stringify!($id));
         $system.definitions.insert(key, term);
         }
@@ -201,7 +217,7 @@ macro_rules! bool_system {
         {
             let mut system = $crate::systems::bool::BoolSystem::<slotmap::DefaultKey, slotmap::DefaultKey, &str>::default();
             $(
-                bool_def!($id = $def; system);
+                $crate::bool_def!($id = $def; system);
             )*
             system
         }
