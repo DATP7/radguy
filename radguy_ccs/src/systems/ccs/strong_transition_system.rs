@@ -17,6 +17,7 @@ pub struct StrongTransitionSystem<'a, ProcKey: Key> {
     process_names: HashMap<&'a str, ProcKey>,
     process_bindings: RefCell<BiSlotMap<ProcKey, FlatProcess<'a, ProcKey>>>,
     transition_cache: RefCell<SecondaryMap<ProcKey, TransitionMap<'a, ProcKey>>>,
+    normalisation_cache: RefCell<SecondaryMap<ProcKey, ProcKey>>,
 }
 
 impl<'a, ProcKey: Key> StrongTransitionSystem<'a, ProcKey> {
@@ -84,9 +85,12 @@ impl<'a, ProcKey: Key> StrongTransitionSystem<'a, ProcKey> {
         }
     }
     pub fn get_normalized_process(&self, key: ProcKey) -> ProcKey {
+        if let Some(norm_key) = self.normalisation_cache.borrow().get(key) {
+            return *norm_key;
+        }
         // TODO potentially cache this
         let process = self.get_process(key);
-        match process {
+        let norm_proc_key = match process {
             FlatProcess::Nil | FlatProcess::Named(..) => key,
             FlatProcess::ActionPrefix {
                 action,
@@ -128,7 +132,13 @@ impl<'a, ProcKey: Key> StrongTransitionSystem<'a, ProcKey> {
                 };
                 self.process_bindings.borrow_mut().get_or_insert_key(new)
             }
-        }
+        };
+
+        self.normalisation_cache
+            .borrow_mut()
+            .insert(key, norm_proc_key);
+
+        norm_proc_key
     }
 
     fn normalize_relabelling(
