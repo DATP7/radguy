@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::Display,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Process<'a> {
@@ -72,5 +75,18 @@ impl<'a> Action<'a> {
     pub fn parse(ccs: &'a str) -> Self {
         let parser = super::grammar::ActionParser::new();
         parser.parse(ccs).expect("action should parse")
+    }
+}
+
+impl Display for Action<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Tau => write!(f, "tau"),
+            Self::Label {
+                name,
+                is_complement,
+            } if *is_complement => write!(f, "'{name}"),
+            Self::Label { name, .. } => write!(f, "{name}"),
+        }
     }
 }

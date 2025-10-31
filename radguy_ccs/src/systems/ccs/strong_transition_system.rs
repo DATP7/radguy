@@ -34,8 +34,46 @@ impl<'a, ProcKey: Key> StrongTransitionSystem<'a, ProcKey> {
             .clone()
     }
 
+    pub fn process_to_string(&self, process_key: ProcKey) -> String {
+        let proc = self.get_process(process_key);
+        match proc {
+            FlatProcess::Nil => "0".to_owned(),
+            FlatProcess::Named(name) => name.to_owned(),
+            FlatProcess::ActionPrefix { action, process } => {
+                format!("{action}.{}", self.process_to_string(process))
+            }
+            FlatProcess::Restriction {
+                process,
+                restrictions,
+            } => format!(
+                "({})\\{{{}}}",
+                self.process_to_string(process),
+                restrictions.iter().copied().collect::<Vec<_>>().join(", "),
+            ),
+            FlatProcess::Relabelling { process, labels } => format!(
+                "({})[{}]",
+                self.process_to_string(process),
+                labels
+                    .iter()
+                    .map(|(from, to)| format!("{to}/{from}"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            FlatProcess::Sum(lhs, rhs) => format!(
+                "({}) + ({})",
+                self.process_to_string(lhs),
+                self.process_to_string(rhs)
+            ),
+            FlatProcess::Compose(lhs, rhs) => format!(
+                "({}) | ({})",
+                self.process_to_string(lhs),
+                self.process_to_string(rhs)
+            ),
+        }
+    }
+
     pub fn insert_ast_process(&self, process: &Process<'a>) -> ProcKey {
-        match process {
+        let proc_key = match process {
             Process::Nil => self.insert_process(FlatProcess::Nil),
             Process::Named(name) => self.insert_process(FlatProcess::Named(name)),
             Process::ActionPrefix { action, process } => {
@@ -82,7 +120,8 @@ impl<'a, ProcKey: Key> StrongTransitionSystem<'a, ProcKey> {
                     .borrow_mut()
                     .get_or_insert_key(FlatProcess::Compose(left_key, right_key))
             }
-        }
+        };
+        self.get_normalized_process(proc_key)
     }
     pub fn get_normalized_process(&self, key: ProcKey) -> ProcKey {
         if let Some(norm_key) = self.normalisation_cache.borrow().get(key) {
@@ -455,6 +494,20 @@ impl<'a, ProcKey: Key> TransitionSystem<'a, ProcKey> for StrongTransitionSystem<
                 successors
             }
         };
+
+        let result: TransitionMap<_> = result
+            .into_iter()
+            .map(|(act, targets)| {
+                (
+                    act,
+                    targets
+                        .into_iter()
+                        .map(|target| self.get_normalized_process(target))
+                        .collect(),
+                )
+            })
+            .collect();
+
         self.transition_cache
             .borrow_mut()
             .insert(process_key, result.clone());
@@ -473,7 +526,6 @@ mod tests {
     use crate::systems::ccs::transition_system::TransitionMap;
     use crate::systems::ccs::transition_system::TransitionSystem;
     use slotmap::DefaultKey;
-    use std::collections::HashMap;
 
     macro_rules! test_compose_labels {
         ($($first:expr, $second:expr => $result:expr;)*) => {
@@ -498,7 +550,7 @@ mod tests {
     }
 
     macro_rules! transition_set {
-        ($lts:expr;) => {HashMap::new()};
+        ($lts:expr;) => {TransitionMap::new()};
         ($lts:expr;$($action:expr => $target:expr),*) => {{
             let mut transitions = TransitionMap::new();
             $(
@@ -528,7 +580,18 @@ mod tests {
                 let proc = Process::parse($proc);
                 let key = lts.insert_ast_process(&proc);
                 let transitions = lts.get_transitions(key);
-                assert_eq!(transitions, transition_set![lts; $($action => $target),*])
+                let expected = transition_set![lts; $($action => $target),*];
+
+                println!("expected:");
+                for (act, procs) in &expected {
+                    println!("{act} => {:?}", procs.iter().map(|proc| lts.process_to_string(*proc)).collect::<Vec<_>>());
+                }
+                println!("got:");
+                for (act, procs) in &transitions {
+                    println!("{act} => {:?}", procs.iter().map(|proc| lts.process_to_string(*proc)).collect::<Vec<_>>());
+                }
+
+                assert_eq!(transitions, expected)
             }
             )*
         };
