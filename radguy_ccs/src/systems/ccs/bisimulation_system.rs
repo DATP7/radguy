@@ -6,7 +6,7 @@ use std::{
 };
 
 use itertools::iproduct;
-use radguy::{Assignment, System};
+use radguy::{Arguments, Assignment, PairUniverse, System, Universe};
 use slotmap::Key;
 
 use crate::systems::{
@@ -72,6 +72,7 @@ impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKe
         let left_transitions = self.transition_system.get_transitions(left_key);
         let right_transitions = self.transition_system.get_transitions(right_key);
 
+        // PERF: Different set structure
         let mut local_pairs = HashSet::<(ProcKey, ProcKey)>::new();
 
         // Dummy set placed here to allocate once. unwrap_or_else cannot return a borrowed value
@@ -258,8 +259,7 @@ impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKe
 }
 
 impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKey>>
-    System<VarKey, bool, HashSet<(VarKey, VarKey)>, HashSet<VarKey>>
-    for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
+    System<VarKey, bool> for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
 {
     fn evaluate(&self, var_key: VarKey, assignment: &dyn Assignment<VarKey, bool>) -> bool {
         let term_key = {
@@ -278,6 +278,14 @@ impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKe
         self.bool_system.borrow().evaluate(var_key, assignment)
     }
 
+    fn bottom_assignment(&self) -> impl Assignment<VarKey, bool> {
+        HashMap::new()
+    }
+}
+
+impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKey>>
+    Arguments<VarKey, HashSet<VarKey>> for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
+{
     fn arguments(&self, var_key: VarKey) -> HashSet<VarKey> {
         let term_key = {
             let sys = self.bool_system.borrow();
@@ -290,12 +298,21 @@ impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKe
 
         self.bool_system.borrow().arguments(var_key)
     }
+}
 
-    fn variables(&self) -> HashSet<VarKey> {
+impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKey>>
+    Universe<HashSet<VarKey>> for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
+{
+    fn universe(&self) -> HashSet<VarKey> {
         self.bool_system.borrow().names.keys().collect()
     }
+}
 
-    fn bottom_assignment(&self) -> impl Assignment<VarKey, bool> {
-        HashMap::new()
+impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKey>>
+    PairUniverse<HashSet<(VarKey, VarKey)>>
+    for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
+{
+    fn pair_universe(&self) -> HashSet<(VarKey, VarKey)> {
+        self.bool_system.borrow().pair_universe()
     }
 }

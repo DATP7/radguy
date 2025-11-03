@@ -4,21 +4,22 @@ use std::{
     hash::Hash,
 };
 
-use radguy::bislotmap::BiSlotMap;
-use radguy::{Assignment, System, extension::TermSystem};
+use itertools::iproduct;
+use radguy::{Arguments, Assignment, PairUniverse, Set, System, Universe, extension::TermSystem};
+use radguy::{Union, bislotmap::BiSlotMap};
 use slotmap::{Key, SecondaryMap};
 
 pub mod extension;
 
 #[derive(Default, Debug)]
-pub struct BoolSystem<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone> {
-    pub names: BiSlotMap<V, N>,
-    pub definitions: SecondaryMap<V, T>,
-    pub terms: BiSlotMap<T, BoolTerm<V, T>>,
+pub struct BoolSystem<K: Key, T: Key, N: Hash + Eq + Clone> {
+    pub names: BiSlotMap<K, N>,
+    pub definitions: SecondaryMap<K, T>,
+    pub terms: BiSlotMap<T, BoolTerm<K, T>>,
 }
 
-impl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone> BoolSystem<V, T, N> {
-    pub fn evaluate_term(&self, term_key: T, assignment: &dyn Assignment<V, bool>) -> bool {
+impl<K: Key, T: Key, N: Hash + Eq + Clone> BoolSystem<K, T, N> {
+    pub fn evaluate_term(&self, term_key: T, assignment: &dyn Assignment<K, bool>) -> bool {
         match self.terms.get_value(term_key) {
             BoolTerm::True => true,
             BoolTerm::False => false,
@@ -32,21 +33,23 @@ impl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone> BoolSystem<V, T, N> {
         }
     }
 
-    pub fn term_arguments(&self, term_key: T) -> HashSet<V> {
+    pub fn term_arguments<ArgSet: Set<K> + Union + Default>(&self, term_key: T) -> ArgSet {
         match self.terms.get_value(term_key) {
-            BoolTerm::False | BoolTerm::True => HashSet::new(),
-            BoolTerm::Variable(k) => HashSet::from_iter([*k]),
+            BoolTerm::False | BoolTerm::True => ArgSet::default(),
+            BoolTerm::Variable(k) => {
+                let mut set = ArgSet::default();
+                set.insert(*k);
+                set
+            }
             BoolTerm::Or(lhs, rhs) | BoolTerm::And(lhs, rhs) => self
-                .term_arguments(*lhs)
-                .union(&self.term_arguments(*rhs))
-                .copied()
-                .collect(),
+                .term_arguments::<ArgSet>(*lhs)
+                .union(self.term_arguments(*rhs)),
         }
     }
 }
 
-impl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone + Debug> BoolSystem<V, T, N> {
-    pub fn print_assignment(&self, a: &dyn Assignment<V, bool>) {
+impl<K: Key, T: Key, N: Hash + Eq + Clone + Debug> BoolSystem<K, T, N> {
+    pub fn print_assignment(&self, a: &dyn Assignment<K, bool>) {
         for (key, name) in self.names.iter() {
             println!("{name:?} = {:?}", a.get(&key));
         }
@@ -63,8 +66,19 @@ impl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone + Debug> BoolSystem<V, T
     }
 }
 
-impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
-    System<VarKey, bool, HashSet<(VarKey, VarKey)>, HashSet<VarKey>>
+impl<K: Key, T: Key, N: Hash + Eq + Clone> Universe<HashSet<K>> for BoolSystem<K, T, N> {
+    fn universe(&self) -> HashSet<K> {
+        self.definitions.keys().collect()
+    }
+}
+
+impl<K: Key, T: Key, N: Hash + Eq + Clone> PairUniverse<HashSet<(K, K)>> for BoolSystem<K, T, N> {
+    fn pair_universe(&self) -> HashSet<(K, K)> {
+        iproduct!(self.names.keys(), self.names.keys()).collect()
+    }
+}
+
+impl<VarKey: Key, TermKey: Key, VarName: Hash + Eq + Clone> System<VarKey, bool>
     for BoolSystem<VarKey, TermKey, VarName>
 {
     fn evaluate(&self, key: VarKey, assignment: &dyn Assignment<VarKey, bool>) -> bool {
@@ -72,23 +86,22 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
         self.evaluate_term(*term_key, assignment)
     }
 
-    fn arguments(&self, key: VarKey) -> HashSet<VarKey> {
-        let term_key = self.definitions.get(key).expect("variable must be defined");
-        self.term_arguments(*term_key)
-    }
-
-    fn variables(&self) -> HashSet<VarKey> {
-        self.definitions.keys().collect()
-    }
-
     fn bottom_assignment(&self) -> impl Assignment<VarKey, bool> {
         HashMap::new()
     }
 }
 
-impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
-    TermSystem<VarKey, bool, TermKey, HashSet<(VarKey, VarKey)>, HashSet<VarKey>>
+impl<VarKey: Key, TermKey: Key, VarName: Hash + Eq + Clone> Arguments<VarKey, HashSet<VarKey>>
     for BoolSystem<VarKey, TermKey, VarName>
+{
+    fn arguments(&self, key: VarKey) -> HashSet<VarKey> {
+        let term_key = self.definitions.get(key).expect("variable must be defined");
+        self.term_arguments(*term_key)
+    }
+}
+
+impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
+    TermSystem<VarKey, bool, TermKey> for BoolSystem<VarKey, TermKey, VarName>
 {
     fn definition(&self, variable: VarKey) -> TermKey {
         *self

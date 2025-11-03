@@ -12,14 +12,27 @@ pub mod extension;
 pub mod oracle;
 
 pub trait Set<T> {
-    #[must_use]
-    fn intersect(&self, other: Self) -> Self;
-    #[must_use]
-    fn union(&self, other: Self) -> Self;
-    #[must_use]
-    fn without(&self, _other: &Self) -> Self;
     fn contains(&self, item: &T) -> bool;
-    fn is_subset(&self, other: &Self) -> bool;
+    fn insert(&mut self, item: T) -> bool;
+}
+
+pub trait Union<Other = Self> {
+    #[must_use]
+    fn union(self, other: Other) -> Self;
+}
+
+pub trait Intersect<Other = Self> {
+    #[must_use]
+    fn intersect(self, other: &Other) -> Self;
+}
+
+pub trait Without<Other = Self> {
+    #[must_use]
+    fn without(self, other: &Other) -> Self;
+}
+
+pub trait IsSubset<Other = Self> {
+    fn is_subset(&self, other: &Other) -> bool;
 }
 
 pub trait Cartesian<Rhs = Self> {
@@ -29,26 +42,32 @@ pub trait Cartesian<Rhs = Self> {
     fn cartesian(&self, other: &Rhs) -> Self::Output;
 }
 
-pub trait IterSet: Set<Self::Item> {
-    type Item;
-    type Iter<'a>: Iterator<Item = &'a Self::Item>
-    where
-        Self: 'a;
-    fn iter(&self) -> Self::Iter<'_>;
+pub trait Diagonal {
+    type Output;
+    /// Returns the reflexive relation of elements on a set
+    /// i.e. diagonal({x}) = {(x,x)}
+    fn diagonal(&self) -> Self::Output;
 }
 
-pub trait System<
-    VarKey: Copy,
-    VarValue: PartialOrd,
-    PairSet: IterSet<Item = (VarKey, VarKey)>,
-    VarSet: IterSet<Item = VarKey>,
->
-{
-    fn evaluate(&self, key: VarKey, assignment: &dyn Assignment<VarKey, VarValue>) -> VarValue;
+pub trait Universe<S> {
+    /// Returns a structure S containing all variables in the system
+    #[must_use]
+    fn universe(&self) -> S;
+}
 
-    fn arguments(&self, key: VarKey) -> VarSet;
-    fn variables(&self) -> VarSet;
+pub trait PairUniverse<S> {
+    /// Returns the cartesian product of all the variables, $VV times VV$
+    #[must_use]
+    fn pair_universe(&self) -> S;
+}
+
+pub trait System<VarKey: Copy, VarValue: PartialOrd> {
+    fn evaluate(&self, key: VarKey, assignment: &dyn Assignment<VarKey, VarValue>) -> VarValue;
     fn bottom_assignment(&self) -> impl Assignment<VarKey, VarValue>;
+}
+
+pub trait Arguments<VarKey, VarSet> {
+    fn arguments(&self, key: VarKey) -> VarSet;
 }
 
 pub trait Assignment<K, V> {
@@ -56,38 +75,38 @@ pub trait Assignment<K, V> {
     fn update(&mut self, key: K, value: V);
 }
 
-impl<T: Eq + Hash + Copy, S: ::std::hash::BuildHasher + Default> Set<T> for HashSet<T, S> {
-    fn intersect(&self, other: Self) -> Self {
-        self.intersection(&other).copied().collect()
-    }
-
-    fn union(&self, other: Self) -> Self {
-        self.union(&other).copied().collect()
-    }
-
-    fn is_subset(&self, other: &Self) -> bool {
-        self.is_subset(other)
+impl<T: Eq + Hash, S: ::std::hash::BuildHasher + Default> Set<T> for HashSet<T, S> {
+    fn insert(&mut self, item: T) -> bool {
+        Self::insert(self, item)
     }
 
     fn contains(&self, item: &T) -> bool {
         self.contains(item)
     }
+}
 
-    fn without(&self, other: &Self) -> Self {
-        self.difference(other).copied().collect()
+impl<T: Eq + Hash, S: ::std::hash::BuildHasher + Default> Union<Self> for HashSet<T, S> {
+    fn union(mut self, other: Self) -> Self {
+        self.extend(other);
+        self
     }
 }
 
-impl<T: Eq + Hash + Copy, S: ::std::hash::BuildHasher + Default> IterSet for HashSet<T, S> {
-    type Item = T;
-    type Iter<'a>
-        = std::collections::hash_set::Iter<'a, T>
-    where
-        T: 'a,
-        Self: 'a;
+impl<T: Eq + Hash + Copy, S: ::std::hash::BuildHasher + Default> Intersect<Self> for HashSet<T, S> {
+    fn intersect(self, other: &Self) -> Self {
+        self.intersection(other).copied().collect()
+    }
+}
 
-    fn iter(&self) -> Self::Iter<'_> {
-        self.iter()
+impl<T: Eq + Hash, S: ::std::hash::BuildHasher + Default> IsSubset<Self> for HashSet<T, S> {
+    fn is_subset(&self, other: &Self) -> bool {
+        self.is_subset(other)
+    }
+}
+
+impl<T: Eq + Hash + Copy, S: ::std::hash::BuildHasher + Default> Without<Self> for HashSet<T, S> {
+    fn without(self, other: &Self) -> Self {
+        self.difference(other).copied().collect()
     }
 }
 
@@ -96,6 +115,14 @@ impl<T: Eq + Hash + Copy, S: ::std::hash::BuildHasher> Cartesian for HashSet<T, 
 
     fn cartesian(&self, other: &Self) -> Self::Output {
         iproduct!(self.iter().copied(), other.iter().copied()).collect()
+    }
+}
+
+impl<T: Eq + Hash + Copy, S: ::std::hash::BuildHasher> Diagonal for HashSet<T, S> {
+    type Output = HashSet<(T, T)>;
+
+    fn diagonal(&self) -> Self::Output {
+        self.iter().copied().map(|x| (x, x)).collect()
     }
 }
 
@@ -114,17 +141,20 @@ impl<K: Hash + Eq, V: Bottom + Clone, S: std::hash::BuildHasher> Assignment<K, V
 pub fn kleene_local<
     K: Copy + Hash + Eq + Debug,
     V: Eq + PartialOrd,
-    PS: IterSet<Item = (K, K)>,
-    VS: IterSet<Item = K> + Cartesian<Output = PS> + FromIterator<K>,
-    S: System<K, V, PS, VS>,
+    PS,
+    VS: Set<K> + Union + IsSubset + FromIterator<K>,
+    S: System<K, V> + PairUniverse<PS> + Arguments<K, VS>,
 >(
     system: &S,
     target: K,
-    oracle: &impl LocalOracle<K, V, PS, VS, S>,
-) -> V {
+    oracle: &impl LocalOracle<K, V, VS, PS, S>,
+) -> V
+where
+    for<'a> &'a PS: IntoIterator<Item = &'a (K, K)>,
+{
     let mut assignment = system.bottom_assignment();
     let mut visited = std::iter::once(target).collect();
-    let mut rel = system.variables().cartesian(&system.variables());
+    let mut rel = system.pair_universe();
     let mut todo = local_dependencies(target, &visited, &assignment, oracle, system, &mut rel);
     let mut iter = todo.iter();
     while let Some(&x) = iter.next() {
@@ -140,22 +170,19 @@ pub fn kleene_local<
     assignment.get(&target)
 }
 
-fn local_dependencies<
-    K: Copy + Hash + Eq,
-    V: PartialOrd,
-    PS: IterSet<Item = (K, K)>,
-    VS: IterSet<Item = K> + Cartesian<Output = PS>,
-    S: System<K, V, PS, VS>,
->(
+fn local_dependencies<K: Hash + Copy + Eq, V: PartialOrd, VS: Set<K>, PS, S: System<K, V>>(
     variable: K,
     visited: &VS,
     assignment: &impl Assignment<K, V>,
-    oracle: &impl LocalOracle<K, V, PS, VS, S>,
+    oracle: &impl LocalOracle<K, V, VS, PS, S>,
     system: &S,
     rel: &mut PS,
-) -> Vec<K> {
+) -> Vec<K>
+where
+    for<'a> &'a PS: IntoIterator<Item = &'a (K, K)>,
+{
     *rel = oracle.approximate_flow(visited, assignment, rel, system);
-    rel.iter()
+    rel.into_iter()
         .copied()
         .filter_map(|(x, y)| if y == variable { Some(x) } else { None })
         .filter(|x| visited.contains(x))

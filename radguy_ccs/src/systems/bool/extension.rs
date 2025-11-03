@@ -1,6 +1,5 @@
-use itertools::iproduct;
 use radguy::{
-    Assignment, System,
+    Assignment, Universe,
     extension::{LocalExtension, TermSystem},
 };
 use slotmap::Key;
@@ -18,8 +17,8 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
         VarKey,
         bool,
         TermKey,
-        HashSet<(VarKey, VarKey)>,
         HashSet<VarKey>,
+        HashSet<(VarKey, VarKey)>,
         HashSet<(VarKey, TermKey)>,
     > for BoolExtension<TermKey, VarName>
 {
@@ -33,10 +32,7 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
         system: &Self::System,
     ) -> HashSet<(VarKey, TermKey)> {
         let mut deps = HashSet::new();
-        for (x, y) in iproduct!(
-            system.variables().iter().copied(),
-            system.variables().iter().copied()
-        ) {
+        for (x, y) in possible.iter().copied() {
             collect_terms(
                 x,
                 system.definition(y),
@@ -50,7 +46,7 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
     }
 }
 
-fn collect_terms<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>(
+fn collect_terms<VarKey: Key, TermKey: Key, VarName: Hash + Eq + Clone>(
     x: VarKey,
     term_key: TermKey,
     assignment: &dyn Assignment<VarKey, bool>,
@@ -103,7 +99,8 @@ fn collect_terms<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + C
                 if !current.contains(&(x, i)) {
                     continue;
                 }
-                for z in system.variables() {
+                let universe: HashSet<VarKey> = system.universe();
+                for z in universe {
                     collect_terms(z, j, assignment, possible, system, current);
                     if current.contains(&(z, j)) {
                         current.insert((x, term_key));
