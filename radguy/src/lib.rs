@@ -55,10 +55,19 @@ pub trait Universe<S> {
     fn universe(&self) -> S;
 }
 
-pub trait System<VarKey: Copy, VarValue: PartialOrd, PairSet, VarSet> {
+pub trait PairUniverse<S> {
+    /// Returns the cartesian product of all the variables, $VV times VV$
+    #[must_use]
+    fn pair_universe(&self) -> S;
+}
+
+pub trait System<VarKey: Copy, VarValue: PartialOrd> {
     fn evaluate(&self, key: VarKey, assignment: &dyn Assignment<VarKey, VarValue>) -> VarValue;
-    fn arguments(&self, key: VarKey) -> VarSet;
     fn bottom_assignment(&self) -> impl Assignment<VarKey, VarValue>;
+}
+
+pub trait Arguments<VarKey, VarSet> {
+    fn arguments(&self, key: VarKey) -> VarSet;
 }
 
 pub trait Assignment<K, V> {
@@ -133,19 +142,19 @@ pub fn kleene_local<
     K: Copy + Hash + Eq + Debug,
     V: Eq + PartialOrd,
     PS,
-    VS: Set<K> + Union + IsSubset + Cartesian<Output = PS> + FromIterator<K>,
-    S: System<K, V, PS, VS> + Universe<impl Cartesian<Output = PS>>,
+    VS: Set<K> + Union + IsSubset + FromIterator<K>,
+    S: System<K, V> + PairUniverse<PS> + Arguments<K, VS>,
 >(
     system: &S,
     target: K,
-    oracle: &impl LocalOracle<K, V, PS, VS, S>,
+    oracle: &impl LocalOracle<K, V, VS, PS, S>,
 ) -> V
 where
     for<'a> &'a PS: IntoIterator<Item = &'a (K, K)>,
 {
     let mut assignment = system.bottom_assignment();
     let mut visited = std::iter::once(target).collect();
-    let mut rel = system.universe().cartesian(&system.universe());
+    let mut rel = system.pair_universe();
     let mut todo = local_dependencies(target, &visited, &assignment, oracle, system, &mut rel);
     let mut iter = todo.iter();
     while let Some(&x) = iter.next() {
@@ -161,17 +170,11 @@ where
     assignment.get(&target)
 }
 
-fn local_dependencies<
-    K: Hash + Copy + Eq,
-    V: PartialOrd,
-    PS,
-    VS: Set<K> + Cartesian<Output = PS>,
-    S: System<K, V, PS, VS>,
->(
+fn local_dependencies<K: Hash + Copy + Eq, V: PartialOrd, VS: Set<K>, PS, S: System<K, V>>(
     variable: K,
     visited: &VS,
     assignment: &impl Assignment<K, V>,
-    oracle: &impl LocalOracle<K, V, PS, VS, S>,
+    oracle: &impl LocalOracle<K, V, VS, PS, S>,
     system: &S,
     rel: &mut PS,
 ) -> Vec<K>

@@ -2,14 +2,19 @@ use std::{collections::HashSet, hash::Hash, marker::PhantomData};
 
 use crate::{Assignment, Cartesian, System, Union, Universe, Without, oracle::LocalOracle};
 
+pub trait TermSystem<VarKey: Copy, VarValue: PartialOrd, TermKey: Copy>:
+    System<VarKey, VarValue>
+{
+    fn definition(&self, variable: VarKey) -> TermKey;
+}
+
 pub trait TermToKey<
     VarKey: Copy,
     VarValue: PartialOrd,
     TermKey: Copy,
-    PairSet,
     VarSet,
-    TermSet,
-    S: TermSystem<VarKey, VarValue, TermKey, PairSet, VarSet>,
+    PairSet,
+    S: TermSystem<VarKey, VarValue, TermKey>,
 >
 {
     fn term_to_key(&self, visited: &VarSet, system: &S) -> PairSet;
@@ -19,9 +24,9 @@ impl<
     VarKey: Copy + Hash + Eq,
     VarValue: PartialOrd,
     TermKey: Copy + Eq + Hash,
-    S: TermSystem<VarKey, VarValue, TermKey, HashSet<(VarKey, VarKey)>, HashSet<VarKey>>,
+    S: TermSystem<VarKey, VarValue, TermKey>,
     H: ::std::hash::BuildHasher + Default,
-> TermToKey<VarKey, VarValue, TermKey, HashSet<(VarKey, VarKey)>, HashSet<VarKey>, Self, S>
+> TermToKey<VarKey, VarValue, TermKey, HashSet<VarKey>, HashSet<(VarKey, VarKey)>, S>
     for HashSet<(VarKey, TermKey), H>
 {
     fn term_to_key(&self, visited: &HashSet<VarKey>, system: &S) -> HashSet<(VarKey, VarKey)> {
@@ -42,22 +47,16 @@ impl<
     }
 }
 
-pub trait TermSystem<VarKey: Copy, VarValue: PartialOrd, TermKey: Copy, PairSet, VarSet>:
-    System<VarKey, VarValue, PairSet, VarSet>
-{
-    fn definition(&self, variable: VarKey) -> TermKey;
-}
-
 pub trait LocalExtension<
     VarKey: Hash + Copy,
     VarValue: PartialOrd,
     TermKey: Copy,
-    PairSet,
     VarSet,
+    PairSet,
     TermSet,
 >
 {
-    type System: TermSystem<VarKey, VarValue, TermKey, PairSet, VarSet>;
+    type System: TermSystem<VarKey, VarValue, TermKey>;
 
     fn depends(
         &self,
@@ -72,28 +71,28 @@ pub struct ExtensionOracle<
     K: Hash + Eq + Copy,
     V: PartialOrd,
     T: Copy,
-    PS,
     VS,
+    PS,
     TS,
-    S: TermSystem<K, V, T, PS, VS>,
-    E: LocalExtension<K, V, T, PS, VS, TS, System = S>,
+    S: TermSystem<K, V, T>,
+    E: LocalExtension<K, V, T, VS, PS, TS, System = S>,
     U,
 > {
     extension: E,
-    _phantom_data: PhantomData<(K, V, T, PS, VS, TS, U)>,
+    _phantom_data: PhantomData<(K, V, T, VS, PS, TS, U)>,
 }
 
 impl<
     K: Hash + Eq + Copy,
     V: PartialOrd,
     T: Copy + Eq,
-    PS: Union + FromIterator<(K, K)>,
     VS: Cartesian<Output = PS> + Without,
-    TS: TermToKey<K, V, T, PS, VS, TS, S>,
-    S: TermSystem<K, V, T, PS, VS> + Universe<U>,
-    E: LocalExtension<K, V, T, PS, VS, TS, System = S>,
+    PS: Union + FromIterator<(K, K)>,
+    TS: TermToKey<K, V, T, VS, PS, S>,
+    S: TermSystem<K, V, T> + Universe<U>,
+    E: LocalExtension<K, V, T, VS, PS, TS, System = S>,
     U: Without<VS> + Cartesian<Output = PS>,
-> LocalOracle<K, V, PS, VS, S> for ExtensionOracle<K, V, T, PS, VS, TS, S, E, U>
+> LocalOracle<K, V, VS, PS, S> for ExtensionOracle<K, V, T, VS, PS, TS, S, E, U>
 where
     for<'a> &'a VS: IntoIterator<Item = &'a K>,
 {
@@ -123,10 +122,10 @@ impl<
     PS: FromIterator<(K, K)>,
     VS,
     TS,
-    S: TermSystem<K, V, T, PS, VS>,
-    E: LocalExtension<K, V, T, PS, VS, TS, System = S>,
+    S: TermSystem<K, V, T>,
+    E: LocalExtension<K, V, T, VS, PS, TS, System = S>,
     U,
-> From<E> for ExtensionOracle<K, V, T, PS, VS, TS, S, E, U>
+> From<E> for ExtensionOracle<K, V, T, VS, PS, TS, S, E, U>
 {
     fn from(extension: E) -> Self {
         Self {

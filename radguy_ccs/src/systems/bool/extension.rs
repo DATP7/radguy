@@ -17,8 +17,8 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
         VarKey,
         bool,
         TermKey,
-        HashSet<(VarKey, VarKey)>,
         HashSet<VarKey>,
+        HashSet<(VarKey, VarKey)>,
         HashSet<(VarKey, TermKey)>,
     > for BoolExtension<TermKey, VarName>
 {

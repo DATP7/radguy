@@ -156,27 +156,27 @@ mod tests {
     test_oracles!(
         SMax::default(),
         test_kleene_local_smax;
-        TrivialOracle::default(),
+        TrivialOracle,
         test_kleene_local_trivialoracle;
         LocalMaxR::default(),
         test_kleene_local_localmaxr;
-        TrivialOracle::default().and(SMax::default()),
+        TrivialOracle.and(SMax::default()),
         test_kleene_local_trivialoracle_and_smax;
         LocalMaxR::default().and(SMax::default()),
         test_kleene_local_localmaxr_and_smax;
-        LocalMaxR::default().and(TrivialOracle::default()),
+        LocalMaxR::default().and(TrivialOracle),
         test_kleene_local_localmaxr_and_trivialoracle;
-        TrivialOracle::default().then(SMax::default()),
+        TrivialOracle.then(SMax::default()),
         test_kleene_local_trivialoracle_then_smax;
-        TrivialOracle::default().then(LocalMaxR::default()),
+        TrivialOracle.then(LocalMaxR::default()),
         test_kleene_local_trivialoracle_then_localmaxr;
-        SMax::default().then(TrivialOracle::default()),
+        SMax::default().then(TrivialOracle),
         test_kleene_local_smax_then_trivialoracle;
         SMax::default().then(LocalMaxR::default()),
         test_kleene_local_smax_then_localmaxr;
         LocalMaxR::default().then(SMax::default()),
         test_kleene_local_localmaxr_then_smax;
-        LocalMaxR::default().then(TrivialOracle::default()),
+        LocalMaxR::default().then(TrivialOracle),
         test_kleene_local_localmaxr_then_trivialoracle
     );
 }

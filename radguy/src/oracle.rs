@@ -1,10 +1,11 @@
 use crate::{
-    Assignment, Cartesian, Diagonal, Intersect, Maximal, Set, System, Union, Universe, Without,
+    Assignment, Cartesian, Diagonal, Intersect, Maximal, PairUniverse, Set, System, Union,
+    Universe, Without,
 };
 use std::fmt::Debug;
 use std::{collections::HashSet, hash::Hash, marker::PhantomData};
 
-pub trait LocalOracle<K: Hash + Eq + Copy, V: PartialOrd, PS, VS, S: System<K, V, PS, VS>> {
+pub trait LocalOracle<K: Hash + Eq + Copy, V: PartialOrd, VS, PS, S: System<K, V>> {
     fn approximate_flow(
         &self,
         visited: &VS,
@@ -14,7 +15,7 @@ pub trait LocalOracle<K: Hash + Eq + Copy, V: PartialOrd, PS, VS, S: System<K, V
     ) -> PS;
 
     #[must_use]
-    fn then(self, other: impl LocalOracle<K, V, PS, VS, S>) -> impl LocalOracle<K, V, PS, VS, S>
+    fn then(self, other: impl LocalOracle<K, V, VS, PS, S>) -> impl LocalOracle<K, V, VS, PS, S>
     where
         Self: std::marker::Sized,
     {
@@ -26,7 +27,7 @@ pub trait LocalOracle<K: Hash + Eq + Copy, V: PartialOrd, PS, VS, S: System<K, V
     }
 
     #[must_use]
-    fn and(self, other: impl LocalOracle<K, V, PS, VS, S>) -> impl LocalOracle<K, V, PS, VS, S>
+    fn and(self, other: impl LocalOracle<K, V, VS, PS, S>) -> impl LocalOracle<K, V, VS, PS, S>
     where
         Self: std::marker::Sized,
         PS: Intersect,
@@ -45,11 +46,11 @@ pub struct LocalMaxR<U>(PhantomData<U>);
 impl<
     K: Hash + Eq + Copy + Debug,
     V: Maximal,
-    PS: FromIterator<(K, K)> + Union,
     VS: Set<K> + Diagonal<Output = PS>,
-    S: System<K, V, PS, VS> + Universe<U>,
+    PS: FromIterator<(K, K)> + Union,
+    S: System<K, V> + Universe<U>,
     U: Cartesian<Output = PS> + Without<VS>,
-> LocalOracle<K, V, PS, VS, S> for LocalMaxR<U>
+> LocalOracle<K, V, VS, PS, S> for LocalMaxR<U>
 where
     for<'a> &'a VS: IntoIterator<Item = &'a K>,
     for<'a> &'a U: IntoIterator<Item = &'a K>,
@@ -85,12 +86,13 @@ where
 #[derive(Default)]
 pub struct SMax<U>(PhantomData<U>);
 
+// TODO: Make this more general than HashSet
 impl<
     K: Hash + Eq + Copy,
     V: Maximal,
-    S: System<K, V, HashSet<(K, K)>, HashSet<K>> + Universe<U>,
-    U: Cartesian<Output = HashSet<(K, K)>>,
-> LocalOracle<K, V, HashSet<(K, K)>, HashSet<K>, S> for SMax<U>
+    S: System<K, V> + PairUniverse<U>,
+    U: IntoIterator<Item = (K, K)>,
+> LocalOracle<K, V, HashSet<K>, HashSet<(K, K)>, S> for SMax<U>
 {
     fn approximate_flow(
         &self,
@@ -99,12 +101,10 @@ impl<
         _possible: &HashSet<(K, K)>,
         system: &S,
     ) -> HashSet<(K, K)> {
-        let variables = system.universe();
-        variables
-            .cartesian(&variables)
+        system
+            .pair_universe()
             .into_iter()
             .filter(|(x, y)| !assignment.get(x).is_maximal() && !assignment.get(y).is_maximal())
-            // TODO: Consider adding FromIterator to IterSet and using that here
             .collect::<HashSet<_>>()
     }
 }
@@ -112,34 +112,34 @@ impl<
 pub struct ComposeLocal<
     K: Hash + Eq + Copy,
     V: PartialOrd,
-    P,
-    I,
-    S: System<K, V, P, I>,
-    T: LocalOracle<K, V, P, I, S>,
-    U: LocalOracle<K, V, P, I, S>,
+    VarSet,
+    PairSet,
+    S: System<K, V>,
+    T: LocalOracle<K, V, VarSet, PairSet, S>,
+    U: LocalOracle<K, V, VarSet, PairSet, S>,
 > {
     outer: T,
     inner: U,
-    _phantom_data: PhantomData<(K, V, P, I, S)>,
+    _phantom_data: PhantomData<(K, V, VarSet, PairSet, S)>,
 }
 
 impl<
     K: Hash + Eq + Copy,
     V: PartialOrd,
-    P,
-    I,
-    S: System<K, V, P, I>,
-    T: LocalOracle<K, V, P, I, S>,
-    U: LocalOracle<K, V, P, I, S>,
-> LocalOracle<K, V, P, I, S> for ComposeLocal<K, V, P, I, S, T, U>
+    VarSet,
+    PairSet,
+    S: System<K, V>,
+    T: LocalOracle<K, V, VarSet, PairSet, S>,
+    U: LocalOracle<K, V, VarSet, PairSet, S>,
+> LocalOracle<K, V, VarSet, PairSet, S> for ComposeLocal<K, V, VarSet, PairSet, S, T, U>
 {
     fn approximate_flow(
         &self,
-        visited: &I,
+        visited: &VarSet,
         assignment: &impl Assignment<K, V>,
-        possible: &P,
+        possible: &PairSet,
         system: &S,
-    ) -> P {
+    ) -> PairSet {
         let Self { outer, inner, .. } = self;
         outer.approximate_flow(
             visited,
@@ -153,34 +153,34 @@ impl<
 pub struct IntersectLocal<
     K: Hash + Eq + Copy,
     V: PartialOrd,
-    P,
-    I,
-    S: System<K, V, P, I>,
-    T: LocalOracle<K, V, P, I, S>,
-    U: LocalOracle<K, V, P, I, S>,
+    VarSet,
+    PairSet,
+    S: System<K, V>,
+    T: LocalOracle<K, V, VarSet, PairSet, S>,
+    U: LocalOracle<K, V, VarSet, PairSet, S>,
 > {
     left: T,
     right: U,
-    _phantom_data: PhantomData<(K, V, P, I, S)>,
+    _phantom_data: PhantomData<(K, V, VarSet, PairSet, S)>,
 }
 
 impl<
     K: Hash + Eq + Copy,
     V: PartialOrd,
-    P: Intersect,
-    I,
-    S: System<K, V, P, I>,
-    T: LocalOracle<K, V, P, I, S>,
-    U: LocalOracle<K, V, P, I, S>,
-> LocalOracle<K, V, P, I, S> for IntersectLocal<K, V, P, I, S, T, U>
+    VarSet,
+    PairSet: Intersect,
+    S: System<K, V>,
+    T: LocalOracle<K, V, VarSet, PairSet, S>,
+    U: LocalOracle<K, V, VarSet, PairSet, S>,
+> LocalOracle<K, V, VarSet, PairSet, S> for IntersectLocal<K, V, VarSet, PairSet, S, T, U>
 {
     fn approximate_flow(
         &self,
-        visited: &I,
+        visited: &VarSet,
         assignment: &impl Assignment<K, V>,
-        possible: &P,
+        possible: &PairSet,
         system: &S,
-    ) -> P {
+    ) -> PairSet {
         let Self { left, right, .. } = self;
         let left = left.approximate_flow(visited, assignment, possible, system);
         let right = right.approximate_flow(visited, assignment, possible, system);
@@ -189,25 +189,23 @@ impl<
 }
 
 #[derive(Default)]
-pub struct TrivialOracle<U>(PhantomData<U>);
+pub struct TrivialOracle;
 
 impl<
     K: Hash + Eq + Copy,
     V: Maximal,
-    P,
-    I: Cartesian<Output = P>,
-    S: System<K, V, P, I> + Universe<U>,
-    U: Cartesian<Output = P>,
-> LocalOracle<K, V, P, I, S> for TrivialOracle<U>
+    VarSet: Cartesian<Output = PairSet>,
+    PairSet,
+    S: System<K, V> + PairUniverse<PairSet>,
+> LocalOracle<K, V, VarSet, PairSet, S> for TrivialOracle
 {
     fn approximate_flow(
         &self,
-        _visited: &I,
+        _visited: &VarSet,
         _assignment: &impl Assignment<K, V>,
-        _possible: &P,
+        _possible: &PairSet,
         system: &S,
-    ) -> P {
-        let universe = system.universe();
-        universe.cartesian(&universe)
+    ) -> PairSet {
+        system.pair_universe()
     }
 }

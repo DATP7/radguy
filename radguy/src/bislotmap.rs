@@ -27,7 +27,8 @@ impl<K: Key, V: Hash + Eq + Clone> BiSlotMap<K, V> {
         self.vals.iter()
     }
 
-    pub fn keys(&self) -> impl Iterator<Item = K> {
+    #[must_use]
+    pub fn keys(&self) -> slotmap::basic::Keys<'_, K, V> {
         self.vals.keys()
     }
 

@@ -4,7 +4,8 @@ use std::{
     hash::Hash,
 };
 
-use radguy::{Assignment, Set, System, Universe, extension::TermSystem};
+use itertools::iproduct;
+use radguy::{Arguments, Assignment, PairUniverse, Set, System, Universe, extension::TermSystem};
 use radguy::{Union, bislotmap::BiSlotMap};
 use slotmap::{Key, SecondaryMap};
 
@@ -71,8 +72,13 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone> Universe<HashSet<K>> for BoolSystem<K
     }
 }
 
-impl<VarKey: Key, TermKey: Key, VarName: Hash + Eq + Clone>
-    System<VarKey, bool, HashSet<(VarKey, VarKey)>, HashSet<VarKey>>
+impl<K: Key, T: Key, N: Hash + Eq + Clone> PairUniverse<HashSet<(K, K)>> for BoolSystem<K, T, N> {
+    fn pair_universe(&self) -> HashSet<(K, K)> {
+        iproduct!(self.names.keys(), self.names.keys()).collect()
+    }
+}
+
+impl<VarKey: Key, TermKey: Key, VarName: Hash + Eq + Clone> System<VarKey, bool>
     for BoolSystem<VarKey, TermKey, VarName>
 {
     fn evaluate(&self, key: VarKey, assignment: &dyn Assignment<VarKey, bool>) -> bool {
@@ -80,19 +86,22 @@ impl<VarKey: Key, TermKey: Key, VarName: Hash + Eq + Clone>
         self.evaluate_term(*term_key, assignment)
     }
 
-    fn arguments(&self, key: VarKey) -> HashSet<VarKey> {
-        let term_key = self.definitions.get(key).expect("variable must be defined");
-        self.term_arguments(*term_key)
-    }
-
     fn bottom_assignment(&self) -> impl Assignment<VarKey, bool> {
         HashMap::new()
     }
 }
 
-impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
-    TermSystem<VarKey, bool, TermKey, HashSet<(VarKey, VarKey)>, HashSet<VarKey>>
+impl<VarKey: Key, TermKey: Key, VarName: Hash + Eq + Clone> Arguments<VarKey, HashSet<VarKey>>
     for BoolSystem<VarKey, TermKey, VarName>
+{
+    fn arguments(&self, key: VarKey) -> HashSet<VarKey> {
+        let term_key = self.definitions.get(key).expect("variable must be defined");
+        self.term_arguments(*term_key)
+    }
+}
+
+impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
+    TermSystem<VarKey, bool, TermKey> for BoolSystem<VarKey, TermKey, VarName>
 {
     fn definition(&self, variable: VarKey) -> TermKey {
         *self
