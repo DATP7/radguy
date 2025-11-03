@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 itertools = "0.14.0"
+oxidd = "0.11.0"
 slotmap = "1.0.7"
 
 [lints.clippy]
