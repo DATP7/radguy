@@ -83,7 +83,7 @@ impl Set<K> for SimpleBDDSet {
                 .expect("That's it bois, we're committing warcrimes")
         });
         Self::insert_var(item, i);
-        self.bdd.or(&var.expect("oom")).expect("oom");
+        self.bdd = self.bdd.or(&var.expect("oom")).expect("oom");
         true
     }
 }

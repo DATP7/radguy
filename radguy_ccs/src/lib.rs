@@ -2,8 +2,6 @@ pub mod systems;
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
-
     use radguy::kleene_local;
     use radguy::oracle::{LocalMaxR, LocalOracle, SMax, TrivialOracle};
     use slotmap::DefaultKey;
@@ -55,7 +53,7 @@ mod tests {
     }
     #[test]
     fn test_kleene_local_smax_ff_tt() {
-        let oracle = SMax::hash();
+        let oracle = SMax;
         let mut sys1 = bool_system! {
             x = tt;
         };
@@ -78,7 +76,7 @@ mod tests {
 
     #[test]
     fn test_kleene_local_smax_and() {
-        let oracle = SMax::hash();
+        let oracle = SMax;
         let mut sys1 = bool_system! {
             x = (y && z);
             y = tt;
@@ -104,7 +102,7 @@ mod tests {
     }
     #[test]
     fn test_kleene_local_smax_or() {
-        let oracle = SMax::hash();
+        let oracle = SMax;
         let mut sys1 = bool_system! {
             x =(y || z);
             y = tt;
@@ -137,7 +135,7 @@ mod tests {
             j = tt;
         };
         let start1 = sys1.names.get_or_insert_key("x");
-        let oracle = SMax::hash();
+        let oracle = SMax;
         assert!(!kleene_local(&sys1, start1, &oracle));
 
         let mut sys2 = bool_system! {
@@ -156,29 +154,29 @@ mod tests {
     }
 
     test_oracles!(
-        SMax::hash(),
+        SMax,
         test_kleene_local_smax;
         TrivialOracle,
         test_kleene_local_trivialoracle;
-        LocalMaxR::hash(),
+        LocalMaxR,
         test_kleene_local_localmaxr;
-        TrivialOracle.and(SMax::hash()),
+        TrivialOracle.and(SMax),
         test_kleene_local_trivialoracle_and_smax;
-        LocalMaxR::hash().and(SMax::hash()),
+        LocalMaxR.and(SMax),
         test_kleene_local_localmaxr_and_smax;
-        LocalMaxR::hash().and(TrivialOracle),
+        LocalMaxR.and(TrivialOracle),
         test_kleene_local_localmaxr_and_trivialoracle;
-        TrivialOracle.then(SMax::hash()),
+        TrivialOracle.then(SMax),
         test_kleene_local_trivialoracle_then_smax;
-        TrivialOracle.then(LocalMaxR::hash()),
+        TrivialOracle.then(LocalMaxR),
         test_kleene_local_trivialoracle_then_localmaxr;
-        SMax::hash().then(TrivialOracle),
+        SMax.then(TrivialOracle),
         test_kleene_local_smax_then_trivialoracle;
-        SMax::hash().then(LocalMaxR::hash()),
+        SMax.then(LocalMaxR),
         test_kleene_local_smax_then_localmaxr;
-        LocalMaxR::hash().then(SMax::hash()),
+        LocalMaxR.then(SMax),
         test_kleene_local_localmaxr_then_smax;
-        LocalMaxR::hash().then(TrivialOracle),
+        LocalMaxR.then(TrivialOracle),
         test_kleene_local_localmaxr_then_trivialoracle
     );
 }

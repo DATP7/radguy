@@ -41,26 +41,18 @@ pub trait LocalOracle<K: Hash + Eq + Copy, V: PartialOrd, VS, PS, S: System<K, V
 }
 
 #[derive(Default)]
-pub struct LocalMaxR<U>(PhantomData<U>);
-
-impl<K, S: ::std::hash::BuildHasher> LocalMaxR<HashSet<K, S>> {
-    #[must_use]
-    pub const fn hash() -> Self {
-        Self(PhantomData)
-    }
-}
+pub struct LocalMaxR;
 
 impl<
     K: Hash + Eq + Copy + Debug,
     V: Maximal,
     VS: Set<K> + Diagonal<Output = PS>,
     PS: FromIterator<(K, K)> + Union,
-    S: System<K, V> + Universe<U>,
-    U: Cartesian<Output = PS> + Without<VS>,
-> LocalOracle<K, V, VS, PS, S> for LocalMaxR<U>
+    S: System<K, V> + Universe<HashSet<K>>,
+> LocalOracle<K, V, VS, PS, S> for LocalMaxR
 where
+    HashSet<K>: Cartesian<Output = PS> + Without<VS>,
     for<'a> &'a VS: IntoIterator<Item = &'a K>,
-    for<'a> &'a U: IntoIterator<Item = &'a K>,
 {
     fn approximate_flow(
         &self,
@@ -81,7 +73,7 @@ where
                 if system.evaluate(y, assignment).is_maximal() {
                     std::iter::empty().collect::<Vec<_>>()
                 } else {
-                    universe.into_iter().map(|&x| (x, y)).collect()
+                    universe.iter().map(|&x| (x, y)).collect()
                 }
             })
             .collect();
@@ -91,22 +83,11 @@ where
 }
 
 #[derive(Default)]
-pub struct SMax<U>(PhantomData<U>);
-
-impl<K, S: ::std::hash::BuildHasher> SMax<HashSet<(K, K), S>> {
-    #[must_use]
-    pub const fn hash() -> Self {
-        Self(PhantomData)
-    }
-}
+pub struct SMax;
 
 // TODO: Make this more general than HashSet
-impl<
-    K: Hash + Eq + Copy,
-    V: Maximal,
-    S: System<K, V> + PairUniverse<U>,
-    U: IntoIterator<Item = (K, K)>,
-> LocalOracle<K, V, HashSet<K>, HashSet<(K, K)>, S> for SMax<U>
+impl<K: Hash + Eq + Copy, V: Maximal, S: System<K, V> + PairUniverse<HashSet<(K, K)>>>
+    LocalOracle<K, V, HashSet<K>, HashSet<(K, K)>, S> for SMax
 {
     fn approximate_flow(
         &self,
