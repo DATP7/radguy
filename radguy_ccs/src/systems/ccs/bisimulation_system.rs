@@ -6,7 +6,7 @@ use std::{
 };
 
 use itertools::iproduct;
-use radguy::{Arguments, Assignment, PairUniverse, System, Universe};
+use radguy::{Arguments, Assignment, PairUniverse, System, Universe, bdd::SimpleBDDSet};
 use slotmap::Key;
 
 use crate::systems::{
@@ -314,5 +314,21 @@ impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKe
 {
     fn pair_universe(&self) -> HashSet<(VarKey, VarKey)> {
         self.bool_system.borrow().pair_universe()
+    }
+}
+
+impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKey>>
+    Universe<SimpleBDDSet> for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
+{
+    fn universe(&self) -> SimpleBDDSet {
+        SimpleBDDSet::t()
+    }
+}
+
+impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKey>>
+    PairUniverse<SimpleBDDSet> for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
+{
+    fn pair_universe(&self) -> SimpleBDDSet {
+        SimpleBDDSet::t()
     }
 }

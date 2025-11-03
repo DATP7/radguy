@@ -5,7 +5,10 @@ use std::{
 };
 
 use itertools::iproduct;
-use radguy::{Arguments, Assignment, PairUniverse, Set, System, Universe, extension::TermSystem};
+use radguy::{
+    Arguments, Assignment, PairUniverse, Set, System, Universe, bdd::SimpleBDDSet,
+    extension::TermSystem,
+};
 use radguy::{Union, bislotmap::BiSlotMap};
 use slotmap::{Key, SecondaryMap};
 
@@ -75,6 +78,18 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone> Universe<HashSet<K>> for BoolSystem<K
 impl<K: Key, T: Key, N: Hash + Eq + Clone> PairUniverse<HashSet<(K, K)>> for BoolSystem<K, T, N> {
     fn pair_universe(&self) -> HashSet<(K, K)> {
         iproduct!(self.names.keys(), self.names.keys()).collect()
+    }
+}
+
+impl<K: Key, T: Key, N: Hash + Eq + Clone> Universe<SimpleBDDSet> for BoolSystem<K, T, N> {
+    fn universe(&self) -> SimpleBDDSet {
+        SimpleBDDSet::t()
+    }
+}
+
+impl<K: Key, T: Key, N: Hash + Eq + Clone> PairUniverse<SimpleBDDSet> for BoolSystem<K, T, N> {
+    fn pair_universe(&self) -> SimpleBDDSet {
+        SimpleBDDSet::t()
     }
 }
 

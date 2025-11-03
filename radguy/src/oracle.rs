@@ -43,6 +43,13 @@ pub trait LocalOracle<K: Hash + Eq + Copy, V: PartialOrd, VS, PS, S: System<K, V
 #[derive(Default)]
 pub struct LocalMaxR<U>(PhantomData<U>);
 
+impl<K, S: ::std::hash::BuildHasher> LocalMaxR<HashSet<K, S>> {
+    #[must_use]
+    pub const fn hash() -> Self {
+        Self(PhantomData)
+    }
+}
+
 impl<
     K: Hash + Eq + Copy + Debug,
     V: Maximal,
@@ -85,6 +92,13 @@ where
 
 #[derive(Default)]
 pub struct SMax<U>(PhantomData<U>);
+
+impl<K, S: ::std::hash::BuildHasher> SMax<HashSet<(K, K), S>> {
+    #[must_use]
+    pub const fn hash() -> Self {
+        Self(PhantomData)
+    }
+}
 
 // TODO: Make this more general than HashSet
 impl<
