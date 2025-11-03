@@ -1,6 +1,6 @@
-use itertools::iproduct;
-
-use crate::{Assignment, Cartesian, Intersect, Maximal, Set, System};
+use crate::{
+    Assignment, Cartesian, Diagonal, Intersect, Maximal, Set, System, Union, Universe, Without,
+};
 use std::fmt::Debug;
 use std::{collections::HashSet, hash::Hash, marker::PhantomData};
 
@@ -39,17 +39,20 @@ pub trait LocalOracle<K: Hash + Eq + Copy, V: PartialOrd, PS, VS, S: System<K, V
     }
 }
 
-pub struct LocalMaxR;
+#[derive(Default)]
+pub struct LocalMaxR<U>(PhantomData<U>);
 
 impl<
     K: Hash + Eq + Copy + Debug,
     V: Maximal,
-    PS: FromIterator<(K, K)>,
-    VS: Set<K>,
-    S: System<K, V, PS, VS>,
-> LocalOracle<K, V, PS, VS, S> for LocalMaxR
+    PS: FromIterator<(K, K)> + Union,
+    VS: Set<K> + Diagonal<Output = PS>,
+    S: System<K, V, PS, VS> + Universe<U>,
+    U: Cartesian<Output = PS> + Without<VS>,
+> LocalOracle<K, V, PS, VS, S> for LocalMaxR<U>
 where
     for<'a> &'a VS: IntoIterator<Item = &'a K>,
+    for<'a> &'a U: IntoIterator<Item = &'a K>,
 {
     fn approximate_flow(
         &self,
@@ -58,36 +61,36 @@ where
         _possible: &PS,
         system: &S,
     ) -> PS {
-        let unvisited = system
-            .variables()
+        let unvisited = system.universe().without(visited);
+        let universe = system.universe();
+        let unvisited_dep = universe.cartesian(&unvisited);
+        let self_dep = visited.diagonal();
+
+        // Alternative version
+        let max_dep = visited
             .into_iter()
-            .copied()
-            .filter(|v| !visited.contains(v))
-            .collect::<HashSet<_>>();
-        let variables = system.variables();
-        let unvisited_dep = iproduct!(variables.into_iter().copied(), unvisited.iter().copied());
-        let self_dep = visited.into_iter().map(|&x| (x, x));
-        let max_dep = visited.into_iter().flat_map(|&y| {
-            // TODO: Maybe not hashsets
-            if system.evaluate(y, assignment).is_maximal() {
-                HashSet::new()
-            } else {
-                // TODO: Can this just be visited instead?
-                system
-                    .variables()
-                    .into_iter()
-                    .map(|&x| (x, y))
-                    .collect::<HashSet<_>>()
-            }
-        });
-        unvisited_dep.chain(self_dep).chain(max_dep).collect()
+            .flat_map(|&y| {
+                if system.evaluate(y, assignment).is_maximal() {
+                    std::iter::empty().collect::<Vec<_>>()
+                } else {
+                    universe.into_iter().map(|&x| (x, y)).collect()
+                }
+            })
+            .collect();
+
+        unvisited_dep.union(self_dep).union(max_dep)
     }
 }
 
-pub struct SMax;
+#[derive(Default)]
+pub struct SMax<U>(PhantomData<U>);
 
-impl<K: Hash + Eq + Copy, V: Maximal, S: System<K, V, HashSet<(K, K)>, HashSet<K>>>
-    LocalOracle<K, V, HashSet<(K, K)>, HashSet<K>, S> for SMax
+impl<
+    K: Hash + Eq + Copy,
+    V: Maximal,
+    S: System<K, V, HashSet<(K, K)>, HashSet<K>> + Universe<U>,
+    U: Cartesian<Output = HashSet<(K, K)>>,
+> LocalOracle<K, V, HashSet<(K, K)>, HashSet<K>, S> for SMax<U>
 {
     fn approximate_flow(
         &self,
@@ -96,7 +99,7 @@ impl<K: Hash + Eq + Copy, V: Maximal, S: System<K, V, HashSet<(K, K)>, HashSet<K
         _possible: &HashSet<(K, K)>,
         system: &S,
     ) -> HashSet<(K, K)> {
-        let variables = system.variables();
+        let variables = system.universe();
         variables
             .cartesian(&variables)
             .into_iter()
@@ -185,10 +188,17 @@ impl<
     }
 }
 
-pub struct TrivialOracle;
+#[derive(Default)]
+pub struct TrivialOracle<U>(PhantomData<U>);
 
-impl<K: Hash + Eq + Copy, V: Maximal, P, I: Cartesian<Output = P>, S: System<K, V, P, I>>
-    LocalOracle<K, V, P, I, S> for TrivialOracle
+impl<
+    K: Hash + Eq + Copy,
+    V: Maximal,
+    P,
+    I: Cartesian<Output = P>,
+    S: System<K, V, P, I> + Universe<U>,
+    U: Cartesian<Output = P>,
+> LocalOracle<K, V, P, I, S> for TrivialOracle<U>
 {
     fn approximate_flow(
         &self,
@@ -197,6 +207,7 @@ impl<K: Hash + Eq + Copy, V: Maximal, P, I: Cartesian<Output = P>, S: System<K, 
         _possible: &P,
         system: &S,
     ) -> P {
-        system.variables().cartesian(&system.variables())
+        let universe = system.universe();
+        universe.cartesian(&universe)
     }
 }

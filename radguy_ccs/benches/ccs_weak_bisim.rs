@@ -23,7 +23,7 @@ macro_rules! bisim_bench_suite {
                     },
                     |mut sys| {
                         let target = sys.specify_comparison($left, $right);
-                        let result = !kleene_local(&sys, target, &SMax);
+                        let result = !kleene_local(&sys, target, &SMax::default());
                         assert_eq!($eq, result, "{} and {} should{} be bisimilar in{}", $left, $right, if !$eq { " not" } else {""}, $ccs)
                     },
                     criterion::BatchSize::SmallInput,

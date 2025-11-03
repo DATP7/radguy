@@ -42,16 +42,22 @@ pub trait Cartesian<Rhs = Self> {
     fn cartesian(&self, other: &Rhs) -> Self::Output;
 }
 
-pub trait Universe<K: Copy, V: PartialOrd, PS, VS, S: System<K, V, PS, VS>> {
+pub trait Diagonal {
+    type Output;
+    /// Returns the reflexive relation of elements on a set
+    /// i.e. diagonal({x}) = {(x,x)}
+    fn diagonal(&self) -> Self::Output;
+}
+
+pub trait Universe<S> {
+    /// Returns a structure S containing all variables in the system
     #[must_use]
-    fn universe(&self, system: &S) -> Self;
+    fn universe(&self) -> S;
 }
 
 pub trait System<VarKey: Copy, VarValue: PartialOrd, PairSet, VarSet> {
     fn evaluate(&self, key: VarKey, assignment: &dyn Assignment<VarKey, VarValue>) -> VarValue;
-
     fn arguments(&self, key: VarKey) -> VarSet;
-    fn variables(&self) -> VarSet;
     fn bottom_assignment(&self) -> impl Assignment<VarKey, VarValue>;
 }
 
@@ -103,6 +109,14 @@ impl<T: Eq + Hash + Copy, S: ::std::hash::BuildHasher> Cartesian for HashSet<T, 
     }
 }
 
+impl<T: Eq + Hash + Copy, S: ::std::hash::BuildHasher> Diagonal for HashSet<T, S> {
+    type Output = HashSet<(T, T)>;
+
+    fn diagonal(&self) -> Self::Output {
+        self.iter().copied().map(|x| (x, x)).collect()
+    }
+}
+
 impl<K: Hash + Eq, V: Bottom + Clone, S: std::hash::BuildHasher> Assignment<K, V>
     for HashMap<K, V, S>
 {
@@ -120,7 +134,7 @@ pub fn kleene_local<
     V: Eq + PartialOrd,
     PS,
     VS: Set<K> + Union + IsSubset + Cartesian<Output = PS> + FromIterator<K>,
-    S: System<K, V, PS, VS>,
+    S: System<K, V, PS, VS> + Universe<impl Cartesian<Output = PS>>,
 >(
     system: &S,
     target: K,
@@ -131,7 +145,7 @@ where
 {
     let mut assignment = system.bottom_assignment();
     let mut visited = std::iter::once(target).collect();
-    let mut rel = system.variables().cartesian(&system.variables());
+    let mut rel = system.universe().cartesian(&system.universe());
     let mut todo = local_dependencies(target, &visited, &assignment, oracle, system, &mut rel);
     let mut iter = todo.iter();
     while let Some(&x) = iter.next() {
@@ -148,7 +162,7 @@ where
 }
 
 fn local_dependencies<
-    K: Copy + Hash + Eq,
+    K: Hash + Copy + Eq,
     V: PartialOrd,
     PS,
     VS: Set<K> + Cartesian<Output = PS>,

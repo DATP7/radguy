@@ -20,7 +20,7 @@ macro_rules! weak_bisim_test {
                     let mut sys = BisimulationSystem::<DefaultKey, DefaultKey, DefaultKey, WeakTransitionSystem<DefaultKey>>::new(weak_transition_system);
                     let start = sys.specify_comparison($left, $right);
 
-                    let result = !kleene_local(&sys, start, &SMax);
+                    let result = !kleene_local(&sys, start, &SMax::default());
                     assert_eq!($eq, result, "{} and {} should{} be bisimilar in{}", $left, $right, if !$eq { " not" } else {""}, $ccs);
                 }
             )*

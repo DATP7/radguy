@@ -1,6 +1,6 @@
 use std::{collections::HashSet, hash::Hash, marker::PhantomData};
 
-use crate::{Assignment, Cartesian, System, Union, Without, oracle::LocalOracle};
+use crate::{Assignment, Cartesian, System, Union, Universe, Without, oracle::LocalOracle};
 
 pub trait TermToKey<
     VarKey: Copy,
@@ -77,9 +77,10 @@ pub struct ExtensionOracle<
     TS,
     S: TermSystem<K, V, T, PS, VS>,
     E: LocalExtension<K, V, T, PS, VS, TS, System = S>,
+    U,
 > {
     extension: E,
-    _phantom_data: PhantomData<(K, V, T, PS, VS, TS)>,
+    _phantom_data: PhantomData<(K, V, T, PS, VS, TS, U)>,
 }
 
 impl<
@@ -89,9 +90,10 @@ impl<
     PS: Union + FromIterator<(K, K)>,
     VS: Cartesian<Output = PS> + Without,
     TS: TermToKey<K, V, T, PS, VS, TS, S>,
-    S: TermSystem<K, V, T, PS, VS>,
+    S: TermSystem<K, V, T, PS, VS> + Universe<U>,
     E: LocalExtension<K, V, T, PS, VS, TS, System = S>,
-> LocalOracle<K, V, PS, VS, S> for ExtensionOracle<K, V, T, PS, VS, TS, S, E>
+    U: Without<VS> + Cartesian<Output = PS>,
+> LocalOracle<K, V, PS, VS, S> for ExtensionOracle<K, V, T, PS, VS, TS, S, E, U>
 where
     for<'a> &'a VS: IntoIterator<Item = &'a K>,
 {
@@ -102,8 +104,8 @@ where
         possible: &PS,
         system: &E::System,
     ) -> PS {
-        let unvisited = system.variables().without(visited);
-        let unvisited_dep = system.variables().cartesian(&unvisited);
+        let unvisited = system.universe().without(visited);
+        let unvisited_dep = system.universe().cartesian(&unvisited);
         let self_dep: PS = visited.into_iter().map(|&x| (x, x)).collect();
         let terms = self
             .extension
@@ -123,7 +125,8 @@ impl<
     TS,
     S: TermSystem<K, V, T, PS, VS>,
     E: LocalExtension<K, V, T, PS, VS, TS, System = S>,
-> From<E> for ExtensionOracle<K, V, T, PS, VS, TS, S, E>
+    U,
+> From<E> for ExtensionOracle<K, V, T, PS, VS, TS, S, E, U>
 {
     fn from(extension: E) -> Self {
         Self {
