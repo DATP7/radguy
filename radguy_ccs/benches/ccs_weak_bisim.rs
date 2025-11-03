@@ -32,7 +32,7 @@ macro_rules! bisim_bench_suite {
                     },
                     |mut sys| {
                         let target = sys.specify_comparison($left, $right);
-                        let result = !kleene_local(&sys, target, &LocalMaxR);
+                        let result = !kleene_local(&sys, target, &LocalMaxR::default());
                         assert_eq!($eq, result, "{} and {} should{} be bisimilar in{}", $left, $right, if !$eq { " not" } else {""}, $ccs)
                     },
                     criterion::BatchSize::SmallInput,
@@ -47,7 +47,7 @@ macro_rules! bisim_bench_suite {
                         },
                         |mut sys| {
                             let target = sys.specify_comparison($left, $right);
-                            let result = !ordered::kleene_local(&sys, target, &LocalMaxR.constant(StrategyWeight::Infinity).and_by(CountOracle, std::cmp::min));
+                            let result = !ordered::kleene_local(&sys, target, &LocalMaxR::default().constant(StrategyWeight::Infinity).and_by(CountOracle, std::cmp::min));
                             assert_eq!($eq, result, "{} and {} should{} be bisimilar in{}", $left, $right, if !$eq { " not" } else {""}, $ccs)
                         },
                         criterion::BatchSize::SmallInput,

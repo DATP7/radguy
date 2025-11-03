@@ -112,23 +112,23 @@ mod unordered {
     use radguy_ccs::systems::bool::extension::BoolExtension;
 
     test_oracles_unordered! {
-        SMax, smax;
+        SMax::default(), smax;
         TrivialOracle, trivialoracle;
-        LocalMaxR, localmaxr;
-        TrivialOracle.and(SMax), trivialoracle_and_smax;
-        LocalMaxR.and(SMax), localmaxr_and_smax;
-        LocalMaxR.and(TrivialOracle), localmaxr_and_trivialoracle;
-        TrivialOracle.then(SMax), trivialoracle_then_smax;
-        TrivialOracle.then(LocalMaxR), trivialoracle_then_localmaxr;
-        SMax.then(TrivialOracle), smax_then_trivialoracle;
-        SMax.then(LocalMaxR), smax_then_localmaxr;
-        LocalMaxR.then(SMax), localmaxr_then_smax;
-        LocalMaxR.then(TrivialOracle), localmaxr_then_trivialoracle;
+        LocalMaxR::default(), localmaxr;
+        TrivialOracle.and(SMax::default()), trivialoracle_and_smax;
+        LocalMaxR::default().and(SMax::default()), localmaxr_and_smax;
+        LocalMaxR::default().and(TrivialOracle), localmaxr_and_trivialoracle;
+        TrivialOracle.then(SMax::default()), trivialoracle_then_smax;
+        TrivialOracle.then(LocalMaxR::default()), trivialoracle_then_localmaxr;
+        SMax::default().then(TrivialOracle), smax_then_trivialoracle;
+        SMax::default().then(LocalMaxR::default()), smax_then_localmaxr;
+        LocalMaxR::default().then(SMax::default()), localmaxr_then_smax;
+        LocalMaxR::default().then(TrivialOracle), localmaxr_then_trivialoracle;
         ExtensionOracle::from(BoolExtension::default()), bool_extension;
-        SMax.then(ExtensionOracle::from(BoolExtension::default())), smax_then_bool_extension;
-        ExtensionOracle::from(BoolExtension::default()).then(SMax), bool_extension_then_smax;
-        SMax.and(ExtensionOracle::from(BoolExtension::default())), smax_and_bool_extension;
-        LocalMaxR.then(ExtensionOracle::from(BoolExtension::default())), localmaxr_then_bool_extension;
+        SMax::default().then(ExtensionOracle::from(BoolExtension::default())), smax_then_bool_extension;
+        ExtensionOracle::from(BoolExtension::default()).then(SMax::default()), bool_extension_then_smax;
+        SMax::default().and(ExtensionOracle::from(BoolExtension::default())), smax_and_bool_extension;
+        LocalMaxR::default().then(ExtensionOracle::from(BoolExtension::default())), localmaxr_then_bool_extension;
     }
 }
 
@@ -142,9 +142,9 @@ mod ordered {
     };
 
     test_oracles_ordered! {
-        SMax.constant(StrategyWeight::Num(0)), smax_const_0;
-        SMax.constant(StrategyWeight::Infinity), smax_const_infinity;
-        SMax.constant(StrategyWeight::Num(0)).then(CountOracle), smax_then_count;
-        SMax.constant(StrategyWeight::Num(10)).and_by(CountOracle, std::cmp::min), smax_10_and_min_count;
+        SMax::default().constant(StrategyWeight::Num(0)), smax_const_0;
+        SMax::default().constant(StrategyWeight::Infinity), smax_const_infinity;
+        SMax::default().constant(StrategyWeight::Num(0)).then(CountOracle), smax_then_count;
+        SMax::default().constant(StrategyWeight::Num(10)).and_by(CountOracle, std::cmp::min), smax_10_and_min_count;
     }
 }

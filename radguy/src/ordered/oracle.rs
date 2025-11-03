@@ -4,7 +4,6 @@ use std::collections::HashSet;
 use std::hash::Hash;
 use std::marker::PhantomData;
 
-use crate::IterSet;
 use crate::System;
 use crate::oracle::LocalOracle;
 use crate::ordered::strategy::Domain;
@@ -18,10 +17,9 @@ use crate::{Assignment, ordered::Strategy};
 pub trait StrategicLocalOracle<
     K: Eq + Copy,
     V: PartialOrd,
-    PS: IterSet<Item = (K, K)>,
-    VS: IterSet<Item = K>,
+    VS,
     PairStrategy: Strategy<(K, K)>,
-    S: System<K, V, PS, VS>,
+    S: System<K, V>,
 >
 {
     fn get_strategy(
@@ -35,8 +33,8 @@ pub trait StrategicLocalOracle<
     #[must_use]
     fn then(
         self,
-        other: impl StrategicLocalOracle<K, V, PS, VS, PairStrategy, S>,
-    ) -> impl StrategicLocalOracle<K, V, PS, VS, PairStrategy, S>
+        other: impl StrategicLocalOracle<K, V, VS, PairStrategy, S>,
+    ) -> impl StrategicLocalOracle<K, V, VS, PairStrategy, S>
     where
         Self: std::marker::Sized,
     {
@@ -50,9 +48,9 @@ pub trait StrategicLocalOracle<
     #[must_use]
     fn and_by(
         self,
-        other: impl StrategicLocalOracle<K, V, PS, VS, PairStrategy, S>,
+        other: impl StrategicLocalOracle<K, V, VS, PairStrategy, S>,
         f: impl Fn(StrategyWeight, StrategyWeight) -> StrategyWeight,
-    ) -> impl StrategicLocalOracle<K, V, PS, VS, PairStrategy, S>
+    ) -> impl StrategicLocalOracle<K, V, VS, PairStrategy, S>
     where
         Self: std::marker::Sized,
         PairStrategy: IntersectBy<(K, K)>,
@@ -69,28 +67,28 @@ pub trait StrategicLocalOracle<
 pub struct Constant<
     K: Hash + Eq + Copy,
     V: PartialOrd,
-    P: IterSet<Item = (K, K)>,
-    I: IterSet<Item = K>,
-    S: System<K, V, P, I>,
-    O: LocalOracle<K, V, P, I, S>,
+    VS,
+    PS,
+    S: System<K, V>,
+    O: LocalOracle<K, V, VS, PS, S>,
 > {
     oracle: O,
     value: StrategyWeight,
-    _phantom_data: PhantomData<(K, V, P, I, S)>,
+    _phantom_data: PhantomData<(K, V, VS, PS, S)>,
 }
 
 impl<
     K: Hash + Eq + Copy,
     V: PartialOrd,
-    P: IterSet<Item = (K, K)> + IntoIterator<Item = (K, K)> + FromIterator<(K, K)>,
-    I: IterSet<Item = K>,
-    S: System<K, V, P, I>,
-    O: LocalOracle<K, V, P, I, S>,
-> StrategicLocalOracle<K, V, P, I, StrategyHeap<(K, K)>, S> for Constant<K, V, P, I, S, O>
+    VS,
+    PS: IntoIterator<Item = (K, K)> + FromIterator<(K, K)>,
+    S: System<K, V>,
+    O: LocalOracle<K, V, VS, PS, S>,
+> StrategicLocalOracle<K, V, VS, StrategyHeap<(K, K)>, S> for Constant<K, V, VS, PS, S, O>
 {
     fn get_strategy(
         &self,
-        visited: &I,
+        visited: &VS,
         assignment: &impl Assignment<K, V>,
         strategy: &StrategyHeap<(K, K)>,
         system: &S,
@@ -103,17 +101,12 @@ impl<
     }
 }
 
-pub trait ToConstant<
-    K: Hash + Eq + Copy,
-    V: PartialOrd,
-    P: IterSet<Item = (K, K)> + IntoIterator<Item = (K, K)> + FromIterator<(K, K)>,
-    I: IterSet<Item = K>,
-    S: System<K, V, P, I>,
->: LocalOracle<K, V, P, I, S> + Sized
+pub trait ToConstant<K: Hash + Eq + Copy, V: PartialOrd, VS, PS, S: System<K, V>>:
+    LocalOracle<K, V, VS, PS, S> + Sized
 {
     /// Convert a classical local oracle to a strategic local oracle, where all elements in the
     /// relation are assigned to `value`
-    fn constant(self, value: StrategyWeight) -> Constant<K, V, P, I, S, Self> {
+    fn constant(self, value: StrategyWeight) -> Constant<K, V, VS, PS, S, Self> {
         Constant {
             oracle: self,
             value,
@@ -122,43 +115,35 @@ pub trait ToConstant<
     }
 }
 
-impl<
-    K: Hash + Eq + Copy,
-    V: PartialOrd,
-    P: IterSet<Item = (K, K)> + IntoIterator<Item = (K, K)> + FromIterator<(K, K)>,
-    I: IterSet<Item = K>,
-    S: System<K, V, P, I>,
-    O: LocalOracle<K, V, P, I, S> + Sized,
-> ToConstant<K, V, P, I, S> for O
+impl<K: Hash + Eq + Copy, V: PartialOrd, VS, PS, S: System<K, V>, O: LocalOracle<K, V, VS, PS, S>>
+    ToConstant<K, V, VS, PS, S> for O
 {
 }
 
 pub struct ComposeStrategic<
     K: Eq + Copy,
     V: PartialOrd,
-    PS: IterSet<Item = (K, K)>,
-    VS: IterSet<Item = K>,
+    VS,
     PairStrategy: Strategy<(K, K)>,
-    S: System<K, V, PS, VS>,
-    T: StrategicLocalOracle<K, V, PS, VS, PairStrategy, S>,
-    U: StrategicLocalOracle<K, V, PS, VS, PairStrategy, S>,
+    S: System<K, V>,
+    T: StrategicLocalOracle<K, V, VS, PairStrategy, S>,
+    U: StrategicLocalOracle<K, V, VS, PairStrategy, S>,
 > {
     outer: T,
     inner: U,
-    _phantom_data: PhantomData<(K, V, PS, VS, PairStrategy, S)>,
+    _phantom_data: PhantomData<(K, V, VS, PairStrategy, S)>,
 }
 
 impl<
     K: Eq + Copy,
     V: PartialOrd,
-    PS: IterSet<Item = (K, K)>,
-    VS: IterSet<Item = K>,
+    VS,
     PairStrategy: Strategy<(K, K)>,
-    S: System<K, V, PS, VS>,
-    T: StrategicLocalOracle<K, V, PS, VS, PairStrategy, S>,
-    U: StrategicLocalOracle<K, V, PS, VS, PairStrategy, S>,
-> StrategicLocalOracle<K, V, PS, VS, PairStrategy, S>
-    for ComposeStrategic<K, V, PS, VS, PairStrategy, S, T, U>
+    S: System<K, V>,
+    T: StrategicLocalOracle<K, V, VS, PairStrategy, S>,
+    U: StrategicLocalOracle<K, V, VS, PairStrategy, S>,
+> StrategicLocalOracle<K, V, VS, PairStrategy, S>
+    for ComposeStrategic<K, V, VS, PairStrategy, S, T, U>
 {
     fn get_strategy(
         &self,
@@ -181,32 +166,30 @@ impl<
 pub struct IntersectByStrategic<
     K: Eq + Copy,
     V: PartialOrd,
-    PS: IterSet<Item = (K, K)>,
-    VS: IterSet<Item = K>,
+    VS,
     PairStrategy: Strategy<(K, K)>,
-    S: System<K, V, PS, VS>,
-    T: StrategicLocalOracle<K, V, PS, VS, PairStrategy, S>,
-    U: StrategicLocalOracle<K, V, PS, VS, PairStrategy, S>,
+    S: System<K, V>,
+    T: StrategicLocalOracle<K, V, VS, PairStrategy, S>,
+    U: StrategicLocalOracle<K, V, VS, PairStrategy, S>,
     F: Fn(StrategyWeight, StrategyWeight) -> StrategyWeight,
 > {
     left: T,
     right: U,
     f: F,
-    _phantom_data: PhantomData<(K, V, PS, VS, PairStrategy, S)>,
+    _phantom_data: PhantomData<(K, V, VS, PairStrategy, S)>,
 }
 
 impl<
     K: Eq + Copy,
     V: PartialOrd,
-    PS: IterSet<Item = (K, K)>,
-    VS: IterSet<Item = K>,
+    VS,
     PairStrategy: Strategy<(K, K)> + IntersectBy<(K, K), PairStrategy>,
-    S: System<K, V, PS, VS>,
-    T: StrategicLocalOracle<K, V, PS, VS, PairStrategy, S>,
-    U: StrategicLocalOracle<K, V, PS, VS, PairStrategy, S>,
+    S: System<K, V>,
+    T: StrategicLocalOracle<K, V, VS, PairStrategy, S>,
+    U: StrategicLocalOracle<K, V, VS, PairStrategy, S>,
     F: Fn(StrategyWeight, StrategyWeight) -> StrategyWeight,
-> StrategicLocalOracle<K, V, PS, VS, PairStrategy, S>
-    for IntersectByStrategic<K, V, PS, VS, PairStrategy, S, T, U, F>
+> StrategicLocalOracle<K, V, VS, PairStrategy, S>
+    for IntersectByStrategic<K, V, VS, PairStrategy, S, T, U, F>
 {
     fn get_strategy(
         &self,
@@ -230,9 +213,8 @@ impl<
 pub struct CountOracle;
 
 // TODO: Make this generic on set/strategy implementation
-impl<K: Eq + Copy + Hash, V: PartialOrd, S: System<K, V, HashSet<(K, K)>, HashSet<K>>>
-    StrategicLocalOracle<K, V, HashSet<(K, K)>, HashSet<K>, StrategyHeap<(K, K)>, S>
-    for CountOracle
+impl<K: Eq + Copy + Hash, V: PartialOrd, S: System<K, V>>
+    StrategicLocalOracle<K, V, HashSet<K>, StrategyHeap<(K, K)>, S> for CountOracle
 {
     fn get_strategy(
         &self,

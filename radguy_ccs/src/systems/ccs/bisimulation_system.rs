@@ -327,11 +327,9 @@ impl<
     TermKey: Key + Hash,
     T: TransitionSystem<'a, ProcKey>,
     OutStrategy: Strategy<(VarKey, VarKey)>,
-> InitialStrategy<VarKey, bool, HashSet<(VarKey, VarKey)>, HashSet<VarKey>, OutStrategy>
-    for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
+> InitialStrategy<VarKey, bool, OutStrategy> for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
 where
-    BoolSystem<VarKey, TermKey, (ProcKey, ProcKey)>:
-        InitialStrategy<VarKey, bool, HashSet<(VarKey, VarKey)>, HashSet<VarKey>, OutStrategy>,
+    BoolSystem<VarKey, TermKey, (ProcKey, ProcKey)>: InitialStrategy<VarKey, bool, OutStrategy>,
 {
     fn get_initial_strategy(&self) -> OutStrategy {
         self.bool_system.borrow().get_initial_strategy()

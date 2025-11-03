@@ -1,5 +1,5 @@
 use crate::{
-    Assignment, Cartesian, IterSet, System,
+    Arguments, Assignment, Cartesian, IsSubset, Set, System, Union,
     ordered::{
         oracle::StrategicLocalOracle,
         strategy::{InitialStrategy, Intersect, SliceRight, Strategy},
@@ -14,14 +14,15 @@ pub fn kleene_local<
     VarValue: PartialOrd,
     VarStrategy: Strategy<VarKey> + Intersect<VarKey, VarSet> + Debug,
     PairStrat: Strategy<(VarKey, VarKey)> + SliceRight<VarKey, VarKey, VarStrategy>,
-    VarSet: IterSet<Item = VarKey> + FromIterator<VarKey> + Cartesian<Output = PairSet> + Debug,
-    PairSet: IterSet<Item = (VarKey, VarKey)>,
-    S: System<VarKey, VarValue, PairSet, VarSet>
-        + InitialStrategy<VarKey, VarValue, PairSet, VarSet, PairStrat>,
+    VarSet: Set<VarKey> + Union + IsSubset + Cartesian<Output = PairSet> + FromIterator<VarKey> + Debug,
+    PairSet,
+    S: System<VarKey, VarValue>
+        + InitialStrategy<VarKey, VarValue, PairStrat>
+        + Arguments<VarKey, VarSet>,
 >(
     system: &S,
     target: VarKey,
-    oracle: &impl StrategicLocalOracle<VarKey, VarValue, PairSet, VarSet, PairStrat, S>,
+    oracle: &impl StrategicLocalOracle<VarKey, VarValue, VarSet, PairStrat, S>,
 ) -> VarValue {
     let initial_strategy = system.get_initial_strategy();
     let mut assignment = system.bottom_assignment();
@@ -35,7 +36,7 @@ pub fn kleene_local<
     while let Some(x) = todo.extract_min() {
         let evaluated = system.evaluate(x, &assignment);
         // TODO: i think this is a lot of allocation
-        visited = visited.union(std::iter::once(x).collect());
+        visited.insert(x);
         if assignment.get(&x) != evaluated || !system.arguments(x).is_subset(&discovered) {
             assignment.update(x, evaluated);
             discovered = discovered.union(system.arguments(x));

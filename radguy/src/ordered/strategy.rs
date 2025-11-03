@@ -4,7 +4,7 @@ use std::{
     hash::Hash,
 };
 
-use crate::{Cartesian, IterSet, System};
+use crate::System;
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum StrategyWeight {
@@ -73,10 +73,8 @@ pub trait Strategy<T: Copy> {
 pub trait InitialStrategy<
     VarKey: Copy,
     VarValue: PartialOrd,
-    PairSet: IterSet<Item = (VarKey, VarKey)>,
-    VarSet: IterSet<Item = VarKey> + Cartesian<Output = PairSet>,
     OutStrategy: Strategy<(VarKey, VarKey)>,
->: System<VarKey, VarValue, PairSet, VarSet>
+>: System<VarKey, VarValue>
 {
     /// Get a strategy where all variables are assigned to infinity
     fn get_initial_strategy(&self) -> OutStrategy;
@@ -115,7 +113,8 @@ pub trait IntersectBy<T: Eq + Copy, Other: Strategy<T> = Self> {
     ) -> Self;
 }
 
-pub trait Domain<T: Copy, S: IterSet<Item = T>>: Strategy<T> {
+pub trait Domain<T: Copy, S>: Strategy<T> {
+    /// Get the set of elements that have a value in the strategy
     fn domain(self) -> S;
 }
 
@@ -191,7 +190,7 @@ where
     }
 }
 
-impl<T: Copy, S: IterSet<Item = T> + FromIterator<T>> Domain<T, S> for StrategyHeap<T> {
+impl<T: Copy, S: FromIterator<T>> Domain<T, S> for StrategyHeap<T> {
     fn domain(self) -> S {
         self.into_iter()
             .map(|Reverse(StrategyItem(_, v))| v)
