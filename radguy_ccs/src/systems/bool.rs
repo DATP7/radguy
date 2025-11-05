@@ -6,11 +6,12 @@ use std::{
 
 use itertools::iproduct;
 use radguy::{
-    Arguments, Assignment, PairUniverse, Set, System, Universe, bdd::SimpleBDDSet,
+    Arguments, Assignment, PairUniverse, Set, System, Universe,
+    bdd::{SimpleBDDRelation, SimpleBDDSet},
     extension::TermSystem,
 };
 use radguy::{Union, bislotmap::BiSlotMap};
-use slotmap::{Key, SecondaryMap};
+use slotmap::{DefaultKey, Key, SecondaryMap};
 
 pub mod extension;
 
@@ -75,9 +76,15 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone> Universe<HashSet<K>> for BoolSystem<K
     }
 }
 
-impl<K: Key, T: Key, N: Hash + Eq + Clone> PairUniverse<HashSet<(K, K)>> for BoolSystem<K, T, N> {
+impl<K: Key, T: Key, N: Hash + Eq + Clone> PairUniverse<K, HashSet<(K, K)>>
+    for BoolSystem<K, T, N>
+{
     fn pair_universe(&self) -> HashSet<(K, K)> {
         iproduct!(self.names.keys(), self.names.keys()).collect()
+    }
+
+    fn diagonal(&self, _visited: &HashSet<K>) -> HashSet<(K, K)> {
+        self.names.keys().map(|k| (k, k)).collect()
     }
 }
 
@@ -87,9 +94,15 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone> Universe<SimpleBDDSet> for BoolSystem
     }
 }
 
-impl<K: Key, T: Key, N: Hash + Eq + Clone> PairUniverse<SimpleBDDSet> for BoolSystem<K, T, N> {
-    fn pair_universe(&self) -> SimpleBDDSet {
-        SimpleBDDSet::t()
+impl<T: Key, N: Hash + Eq + Clone> PairUniverse<DefaultKey, SimpleBDDRelation>
+    for BoolSystem<DefaultKey, T, N>
+{
+    fn pair_universe(&self) -> SimpleBDDRelation {
+        SimpleBDDRelation::t()
+    }
+
+    fn diagonal(&self, visited: &HashSet<DefaultKey>) -> SimpleBDDRelation {
+        SimpleBDDRelation::diagonal(visited)
     }
 }
 
@@ -106,7 +119,7 @@ impl<VarKey: Key, TermKey: Key, VarName: Hash + Eq + Clone> System<VarKey, bool>
     }
 }
 
-impl<VarKey: Key, TermKey: Key, VarName: Hash + Eq + Clone> Arguments<VarKey, HashSet<VarKey>>
+impl<VarKey: Key, TermKey: Key, VarName: Hash + Eq + Clone> Arguments<VarKey>
     for BoolSystem<VarKey, TermKey, VarName>
 {
     fn arguments(&self, key: VarKey) -> HashSet<VarKey> {

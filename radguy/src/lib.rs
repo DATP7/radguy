@@ -40,7 +40,7 @@ pub trait Cartesian<Rhs = Self> {
     type Output;
     /// Returns the Cartesian product of two sets.
     /// (a, b) for a in self, b in other.
-    fn cartesian(&self, other: &Rhs) -> Self::Output;
+    fn cartesian(self, other: &Rhs) -> Self::Output;
 }
 
 pub trait Diagonal {
@@ -56,10 +56,11 @@ pub trait Universe<S> {
     fn universe(&self) -> S;
 }
 
-pub trait PairUniverse<S> {
+pub trait PairUniverse<K, S> {
     /// Returns the cartesian product of all the variables, $VV times VV$
     #[must_use]
     fn pair_universe(&self) -> S;
+    fn diagonal(&self, visited: &HashSet<K>) -> S;
 }
 
 pub trait System<VarKey: Copy, VarValue: PartialOrd> {
@@ -67,8 +68,8 @@ pub trait System<VarKey: Copy, VarValue: PartialOrd> {
     fn bottom_assignment(&self) -> impl Assignment<VarKey, VarValue>;
 }
 
-pub trait Arguments<VarKey, VarSet> {
-    fn arguments(&self, key: VarKey) -> VarSet;
+pub trait Arguments<VarKey> {
+    fn arguments(&self, key: VarKey) -> HashSet<VarKey>;
 }
 
 pub trait Assignment<K, V> {
@@ -114,8 +115,8 @@ impl<T: Eq + Hash + Copy, S: ::std::hash::BuildHasher + Default> Without<Self> f
 impl<T: Eq + Hash + Copy, S: ::std::hash::BuildHasher> Cartesian for HashSet<T, S> {
     type Output = HashSet<(T, T)>;
 
-    fn cartesian(&self, other: &Self) -> Self::Output {
-        iproduct!(self.iter().copied(), other.iter().copied()).collect()
+    fn cartesian(self, other: &Self) -> Self::Output {
+        iproduct!(self.into_iter(), other.iter().copied()).collect()
     }
 }
 
@@ -143,18 +144,17 @@ pub fn kleene_local<
     K: Copy + Hash + Eq + Debug,
     V: Eq + PartialOrd,
     PS,
-    VS: Set<K> + Union + IsSubset + FromIterator<K>,
-    S: System<K, V> + PairUniverse<PS> + Arguments<K, VS>,
+    S: System<K, V> + PairUniverse<K, PS> + Arguments<K>,
 >(
     system: &S,
     target: K,
-    oracle: &impl LocalOracle<K, V, VS, PS, S>,
+    oracle: &impl LocalOracle<K, V, PS, S>,
 ) -> V
 where
     for<'a> &'a PS: IntoIterator<Item = &'a (K, K)>,
 {
     let mut assignment = system.bottom_assignment();
-    let mut visited = std::iter::once(target).collect();
+    let mut visited = HashSet::from([target]);
     let mut rel = system.pair_universe();
     let mut todo = local_dependencies(target, &visited, &assignment, oracle, system, &mut rel);
     let mut iter = todo.iter();
@@ -171,11 +171,11 @@ where
     assignment.get(&target)
 }
 
-fn local_dependencies<K: Hash + Copy + Eq, V: PartialOrd, VS: Set<K>, PS, S: System<K, V>>(
-    variable: K,
-    visited: &VS,
+fn local_dependencies<K: Hash + Copy + Eq, V: PartialOrd, PS, S: System<K, V>>(
+    target: K,
+    visited: &HashSet<K>,
     assignment: &impl Assignment<K, V>,
-    oracle: &impl LocalOracle<K, V, VS, PS, S>,
+    oracle: &impl LocalOracle<K, V, PS, S>,
     system: &S,
     rel: &mut PS,
 ) -> Vec<K>
@@ -185,7 +185,7 @@ where
     *rel = oracle.approximate_flow(visited, assignment, rel, system);
     rel.into_iter()
         .copied()
-        .filter_map(|(x, y)| if y == variable { Some(x) } else { None })
+        .filter_map(|(x, y)| if y == target { Some(x) } else { None })
         .filter(|x| visited.contains(x))
         .collect()
 }

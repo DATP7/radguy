@@ -13,14 +13,8 @@ pub struct BoolExtension<TermKey: Key + Hash, VarName: Hash + Eq + Clone>(
 );
 
 impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
-    LocalExtension<
-        VarKey,
-        bool,
-        TermKey,
-        HashSet<VarKey>,
-        HashSet<(VarKey, VarKey)>,
-        HashSet<(VarKey, TermKey)>,
-    > for BoolExtension<TermKey, VarName>
+    LocalExtension<VarKey, bool, TermKey, HashSet<(VarKey, VarKey)>, HashSet<(VarKey, TermKey)>>
+    for BoolExtension<TermKey, VarName>
 {
     type System = BoolSystem<VarKey, TermKey, VarName>;
 

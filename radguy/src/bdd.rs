@@ -1,17 +1,25 @@
 use std::cell::RefCell;
+use std::collections::HashSet;
+use std::thread::LocalKey;
 
 use oxidd::{BooleanFunction, Manager, ManagerRef};
 
 use oxidd::bdd::{BDDFunction, BDDManagerRef, new_manager};
 use slotmap::{DefaultKey, SecondaryMap};
 
-use crate::{Cartesian, Diagonal, Intersect, IsSubset, Set, Union, Without};
+use crate::{Cartesian, Intersect, IsSubset, Set, Union, Without};
 
 // Type alias makes it easy to replace with generic later. May not be possible.
 type K = DefaultKey;
 
 thread_local!(static SIMPLE_BDD_MANAGER_REF: RefCell<BDDManagerRef> = RefCell::new(new_manager(2048,1024,1)));
-thread_local!(static SIMPLE_BDD_KEY_MAP: RefCell<SecondaryMap<K, u32>> = RefCell::new(SecondaryMap::default()));
+thread_local!(static SIMPLE_BDD_LEFT_MAP: RefCell<SecondaryMap<K, u32>> = RefCell::new(SecondaryMap::default()));
+thread_local!(static SIMPLE_BDD_RIGHT_MAP: RefCell<SecondaryMap<K, u32>> = RefCell::new(SecondaryMap::default()));
+
+// enum BDDMap {
+//     Var,
+//     Term,
+// }
 
 /// This is only a macro because typing the function correctly was too painful
 macro_rules! with_simple_manager_exclusive {
@@ -28,17 +36,61 @@ macro_rules! with_simple_manager_exclusive {
 /// all slotmap code? We cannot store a map in the BDD structure, as we would then have to union
 /// different maps, so if we map then a global map is needed. Manager is also required to be global
 /// or we need some factory abstraction, but that is probably what manager does
-pub struct SimpleBDDSet {
+pub struct SimpleBDDRelation {
     bdd: BDDFunction,
+    // map_type: BDDMap,
 }
 
-impl SimpleBDDSet {
-    fn insert_var(key: K, var: u32) -> Option<u32> {
-        SIMPLE_BDD_KEY_MAP.with(|map_cell| map_cell.borrow_mut().insert(key, var))
+impl SimpleBDDRelation {
+    fn singleton(map: &'static LocalKey<RefCell<SecondaryMap<K, u32>>>, key: K) -> BDDFunction {
+        let i = map.with(|map_ref| {
+            *map_ref
+                .borrow_mut()
+                .entry(key)
+                .expect("Key should still exist")
+                .or_insert_with(|| {
+                    with_simple_manager_exclusive!(|manager| manager
+                        .add_vars(1)
+                        .next()
+                        .expect("That's it bois, we're committing warcrimes"))
+                })
+        });
+
+        with_simple_manager_exclusive!(|manager| BDDFunction::var(manager, i)).expect("oom")
     }
 
-    fn get_var(key: K) -> Option<u32> {
-        SIMPLE_BDD_KEY_MAP.with(|map_cell| map_cell.borrow().get(key).copied())
+    fn left_singleton(key: K) -> BDDFunction {
+        Self::singleton(&SIMPLE_BDD_LEFT_MAP, key)
+    }
+
+    fn right_singleton(key: K) -> BDDFunction {
+        Self::singleton(&SIMPLE_BDD_RIGHT_MAP, key)
+    }
+
+    fn get_left(key: K) -> Option<u32> {
+        SIMPLE_BDD_LEFT_MAP.with(|map_cell| map_cell.borrow().get(key).copied())
+    }
+
+    fn get_right(key: K) -> Option<u32> {
+        SIMPLE_BDD_RIGHT_MAP.with(|map_cell| map_cell.borrow().get(key).copied())
+    }
+
+    fn contains_left(&self, item: K) -> bool {
+        dbg!(Self::get_left(item)).map_or_else(
+            || dbg!(self.bdd.eval(std::iter::empty())),
+            |var| self.bdd.eval(std::iter::once((var, true))),
+        )
+    }
+
+    fn contains_right(&self, item: K) -> bool {
+        Self::get_right(item).map_or_else(
+            || self.bdd.eval(std::iter::empty()),
+            |var| self.bdd.eval(std::iter::once((var, true))),
+        )
+    }
+
+    fn union_mut(&mut self, other: &BDDFunction) {
+        self.bdd = self.bdd.or(other).expect("oom");
     }
 
     #[must_use]
@@ -52,57 +104,53 @@ impl SimpleBDDSet {
         let bdd = with_simple_manager_exclusive!(|manager| BDDFunction::t(manager));
         Self { bdd }
     }
+
+    #[must_use]
+    pub fn diagonal(visited: &HashSet<DefaultKey>) -> Self {
+        let bdd = visited
+            .iter()
+            .map(|k| {
+                let lhs = Self::left_singleton(*k);
+                let rhs = Self::right_singleton(*k);
+                lhs.and(&rhs).expect("oom")
+            })
+            .reduce(|set, pair| set.or(&pair).expect("oom"))
+            .expect("visited should be non-empty");
+        Self { bdd }
+    }
 }
 
-impl Default for SimpleBDDSet {
+impl Default for SimpleBDDRelation {
     fn default() -> Self {
         Self::f()
     }
 }
 
-impl Set<K> for SimpleBDDSet {
-    fn contains(&self, item: &K) -> bool {
-        Self::get_var(*item).map_or_else(
-            || self.bdd.eval(std::iter::empty()),
-            |var| self.bdd.eval(std::iter::once((var, true))),
-        )
-    }
-
-    fn insert(&mut self, item: K) -> bool {
-        // PERF: If the return value is never used, check how much removing this would improve
-        // performance.
-        if self.contains(&item) {
-            return false;
-        }
-
-        let (i, var) = with_simple_manager_exclusive!(|manager| {
-            manager
-                .add_vars(1)
-                .map(|i| (i, BDDFunction::var(manager, i)))
-                .next()
-                .expect("That's it bois, we're committing warcrimes")
-        });
-        Self::insert_var(item, i);
-        self.bdd = self.bdd.or(&var.expect("oom")).expect("oom");
-        true
-    }
-}
-
-impl Union for SimpleBDDSet {
+impl Union for SimpleBDDRelation {
     fn union(self, other: Self) -> Self {
         Self {
             bdd: self.bdd.or(&other.bdd).expect("oom"),
         }
     }
 }
-impl Intersect for SimpleBDDSet {
+
+impl Union<BDDFunction> for SimpleBDDRelation {
+    fn union(self, other: BDDFunction) -> Self {
+        Self {
+            bdd: self.bdd.or(&other).expect("oom"),
+        }
+    }
+}
+
+impl Intersect for SimpleBDDRelation {
     fn intersect(self, other: &Self) -> Self {
         Self {
             bdd: self.bdd.and(&other.bdd).expect("oom"),
         }
     }
 }
-impl Without for SimpleBDDSet {
+
+impl Without for SimpleBDDRelation {
     fn without(self, other: &Self) -> Self {
         Self {
             // PERF: Does this increase the size of the bdd?
@@ -110,23 +158,63 @@ impl Without for SimpleBDDSet {
         }
     }
 }
-impl IsSubset for SimpleBDDSet {
+
+impl IsSubset for SimpleBDDRelation {
     fn is_subset(&self, other: &Self) -> bool {
         self.bdd <= other.bdd
     }
 }
-impl Cartesian for SimpleBDDSet {
-    type Output = Self;
 
-    fn cartesian(&self, other: &Self) -> Self::Output {
-        todo!()
+#[derive(Default)]
+pub struct SimpleBDDSet {
+    rel: SimpleBDDRelation,
+}
+
+impl SimpleBDDSet {
+    #[must_use]
+    pub fn t() -> Self {
+        Self {
+            rel: SimpleBDDRelation::t(),
+        }
+    }
+    #[must_use]
+    pub fn f() -> Self {
+        Self {
+            rel: SimpleBDDRelation::f(),
+        }
     }
 }
-impl Diagonal for SimpleBDDSet {
-    type Output = Self;
 
-    fn diagonal(&self) -> Self::Output {
-        todo!()
+impl Set<K> for SimpleBDDSet {
+    fn contains(&self, item: &K) -> bool {
+        self.rel.contains_left(*item)
+    }
+
+    fn insert(&mut self, item: K) -> bool {
+        if self.contains(&item) {
+            return false;
+        }
+        self.rel.union_mut(&SimpleBDDRelation::left_singleton(item));
+        true
+    }
+}
+
+impl<T> Cartesian<T> for SimpleBDDSet
+where
+    for<'a> &'a T: IntoIterator<Item = &'a K>,
+{
+    type Output = SimpleBDDRelation;
+
+    fn cartesian(mut self, other: &T) -> Self::Output {
+        let rhs = other
+            .into_iter()
+            .map(|key| SimpleBDDRelation::right_singleton(*key))
+            .reduce(|rel, var| rel.or(&var).expect("oom"));
+
+        if let Some(rhs) = rhs {
+            self.rel.bdd = self.rel.bdd.and(&rhs).expect("oom");
+        }
+        self.rel
     }
 }
 
@@ -147,30 +235,55 @@ mod test {
     #[allow(unused_macros)]
     macro_rules! dbg_map {
         () => {
-            SIMPLE_BDD_KEY_MAP.with(|map_cell| {
+            SIMPLE_BDD_LEFT_MAP.with(|map_cell| {
                 dbg!(map_cell.borrow());
             });
         };
     }
 
     #[test]
-    fn simple_bdd_map_contains_added_key() {
-        let mut proxy_map = SlotMap::default();
-        let var = 3;
-        let key = proxy_map.insert(var);
-        SimpleBDDSet::insert_var(key, var);
-        let new_var = SimpleBDDSet::get_var(key);
-        assert_eq!(Some(var), new_var);
+    fn are_bdds_dumb() {
+        let manager_ref = new_manager(2048, 1024, 1);
+        let empty = manager_ref.with_manager_exclusive(|manager| BDDFunction::f(manager));
+        let (i, var) = manager_ref.with_manager_exclusive(|manager| {
+            manager
+                .add_vars(2)
+                .map(|i| (i, BDDFunction::var(manager, i)))
+                .next()
+                .expect("warcrimes")
+        });
+
+        let var = var.expect("oom");
+        let res = empty.or(&var).expect("oom");
+
+        assert!(!empty.eval(std::iter::empty()));
+        assert!(!var.eval(std::iter::once((1, false))));
+        assert!(!var.eval(std::iter::empty()));
+        assert!(res.eval(std::iter::once((i, true))));
+        assert!(!res.eval(std::iter::empty()));
     }
 
     #[test]
-    fn simple_bdd_map_contains_keys_in_bdd() {
+    fn simple_bdd_map_contains_only_inserted_keys() {
         let mut proxy_map = SlotMap::default();
-        let key = proxy_map.insert(3);
-        let mut bdd = SimpleBDDSet::default();
-        bdd.insert(key);
-        let var = SimpleBDDSet::get_var(key);
-        assert_ne!(var, None);
+        let in_key = proxy_map.insert(3);
+        let out_key = proxy_map.insert(6);
+        let mut set = SimpleBDDSet::f();
+
+        assert!(!set.contains(&out_key), "in_key should not be in set early");
+        assert!(
+            !set.contains(&out_key),
+            "out_key should not be in set early"
+        );
+
+        set.insert(in_key);
+        let var = SimpleBDDRelation::get_left(out_key);
+        assert_eq!(var, None, "out_key should not be in global map");
+        let var = SimpleBDDRelation::get_left(in_key);
+        assert_ne!(var, None, "in_key should be in global map");
+
+        assert!(set.contains(&in_key), "in_key should be in set late");
+        assert!(!set.contains(&out_key), "out_key should not be in set late");
     }
 
     #[test]

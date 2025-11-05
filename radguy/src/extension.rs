@@ -12,12 +12,11 @@ pub trait TermToKey<
     VarKey: Copy,
     VarValue: PartialOrd,
     TermKey: Copy,
-    VarSet,
     PairSet,
     S: TermSystem<VarKey, VarValue, TermKey>,
 >
 {
-    fn term_to_key(&self, visited: &VarSet, system: &S) -> PairSet;
+    fn term_to_key(&self, visited: &HashSet<VarKey>, system: &S) -> PairSet;
 }
 
 impl<
@@ -26,7 +25,7 @@ impl<
     TermKey: Copy + Eq + Hash,
     S: TermSystem<VarKey, VarValue, TermKey>,
     H: ::std::hash::BuildHasher + Default,
-> TermToKey<VarKey, VarValue, TermKey, HashSet<VarKey>, HashSet<(VarKey, VarKey)>, S>
+> TermToKey<VarKey, VarValue, TermKey, HashSet<(VarKey, VarKey)>, S>
     for HashSet<(VarKey, TermKey), H>
 {
     fn term_to_key(&self, visited: &HashSet<VarKey>, system: &S) -> HashSet<(VarKey, VarKey)> {
@@ -47,20 +46,13 @@ impl<
     }
 }
 
-pub trait LocalExtension<
-    VarKey: Hash + Copy,
-    VarValue: PartialOrd,
-    TermKey: Copy,
-    VarSet,
-    PairSet,
-    TermSet,
->
+pub trait LocalExtension<VarKey: Hash + Copy, VarValue: PartialOrd, TermKey: Copy, PairSet, TermSet>
 {
     type System: TermSystem<VarKey, VarValue, TermKey>;
 
     fn depends(
         &self,
-        visited: &VarSet,
+        visited: &HashSet<VarKey>,
         assignment: &dyn Assignment<VarKey, VarValue>,
         possible: &PairSet,
         system: &Self::System,
@@ -71,41 +63,37 @@ pub struct ExtensionOracle<
     K: Hash + Eq + Copy,
     V: PartialOrd,
     T: Copy,
-    VS,
     PS,
     TS,
     S: TermSystem<K, V, T>,
-    E: LocalExtension<K, V, T, VS, PS, TS, System = S>,
+    E: LocalExtension<K, V, T, PS, TS, System = S>,
     U,
 > {
     extension: E,
-    _phantom_data: PhantomData<(K, V, T, VS, PS, TS, U)>,
+    _phantom_data: PhantomData<(K, V, T, PS, TS, U)>,
 }
 
 impl<
     K: Hash + Eq + Copy,
     V: PartialOrd,
     T: Copy + Eq,
-    VS: Cartesian<Output = PS> + Without,
     PS: Union + FromIterator<(K, K)>,
-    TS: TermToKey<K, V, T, VS, PS, S>,
+    TS: TermToKey<K, V, T, PS, S>,
     S: TermSystem<K, V, T> + Universe<U>,
-    E: LocalExtension<K, V, T, VS, PS, TS, System = S>,
-    U: Without<VS> + Cartesian<Output = PS>,
-> LocalOracle<K, V, VS, PS, S> for ExtensionOracle<K, V, T, VS, PS, TS, S, E, U>
-where
-    for<'a> &'a VS: IntoIterator<Item = &'a K>,
+    E: LocalExtension<K, V, T, PS, TS, System = S>,
+    U: Without<HashSet<K>> + Cartesian<Output = PS>,
+> LocalOracle<K, V, PS, S> for ExtensionOracle<K, V, T, PS, TS, S, E, U>
 {
     fn approximate_flow(
         &self,
-        visited: &VS,
+        visited: &HashSet<K>,
         assignment: &impl Assignment<K, V>,
         possible: &PS,
         system: &E::System,
     ) -> PS {
         let unvisited = system.universe().without(visited);
         let unvisited_dep = system.universe().cartesian(&unvisited);
-        let self_dep: PS = visited.into_iter().map(|&x| (x, x)).collect();
+        let self_dep: PS = visited.iter().map(|&x| (x, x)).collect();
         let terms = self
             .extension
             .depends(visited, assignment, possible, system);
@@ -120,12 +108,11 @@ impl<
     V: PartialOrd,
     T: Copy + Eq,
     PS: FromIterator<(K, K)>,
-    VS,
     TS,
     S: TermSystem<K, V, T>,
-    E: LocalExtension<K, V, T, VS, PS, TS, System = S>,
+    E: LocalExtension<K, V, T, PS, TS, System = S>,
     U,
-> From<E> for ExtensionOracle<K, V, T, VS, PS, TS, S, E, U>
+> From<E> for ExtensionOracle<K, V, T, PS, TS, S, E, U>
 {
     fn from(extension: E) -> Self {
         Self {

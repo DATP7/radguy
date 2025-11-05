@@ -6,8 +6,11 @@ use std::{
 };
 
 use itertools::iproduct;
-use radguy::{Arguments, Assignment, PairUniverse, System, Universe, bdd::SimpleBDDSet};
-use slotmap::Key;
+use radguy::{
+    Arguments, Assignment, PairUniverse, System, Universe,
+    bdd::{SimpleBDDRelation, SimpleBDDSet},
+};
+use slotmap::{DefaultKey, Key};
 
 use crate::systems::{
     bool::{BoolSystem, BoolTerm},
@@ -284,7 +287,7 @@ impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKe
 }
 
 impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKey>>
-    Arguments<VarKey, HashSet<VarKey>> for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
+    Arguments<VarKey> for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
 {
     fn arguments(&self, var_key: VarKey) -> HashSet<VarKey> {
         let term_key = {
@@ -309,11 +312,15 @@ impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKe
 }
 
 impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKey>>
-    PairUniverse<HashSet<(VarKey, VarKey)>>
+    PairUniverse<VarKey, HashSet<(VarKey, VarKey)>>
     for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
 {
     fn pair_universe(&self) -> HashSet<(VarKey, VarKey)> {
         self.bool_system.borrow().pair_universe()
+    }
+
+    fn diagonal(&self, visited: &HashSet<VarKey>) -> HashSet<(VarKey, VarKey)> {
+        self.bool_system.borrow().diagonal(visited)
     }
 }
 
@@ -325,10 +332,15 @@ impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKe
     }
 }
 
-impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKey>>
-    PairUniverse<SimpleBDDSet> for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
+impl<'a, ProcKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKey>>
+    PairUniverse<DefaultKey, SimpleBDDRelation>
+    for BisimulationSystem<'a, ProcKey, DefaultKey, TermKey, T>
 {
-    fn pair_universe(&self) -> SimpleBDDSet {
-        SimpleBDDSet::t()
+    fn pair_universe(&self) -> SimpleBDDRelation {
+        SimpleBDDRelation::t()
+    }
+
+    fn diagonal(&self, visited: &HashSet<DefaultKey>) -> SimpleBDDRelation {
+        SimpleBDDRelation::diagonal(visited)
     }
 }
