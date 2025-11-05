@@ -10,6 +10,7 @@ use std::{
 pub mod bislotmap;
 pub mod extension;
 pub mod oracle;
+pub mod ordered;
 
 pub trait Set<T> {
     fn contains(&self, item: &T) -> bool;

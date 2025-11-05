@@ -1,5 +1,13 @@
 use criterion::{Criterion, criterion_group, criterion_main};
-use radguy::{kleene_local, oracle::SMax};
+use radguy::{
+    kleene_local,
+    oracle::LocalMaxR,
+    ordered::{
+        self,
+        oracle::{CountOracle, StrategicLocalOracle, ToConstant},
+        strategy::StrategyWeight,
+    },
+};
 use radguy_ccs::systems::ccs::{
     bisimulation_system::BisimulationSystem, grammar::ProgramParser,
     transition_system::TransitionSystem, weak_transition_system::WeakTransitionSystem,
@@ -14,7 +22,8 @@ macro_rules! bisim_bench_suite {
             let ast = parser
                 .parse($ccs)
                 .expect("Program should parse");
-            c.bench_function(stringify!($name), |b| {
+            let mut group = c.benchmark_group(stringify!($name));
+            group.bench_function("unordered", |b| {
                 b.iter_batched(
                     || {
                         let mut lts = WeakTransitionSystem::<DefaultKey>::default();
@@ -23,11 +32,26 @@ macro_rules! bisim_bench_suite {
                     },
                     |mut sys| {
                         let target = sys.specify_comparison($left, $right);
-                        let result = !kleene_local(&sys, target, &SMax::default());
+                        let result = !kleene_local(&sys, target, &LocalMaxR::default());
                         assert_eq!($eq, result, "{} and {} should{} be bisimilar in{}", $left, $right, if !$eq { " not" } else {""}, $ccs)
                     },
                     criterion::BatchSize::SmallInput,
                 );
+            });
+            group.bench_function("ordered", |b|{
+                    b.iter_batched(
+                        || {
+                            let mut lts = WeakTransitionSystem::<DefaultKey>::default();
+                            lts.load_ast(ast.clone());
+                            BisimulationSystem::<DefaultKey, DefaultKey, DefaultKey, _>::new(lts)
+                        },
+                        |mut sys| {
+                            let target = sys.specify_comparison($left, $right);
+                            let result = !ordered::kleene_local(&sys, target, &LocalMaxR::default().constant(StrategyWeight::Infinity).and_by(CountOracle, std::cmp::min));
+                            assert_eq!($eq, result, "{} and {} should{} be bisimilar in{}", $left, $right, if !$eq { " not" } else {""}, $ccs)
+                        },
+                        criterion::BatchSize::SmallInput,
+                    );
             });
         }
         )*
