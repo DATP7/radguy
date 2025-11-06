@@ -1,4 +1,4 @@
-use std::{collections::HashSet, hash::Hash, marker::PhantomData};
+use std::{collections::HashSet, fmt::Display, hash::Hash, marker::PhantomData};
 
 use crate::{Assignment, Cartesian, System, Union, Universe, Without, oracle::LocalOracle};
 
@@ -64,6 +64,37 @@ pub trait LocalExtension<
         possible: &PairSet,
         system: &System,
     ) -> TermSet;
+}
+
+pub trait ExtensionToOracle<
+    K: Hash + Eq + Copy,
+    V: PartialOrd,
+    T: Copy + Eq,
+    VS: Cartesian<Output = PS> + Without,
+    PS: Union + FromIterator<(K, K)>,
+    TS: TermToKey<K, V, T, VS, PS, S>,
+    S: TermSystem<K, V, T> + Universe<U>,
+    U: Without<VS> + Cartesian<Output = PS>,
+>: LocalExtension<K, V, T, VS, PS, TS, S> + Default
+{
+    #[must_use]
+    fn oracle() -> ExtensionOracle<K, V, T, VS, PS, TS, S, Self, U> {
+        ExtensionOracle::from(Self::default())
+    }
+}
+
+impl<
+    K: Hash + Eq + Copy,
+    V: PartialOrd,
+    T: Copy + Eq,
+    VS: Cartesian<Output = PS> + Without,
+    PS: Union + FromIterator<(K, K)>,
+    TS: TermToKey<K, V, T, VS, PS, S>,
+    S: TermSystem<K, V, T> + Universe<U>,
+    U: Without<VS> + Cartesian<Output = PS>,
+    E: LocalExtension<K, V, T, VS, PS, TS, S> + Default,
+> ExtensionToOracle<K, V, T, VS, PS, TS, S, U> for E
+{
 }
 
 #[allow(clippy::type_complexity)]
@@ -132,5 +163,22 @@ impl<
             extension,
             _phantom_data: PhantomData,
         }
+    }
+}
+
+impl<
+    K: Hash + Eq + Copy,
+    V: PartialOrd,
+    T: Copy + Eq,
+    VS: Cartesian<Output = PS> + Without,
+    PS: Union + FromIterator<(K, K)>,
+    TS: TermToKey<K, V, T, VS, PS, S>,
+    S: TermSystem<K, V, T> + Universe<U>,
+    E: LocalExtension<K, V, T, VS, PS, TS, S> + Display,
+    U: Without<VS> + Cartesian<Output = PS>,
+> Display for ExtensionOracle<K, V, T, VS, PS, TS, S, E, U>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "E^({})", self.extension)
     }
 }

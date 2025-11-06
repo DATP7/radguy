@@ -1,6 +1,7 @@
 use std::{
     cmp::{Ordering, Reverse},
     collections::{BinaryHeap, HashMap, HashSet},
+    fmt::Display,
     hash::Hash,
 };
 
@@ -26,6 +27,15 @@ impl Ord for StrategyWeight {
 impl PartialOrd for StrategyWeight {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
+    }
+}
+
+impl Display for StrategyWeight {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Infinity => write!(f, "∞"),
+            Self::Num(x) => write!(f, "{x}"),
+        }
     }
 }
 

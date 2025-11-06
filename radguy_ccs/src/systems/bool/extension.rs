@@ -1,6 +1,6 @@
 use radguy::{Assignment, Universe, extension::LocalExtension};
 use slotmap::Key;
-use std::{collections::HashSet, hash::Hash, marker::PhantomData};
+use std::{collections::HashSet, fmt::Display, hash::Hash, marker::PhantomData};
 
 use crate::systems::bool::{BoolSystem, BoolTerm};
 
@@ -115,5 +115,11 @@ fn collect_terms<
                 }
             }
         }
+    }
+}
+
+impl<TermKey: Key + Hash, VarName: Hash + Eq + Clone> Display for BoolExtension<TermKey, VarName> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Bool")
     }
 }
