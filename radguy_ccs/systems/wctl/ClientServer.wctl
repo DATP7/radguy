@@ -1,0 +1,4 @@
+F1 = E True U[<=10] (A True U[<=1] failed)
+F2 = E True U[<=8] delivered
+F3 = E True U[<=5] failed
+F4 = EF[<=10] (AF[<=1] failed)

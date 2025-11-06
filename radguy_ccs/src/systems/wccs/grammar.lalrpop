@@ -19,7 +19,7 @@ SummationProcess: Process<'input> = {
 }
 
 CompositionProcess: Process<'input> = {
-  <l:ActionPrefixProcess> "|" <r:CompositionProcess> => Process::Compose(Box::new(l), Box::new(r)),
+  <l:AtomicPropositionProcess> "|" <r:CompositionProcess> => Process::Compose(Box::new(l), Box::new(r)),
   AtomicPropositionProcess,
 }
 
@@ -32,31 +32,40 @@ AtomicPropositionProcess: Process<'input> = {
 }
 
 ActionPrefixProcess: Process<'input> = {
-  <action:Action> "." <process:ActionPrefixProcess> => Process::ActionPrefix {action, process: Box::new(process)},
-  RelabeledProcess,
+    <action:Action> "." <process:AtomicPropositionProcess> => Process::ActionPrefix {action, process: Box::new(process)},
+    ActionRelabeledProcess,
 }
 
 
 
 
-RelabeledProcess: Process<'input> = {
-  <process:RelabeledProcess> "[" <labels:Comma<Relabelling>> "]" =>? if labels.iter().any(|(from, to)| *from == "tau" || *to == "tau") {
-    Err(ParseError::User {
-      error: "cannot relabel tau"
-    })
-  } else {
-    Ok(Process::Relabelling {
-      process: Box::new(process),
-      // The syntax for relabelling is [to/from]
-      labels: BTreeMap::from_iter(labels),
-    })
-  },
+ActionRelabeledProcess: Process<'input> = {
+    <process:ActionRelabeledProcess> "[" <labels:Comma<ActionRelabelling>> "]" =>? if labels.iter().any(|(from, to)| *from == "tau" || *to == "tau") {
+        Err(ParseError::User {
+        error: "cannot relabel tau"
+        })
+    } else {
+        Ok(Process::ActionRelabelling {
+        process: Box::new(process),
+        labels: BTreeMap::from_iter(labels),
+        })
+    },
 
-  RestrictedProcess,
+    PropositionRelabeledProcess,
+}
+
+PropositionRelabeledProcess: Process<'input> = {
+    <process:PropositionRelabeledProcess> "[" <labels:Comma<PropositionRelabelling>> "]" => 
+        Process::PropositionRelabelling {
+            process: Box::new(process),
+            labels: BTreeMap::from_iter(labels),
+        },
+
+    RestrictedProcess,
 }
 
 RestrictedProcess: Process<'input> = {
-  <process:Paren> "\\" <restriction:LabelSet> => Process::Restriction {
+  <process:RestrictedProcess> "\\" <restriction:LabelSet> => Process::Restriction {
       process: Box::new(process),
       restriction,
     },
@@ -69,7 +78,8 @@ Paren: Process<'input> = {
   <Id> => Process::Named(<>),
 }
 
-Relabelling: (&'input str, &'input str) = <Label> "->" <Label>;
+ActionRelabelling: (&'input str, &'input str) = <Label> "->" <Label>;
+PropositionRelabelling: (&'input str, &'input str) = <Label> "=>" <Label>;
 
 LabelSet: BTreeSet<&'input str> = {
   "{" <labels:Comma<Label>> "}" =>? if labels.iter().any(|l| *l == "tau") {
@@ -82,18 +92,21 @@ LabelSet: BTreeSet<&'input str> = {
 }
 
 pub Action: WeightedAction<'input> = {
-    "<" <name:Label> <co:"!"?> <weight:("," <Num>)?> ">" =>? match name {
+    "<" <name:Label> <co:"!"?> <weight:(r", *[0-9]+")?> ">" =>? match name {
         "tau" => if co.is_some() {
                 Err(ParseError::User {
                     error: "co tau action not allowed"
                 })
             }
             else {
-                Ok(WeightedAction {weight: weight.unwrap_or(0), action: Action::Tau})
+                Ok(WeightedAction {weight: weight.map(|s| s.trim_start_matches([',', ' ']).parse().expect("Weight should parse to int")).unwrap_or(0), action: Action::Tau})
             },
 
         name => Ok(WeightedAction {
-            weight: weight.unwrap_or(0), 
+            weight: weight
+                    .map(|s| 
+                        s.trim_start_matches([',', ' ']).parse().expect("Weight should parse to int"))
+                    .unwrap_or(0), 
             action: Action::Label {
                 name,
                 is_complement: co.is_some(),
@@ -122,6 +135,6 @@ Comma<T>: Vec<T> = {
 
 match {
     r"\s*" => {}, // whitespace
-    r"\*[^\n\r]*[\n\r]*" => {}, // `* comments`
+    r"\#[^\n\r]*[\n\r]*" => {}, // `* comments`
     _
 }

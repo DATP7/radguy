@@ -14,7 +14,12 @@ pub enum Process<'a> {
         // We use `BTreeSet` because it implements `Hash`
         restriction: BTreeSet<&'a str>,
     },
-    Relabelling {
+    ActionRelabelling {
+        process: Box<Process<'a>>,
+        // We use `BTreeMap` because it implements `Hash`
+        labels: BTreeMap<&'a str, &'a str>,
+    },
+    PropositionRelabelling {
         process: Box<Process<'a>>,
         // We use `BTreeMap` because it implements `Hash`
         labels: BTreeMap<&'a str, &'a str>,
@@ -22,7 +27,7 @@ pub enum Process<'a> {
     Sum(Box<Process<'a>>, Box<Process<'a>>),
     Compose(Box<Process<'a>>, Box<Process<'a>>),
     AtomicPropositions {
-        propositions: BTreeSet<&'a str>,
+        propositions: Vec<&'a str>,
         process: Box<Process<'a>>,
     },
 }
@@ -129,15 +134,6 @@ mod tests {
         };
     }
 
-    macro_rules! parse_file {
-        ($path:expr) => {
-            let wccs = fs::read_to_string($path).expect("file should be readable as string");
-            let parser = ProgramParser::new();
-
-            let _ = parser.parse(&wccs);
-        };
-    }
-
     #[test]
     fn test_parse_func() {
         let parser = ProgramParser::new();
@@ -160,16 +156,17 @@ mod tests {
             S := mow:<a, 1>.T;
             T := dump:S;
             ",
+            "S := mow:dump:<a>.mow:S;", //
+            "T := <a,0>.dump:S;",       // This should work
         ];
 
         let bad = [
-            "S := <tau!>.S;",           // No co tau
-            "S = mow:<a>.S;",           // wrong =
-            "S := mow.<a>.S;",          // . instead of :
-            "S := mow.<a, -2>.S;",      // negative num
-            "S := mow.<a, 0.1>.S;",     // decimal
-            "S := mow.<a, a>.S;",       // id instead of num
-            "S := mow:dump:<a>.mow:S;", //
+            "S := <tau!>.S;",       // No co tau
+            "S = mow:<a>.S;",       // wrong =
+            "S := mow.<a>.S;",      // . instead of :
+            "S := mow.<a, -2>.S;",  // negative num
+            "S := mow.<a, 0.1>.S;", // decimal
+            "S := mow.<a, a>.S;",   // id instead of num
         ];
 
         assert_good!(good, parser);
@@ -180,9 +177,16 @@ mod tests {
     fn large_examples() {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("systems/wccs");
         let entries = fs::read_dir(dir).expect("failed to read dir");
+        let parser = ProgramParser::new();
 
         for entry in entries {
-            parse_file!(entry.expect("invalid dir entry").path());
+            let path = entry.expect("invalid dir entry").path();
+            let wccs = fs::read_to_string(&path).expect("file should be readable as string");
+
+            parser.parse(&wccs).expect(&format!(
+                "file: \"{}\" should parse",
+                path.to_str().expect("to_str should work")
+            ));
         }
     }
 
@@ -215,7 +219,7 @@ mod tests {
         let parsed_process = parser.parse(action_str).expect("Process should parse");
 
         let actual_process = Process::AtomicPropositions {
-            propositions: BTreeSet::from(["mow"]),
+            propositions: Vec::from(["mow"]),
             process: Box::new(Process::Named("S")),
         };
 
