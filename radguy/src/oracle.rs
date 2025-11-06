@@ -1,7 +1,9 @@
 use crate::{
-    Assignment, Cartesian, Diagonal, Intersect, Maximal, PairUniverse, Set, System, Union,
-    Universe, Without,
+    Arguments, Assignment, Cartesian, Diagonal, Intersect, Maximal, PairUniverse, Set, System,
+    Union, Universe, Without,
 };
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::fmt::{Debug, Display};
 use std::{collections::HashSet, hash::Hash, marker::PhantomData};
 
@@ -46,7 +48,7 @@ pub trait LocalOracle<K: Hash + Eq + Copy, V: PartialOrd, VS, PS, S: System<K, V
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct LocalMaxR<U>(PhantomData<U>);
 
 impl<
@@ -95,7 +97,7 @@ impl<U> Display for LocalMaxR<U> {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct SMax<U>(PhantomData<U>);
 
 impl<U> Display for SMax<U> {
@@ -119,6 +121,8 @@ impl<
         _possible: &HashSet<(K, K)>,
         system: &S,
     ) -> HashSet<(K, K)> {
+        // TODO: change this to use relation once we update the relation with discovered variables
+        // after each iteration
         system
             .pair_universe()
             .into_iter()
@@ -236,7 +240,48 @@ impl<
     }
 }
 
-#[derive(Default)]
+// We need to manually implement `Clone` for these oracles, because the derive macro requires that
+// all type parameters of the type implement `Clone`, meaning that `S` needs to implement clone,
+// even though it isn't part of the actual struct
+impl<
+    K: Hash + Eq + Copy,
+    V: PartialOrd,
+    VarSet,
+    PairSet,
+    S: System<K, V>,
+    T: LocalOracle<K, V, VarSet, PairSet, S> + Clone,
+    U: LocalOracle<K, V, VarSet, PairSet, S> + Clone,
+> Clone for ComposeLocal<K, V, VarSet, PairSet, S, T, U>
+{
+    fn clone(&self) -> Self {
+        Self {
+            outer: self.outer.clone(),
+            inner: self.inner.clone(),
+            _phantom_data: self._phantom_data,
+        }
+    }
+}
+
+impl<
+    K: Hash + Eq + Copy,
+    V: PartialOrd,
+    VarSet,
+    PairSet,
+    S: System<K, V>,
+    T: LocalOracle<K, V, VarSet, PairSet, S> + Clone,
+    U: LocalOracle<K, V, VarSet, PairSet, S> + Clone,
+> Clone for IntersectLocal<K, V, VarSet, PairSet, S, T, U>
+{
+    fn clone(&self) -> Self {
+        Self {
+            left: self.left.clone(),
+            right: self.right.clone(),
+            _phantom_data: self._phantom_data,
+        }
+    }
+}
+
+#[derive(Clone, Default)]
 pub struct TrivialOracle;
 
 impl<
@@ -261,5 +306,136 @@ impl<
 impl Display for TrivialOracle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Trivial")
+    }
+}
+
+#[derive(Default, Clone, Debug)]
+pub struct ArgumentsOracle<VarKey: Eq + Copy + Hash> {
+    successors: RefCell<HashMap<VarKey, HashSet<VarKey>>>,
+    ancestors: RefCell<HashMap<VarKey, HashSet<VarKey>>>,
+    previous_visited: RefCell<HashSet<VarKey>>,
+    relation_cache: RefCell<HashSet<(VarKey, VarKey)>>,
+}
+
+impl<K: Eq + Copy + Hash + Debug> ArgumentsOracle<K> {
+    fn get_updated_closure<S: Arguments<K, HashSet<K>>>(
+        &self,
+        visited: &HashSet<K>,
+        system: &S,
+    ) -> HashSet<(K, K)> {
+        let mut successors = self.successors.borrow_mut();
+        let mut ancestors = self.ancestors.borrow_mut();
+        let mut previous_visited = self.previous_visited.borrow_mut();
+
+        if previous_visited.len() == visited.len() {
+            return self.relation_cache.borrow().clone();
+        }
+
+        let new_variables: Vec<_> = visited.difference(&previous_visited).copied().collect();
+        let mut updated_ancestors = HashSet::new();
+
+        let mut to_add = HashSet::new();
+        for &variable in &new_variables {
+            let args = system.arguments(variable);
+            let var_ancestors = ancestors
+                .entry(variable)
+                .or_insert_with(|| HashSet::from([variable]))
+                .clone();
+
+            let new_successors: Vec<_> = args
+                .iter()
+                .copied()
+                .flat_map(|a| {
+                    successors
+                        .entry(a)
+                        .or_insert_with(|| HashSet::from([a]))
+                        .clone()
+                })
+                .chain([variable])
+                .collect();
+
+            let var_successors = successors.entry(variable).or_default();
+
+            var_successors.extend(new_successors);
+
+            let var_successors = var_successors.clone();
+
+            // each new variable has its parent's ancestors as ancestors, and itself
+            for &succ in &var_successors {
+                ancestors
+                    .entry(succ)
+                    .or_default()
+                    .extend(var_ancestors.iter().copied().chain([succ]));
+            }
+
+            for &ancestor in &var_ancestors {
+                if ancestor == variable {
+                    continue;
+                }
+                // TODO: we don't actually need to update the weight of `ancestor` if extending its
+                // successors added nothing
+                successors
+                    .get_mut(&ancestor)
+                    .expect("ancestor must have successors")
+                    .extend(&var_successors);
+            }
+
+            // TODO: this is probably very inefficient
+            for &arg in successors
+                .get(&variable)
+                .expect("variable should have successors")
+            {
+                to_add.extend(
+                    ancestors
+                        .get(&arg)
+                        .expect("argument should have ancestors")
+                        .iter()
+                        .copied()
+                        .map(|anc| (arg, anc)),
+                );
+            }
+
+            updated_ancestors.extend(var_ancestors.iter().copied());
+        }
+        let mut relation = self.relation_cache.borrow_mut();
+
+        // TODO: this could probably be more efficient if we could have keys into the heap
+        // remove all ancestors that could have been updated by `variable`, and reinsert them
+        // with the new weight
+        relation.retain(|(x, y)| {
+            if updated_ancestors.contains(x) || to_add.contains(&(*x, *y)) {
+                to_add.insert((*x, *y));
+                false
+            } else {
+                true
+            }
+        });
+        relation.extend(to_add);
+
+        // PERF: maybe collect to smallvec
+        previous_visited.extend(new_variables);
+
+        relation.clone()
+    }
+}
+
+// TODO: Make this generic on set/strategy implementation
+impl<K: Eq + Copy + Hash + Debug, V: PartialOrd, S: System<K, V> + Arguments<K, HashSet<K>>>
+    LocalOracle<K, V, HashSet<K>, HashSet<(K, K)>, S> for ArgumentsOracle<K>
+{
+    fn approximate_flow(
+        &self,
+        visited: &HashSet<K>,
+        _assignment: &impl Assignment<K, V>,
+        _relation: &HashSet<(K, K)>,
+        system: &S,
+    ) -> HashSet<(K, K)> {
+        self.get_updated_closure(visited, system)
+    }
+}
+
+impl<VarKey: Eq + Copy + Hash> Display for ArgumentsOracle<VarKey> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Args")
     }
 }

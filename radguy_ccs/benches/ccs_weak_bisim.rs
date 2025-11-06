@@ -1,21 +1,20 @@
 use criterion::BenchmarkId;
 use criterion::{Criterion, criterion_group, criterion_main};
-use radguy::extension::ExtensionToOracle;
 use radguy::{
     kleene_local,
-    oracle::{LocalMaxR, SMax},
+    oracle::{ArgumentsOracle, LocalMaxR, LocalOracle, SMax},
     ordered::{
         self,
-        oracle::{CountOracle, InverseCountOracle, StrategicLocalOracle, ToConstant},
+        oracle::{
+            CountOracle, InverseCountOracle, StrategicArgumentsOracle, StrategicLocalOracle,
+            ToConstant,
+        },
         strategy::StrategyWeight,
     },
 };
-use radguy_ccs::systems::{
-    bool::extension::BoolExtension,
-    ccs::{
-        bisimulation_system::BisimulationSystem, grammar::ProgramParser,
-        transition_system::TransitionSystem, weak_transition_system::WeakTransitionSystem,
-    },
+use radguy_ccs::systems::ccs::{
+    bisimulation_system::BisimulationSystem, grammar::ProgramParser,
+    transition_system::TransitionSystem, weak_transition_system::WeakTransitionSystem,
 };
 use slotmap::DefaultKey;
 
@@ -32,11 +31,11 @@ macro_rules! bisim_bench_oracles_ordered {
                     || {
                         let mut lts = WeakTransitionSystem::<DefaultKey>::default();
                         lts.load_ast(ast.clone());
-                        BisimulationSystem::<DefaultKey, DefaultKey, DefaultKey, _>::new(lts)
+                        (BisimulationSystem::<DefaultKey, DefaultKey, DefaultKey, _>::new(lts), (*o).clone())
                     },
-                    |mut sys| {
+                    |(mut sys, o)| {
                         let target = sys.specify_comparison($left, $right);
-                        let result = !ordered::kleene_local(&sys, target, o);
+                        let result = !ordered::kleene_local(&sys, target, &o);
                         assert_eq!(
                             $eq,
                             result,
@@ -68,11 +67,11 @@ macro_rules! bisim_bench_oracles_unordered {
                     || {
                         let mut lts = WeakTransitionSystem::<DefaultKey>::default();
                         lts.load_ast(ast.clone());
-                        BisimulationSystem::<DefaultKey, DefaultKey, DefaultKey, _>::new(lts)
+                        (BisimulationSystem::<DefaultKey, DefaultKey, DefaultKey, _>::new(lts), (*o).clone())
                     },
-                    |mut sys| {
+                    |(mut sys, o)| {
                         let target = sys.specify_comparison($left, $right);
-                        let result = !kleene_local(&sys, target, o);
+                        let result = !kleene_local(&sys, target, &o);
                         assert_eq!(
                             $eq,
                             result,
@@ -99,8 +98,13 @@ macro_rules! bisim_bench_suite {
             bisim_bench_oracles_unordered! { $name: using c, bench $left, $right => $eq in ccs, with
                 SMax::default(),
                 LocalMaxR::default(),
-                BoolExtension::oracle(),
-                // TODO: Figure out why these do not terminate
+                ArgumentsOracle::default(),
+                ArgumentsOracle::default().then(SMax::default()),
+                ArgumentsOracle::default().then(LocalMaxR::default()),
+                ArgumentsOracle::default().and(SMax::default()),
+                ArgumentsOracle::default().and(LocalMaxR::default()),
+                // TODO: Reenable when bool extension works again
+                // BoolExtension::oracle(),
                 // SMax::default().then(BoolExtension::oracle()),
                 // LocalMaxR::default().then(BoolExtension::oracle()),
             };
@@ -108,16 +112,26 @@ macro_rules! bisim_bench_suite {
             bisim_bench_oracles_ordered! { $name: using c, bench $left, $right => $eq in ccs, with
                 SMax::default().constant(StrategyWeight::Infinity),
                 LocalMaxR::default().constant(StrategyWeight::Infinity),
-                LocalMaxR::default().constant(StrategyWeight::Infinity).and_by(CountOracle, std::cmp::min),
-                BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(CountOracle, std::cmp::min),
-                LocalMaxR::default().constant(StrategyWeight::Infinity).and_by(InverseCountOracle, std::cmp::min),
-                BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(InverseCountOracle, std::cmp::min),
+                LocalMaxR::default().constant(StrategyWeight::Infinity).then(CountOracle),
+                LocalMaxR::default().constant(StrategyWeight::Infinity).then(InverseCountOracle),
+                // BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(InverseCountOracle, std::cmp::min),
+                // BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(CountOracle, std::cmp::min),
+                StrategicArgumentsOracle::default(),
+                StrategicArgumentsOracle::default().and_by(CountOracle, std::cmp::min),
+                StrategicArgumentsOracle::default().and_by(InverseCountOracle, std::cmp::min),
+                CountOracle.then(StrategicArgumentsOracle::default()),
+                InverseCountOracle.then(StrategicArgumentsOracle::default()),
+                StrategicArgumentsOracle::default().then(CountOracle),
+                StrategicArgumentsOracle::default().then(InverseCountOracle),
+                StrategicArgumentsOracle::default().and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(CountOracle),
+                StrategicArgumentsOracle::default().and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(InverseCountOracle),
             };
         }
         )*
         criterion_group!(
-            benches,
-            $($name),*
+            name = benches;
+            config = Criterion::default(); //.sample_size(20);
+            targets = $($name),*
         );
     };
 }
@@ -127,7 +141,11 @@ bisim_bench_suite! {
     abpl_ok: "SPEC", "ABPl" => true in include_str!("../systems/ccs/abp_ok.ccs");
     abpl_ok_2: "SPEC", "ABPl_2" => true in include_str!("../systems/ccs/abp_ok.ccs");
     abpl_bad_2: "SPEC", "ABPl_2" => false in include_str!("../systems/ccs/abp_bad.ccs");
+    abpl_ok_3: "SPEC", "ABPl_3" => true in include_str!("../systems/ccs/abp_ok.ccs");
     abpl_bad_3: "SPEC", "ABPl_3" => false in include_str!("../systems/ccs/abp_bad.ccs");
+    // NOTE: these two actually *are* weakly bisimilar, so should not be used
+    // abp_bad: "SPEC", "ABP" => false in include_str!("../systems/ccs/abp_bad.ccs");
+    // abpl_bad: "SPEC", "ABPl" => false in include_str!("../systems/ccs/abp_bad.ccs");
 
     // TODO: Parameterize on size of leader election?
     leader_election_bad_6: "Spec", "Ring" => false in r"

@@ -1,19 +1,16 @@
-use std::cmp::Reverse;
-use std::collections::HashMap;
-use std::collections::HashSet;
-use std::fmt::Display;
-use std::hash::Hash;
-use std::marker::PhantomData;
+use std::{cmp::Reverse, fmt::Display, hash::Hash, marker::PhantomData};
 
-use crate::System;
-use crate::oracle::LocalOracle;
-use crate::ordered::strategy::Domain;
-use crate::ordered::strategy::IntersectBy;
-use crate::ordered::strategy::SliceRight;
-use crate::ordered::strategy::StrategyHeap;
-use crate::ordered::strategy::StrategyItem;
-use crate::ordered::strategy::StrategyWeight;
-use crate::{Assignment, ordered::Strategy};
+use crate::{
+    Assignment, System,
+    oracle::LocalOracle,
+    ordered::{
+        Strategy,
+        strategy::{Domain, IntersectBy, StrategyHeap, StrategyItem, StrategyWeight},
+    },
+};
+
+mod generic;
+pub use generic::*;
 
 pub trait StrategicLocalOracle<
     K: Eq + Copy,
@@ -54,14 +51,14 @@ pub trait StrategicLocalOracle<
         self,
         other: O,
         f: F,
-    ) -> IntersectByStrategic<K, V, VS, PairStrategy, S, O, Self, F>
+    ) -> IntersectByStrategic<K, V, VS, PairStrategy, S, Self, O, F>
     where
         Self: std::marker::Sized,
         PairStrategy: IntersectBy<(K, K)>,
     {
         IntersectByStrategic {
-            left: other,
-            right: self,
+            left: self,
+            right: other,
             f,
             _phantom_data: PhantomData,
         }
@@ -259,72 +256,63 @@ impl<
     }
 }
 
-pub struct CountOracle;
-
-// TODO: Make this generic on set/strategy implementation
-impl<K: Eq + Copy + Hash, V: PartialOrd, S: System<K, V>>
-    StrategicLocalOracle<K, V, HashSet<K>, StrategyHeap<(K, K)>, S> for CountOracle
+// We need to manually implement `Clone` for these oracles, because the derive macro requires that
+// all type parameters of the type implement `Clone`, meaning that `S` needs to implement clone,
+// even though it isn't part of the actual struct
+impl<
+    K: Eq + Copy,
+    V: PartialOrd,
+    VS,
+    PairStrategy: Strategy<(K, K)>,
+    S: System<K, V>,
+    T: StrategicLocalOracle<K, V, VS, PairStrategy, S> + Clone,
+    U: StrategicLocalOracle<K, V, VS, PairStrategy, S> + Clone,
+    F: Fn(StrategyWeight, StrategyWeight) -> StrategyWeight + Clone,
+> Clone for IntersectByStrategic<K, V, VS, PairStrategy, S, T, U, F>
 {
-    fn get_strategy(
-        &self,
-        _visited: &HashSet<K>,
-        _assignment: &impl Assignment<K, V>,
-        strategy: &StrategyHeap<(K, K)>,
-        _system: &S,
-    ) -> StrategyHeap<(K, K)> {
-        let mut lens = HashMap::<K, u64>::new();
-        strategy
-            .iter()
-            .map(|Reverse(StrategyItem(_, (x, y)))| {
-                Reverse(StrategyItem(
-                    StrategyWeight::Num(
-                        *lens
-                            .entry(*x)
-                            .or_insert_with(|| strategy.clone().slice_right(*x).len() as u64),
-                    ),
-                    (*x, *y),
-                ))
-            })
-            .collect()
+    fn clone(&self) -> Self {
+        Self {
+            left: self.left.clone(),
+            right: self.right.clone(),
+            f: self.f.clone(),
+            _phantom_data: self._phantom_data,
+        }
     }
 }
 
-impl Display for CountOracle {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Count")
-    }
-}
-
-pub struct InverseCountOracle;
-
-// TODO: Make this generic on set/strategy implementation
-impl<K: Eq + Copy + Hash, V: PartialOrd, S: System<K, V>>
-    StrategicLocalOracle<K, V, HashSet<K>, StrategyHeap<(K, K)>, S> for InverseCountOracle
+impl<
+    K: Eq + Copy,
+    V: PartialOrd,
+    VS,
+    PairStrategy: Strategy<(K, K)>,
+    S: System<K, V>,
+    T: StrategicLocalOracle<K, V, VS, PairStrategy, S> + Clone,
+    U: StrategicLocalOracle<K, V, VS, PairStrategy, S> + Clone,
+> Clone for ComposeStrategic<K, V, VS, PairStrategy, S, T, U>
 {
-    fn get_strategy(
-        &self,
-        _visited: &HashSet<K>,
-        _assignment: &impl Assignment<K, V>,
-        strategy: &StrategyHeap<(K, K)>,
-        _system: &S,
-    ) -> StrategyHeap<(K, K)> {
-        let mut lens = HashMap::<K, u64>::new();
-        strategy
-            .iter()
-            .map(|Reverse(StrategyItem(_, (x, y)))| {
-                Reverse(StrategyItem(
-                    StrategyWeight::Num(*lens.entry(*x).or_insert_with(|| {
-                        u64::MAX - (strategy.clone().slice_right(*x).len() as u64)
-                    })),
-                    (*x, *y),
-                ))
-            })
-            .collect()
+    fn clone(&self) -> Self {
+        Self {
+            outer: self.outer.clone(),
+            inner: self.inner.clone(),
+            _phantom_data: self._phantom_data,
+        }
     }
 }
 
-impl Display for InverseCountOracle {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Count⁻¹")
+impl<
+    K: Hash + Eq + Copy,
+    V: PartialOrd,
+    VS,
+    PS,
+    S: System<K, V>,
+    O: LocalOracle<K, V, VS, PS, S> + Clone,
+> Clone for Constant<K, V, VS, PS, S, O>
+{
+    fn clone(&self) -> Self {
+        Self {
+            oracle: self.oracle.clone(),
+            value: self.value,
+            _phantom_data: self._phantom_data,
+        }
     }
 }

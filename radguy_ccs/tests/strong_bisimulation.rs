@@ -127,7 +127,6 @@ fn restriction_preserved() {
     };
 }
 
-#[ignore = "performance too bad for ci"]
 #[test]
 fn strong_bisimulation_large_protocol() {
     strong_bisim_test! {

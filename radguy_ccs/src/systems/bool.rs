@@ -1,4 +1,5 @@
 use std::{
+    cell::RefCell,
     collections::{HashMap, HashSet},
     fmt::{Debug, Display},
     hash::Hash,
@@ -27,11 +28,15 @@ pub struct BoolSystemImpl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone> {
     pub names: BiSlotMap<V, N>,
     pub definitions: SecondaryMap<V, T>,
     pub terms: BiSlotMap<T, BoolTerm<V, T>>,
+    term_arguments_cache: RefCell<HashMap<T, HashSet<V>>>,
 }
 
 impl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone> BoolSystemImpl<V, T, N> {
     pub fn term_arguments(&self, term_key: T) -> HashSet<V> {
-        match self.terms.get_value(term_key) {
+        if let Some(cached) = self.term_arguments_cache.borrow().get(&term_key) {
+            return cached.clone();
+        }
+        let args = match self.terms.get_value(term_key) {
             BoolTerm::False | BoolTerm::True => HashSet::new(),
             BoolTerm::Variable(k) => {
                 let mut set = HashSet::new();
@@ -41,7 +46,13 @@ impl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone> BoolSystemImpl<V, T, N>
             BoolTerm::Or(lhs, rhs) | BoolTerm::And(lhs, rhs) => {
                 self.term_arguments(*lhs).union(self.term_arguments(*rhs))
             }
-        }
+        };
+        let insert = self
+            .term_arguments_cache
+            .borrow_mut()
+            .insert(term_key, args.clone());
+        debug_assert!(insert.is_none(), "term should not already be cached");
+        args
     }
 }
 

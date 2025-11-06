@@ -107,7 +107,7 @@ macro_rules! test_oracles_ordered {
 mod unordered {
     use radguy::{
         extension::ExtensionOracle,
-        oracle::{LocalMaxR, LocalOracle, SMax, TrivialOracle},
+        oracle::{ArgumentsOracle, LocalMaxR, LocalOracle, SMax, TrivialOracle},
     };
     use radguy_ccs::systems::bool::extension::BoolExtension;
 
@@ -129,22 +129,35 @@ mod unordered {
         ExtensionOracle::from(BoolExtension::default()).then(SMax::default()), bool_extension_then_smax;
         SMax::default().and(ExtensionOracle::from(BoolExtension::default())), smax_and_bool_extension;
         LocalMaxR::default().then(ExtensionOracle::from(BoolExtension::default())), localmaxr_then_bool_extension;
+        ArgumentsOracle::default(), arguments;
     }
 }
 
 mod ordered {
     use radguy::{
+        extension::LocalExtension,
         oracle::SMax,
         ordered::{
-            oracle::{CountOracle, StrategicLocalOracle, ToConstant},
+            oracle::{
+                CountOracle, InverseCountOracle, StrategicArgumentsOracle, StrategicLocalOracle,
+                ToConstant,
+            },
             strategy::StrategyWeight,
         },
     };
+    use radguy_ccs::systems::bool::extension::BoolExtension;
 
     test_oracles_ordered! {
         SMax::default().constant(StrategyWeight::Num(0)), smax_const_0;
         SMax::default().constant(StrategyWeight::Infinity), smax_const_infinity;
         SMax::default().constant(StrategyWeight::Num(0)).then(CountOracle), smax_then_count;
         SMax::default().constant(StrategyWeight::Num(10)).and_by(CountOracle, std::cmp::min), smax_10_and_min_count;
+        BoolExtension::oracle().constant(StrategyWeight::Num(0)), bool_extension_0;
+        BoolExtension::oracle().constant(StrategyWeight::Num(0)).and_by(CountOracle, std::cmp::min), bool_extension_0_and_min_count;
+        CountOracle, count;
+        InverseCountOracle, count_inverse;
+        StrategicArgumentsOracle::default(), arguments_s;
+        StrategicArgumentsOracle::default().and_by(CountOracle, std::cmp::min), args_s_and_min_count;
+        StrategicArgumentsOracle::default().and_by(InverseCountOracle, std::cmp::min), args_s_and_min_count_inverse;
     }
 }
