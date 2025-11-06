@@ -64,39 +64,24 @@ pub trait LocalExtension<
         possible: &PairSet,
         system: &System,
     ) -> TermSet;
-}
 
-pub trait ExtensionToOracle<
-    K: Hash + Eq + Copy,
-    V: PartialOrd,
-    T: Copy + Eq,
-    VS: Cartesian<Output = PS> + Without,
-    PS: Union + FromIterator<(K, K)>,
-    TS: TermToKey<K, V, T, VS, PS, S>,
-    S: TermSystem<K, V, T> + Universe<U>,
-    U: Without<VS> + Cartesian<Output = PS>,
->: LocalExtension<K, V, T, VS, PS, TS, S> + Default
-{
     #[must_use]
-    fn oracle() -> ExtensionOracle<K, V, T, VS, PS, TS, S, Self, U> {
+    fn oracle<U>()
+    -> ExtensionOracle<VarKey, VarValue, TermKey, VarSet, PairSet, TermSet, System, Self, U>
+    where
+        Self: Default,
+        VarKey: Hash + Eq + Copy,
+        VarValue: PartialOrd,
+        TermKey: Copy + Eq,
+        VarSet: Cartesian<Output = PairSet> + Without,
+        PairSet: Union + FromIterator<(VarKey, VarKey)>,
+        TermSet: TermToKey<VarKey, VarValue, TermKey, VarSet, PairSet, System>,
+        System: Universe<U>,
+        U: Without<VarSet> + Cartesian<Output = PairSet>,
+    {
         ExtensionOracle::from(Self::default())
     }
 }
-
-impl<
-    K: Hash + Eq + Copy,
-    V: PartialOrd,
-    T: Copy + Eq,
-    VS: Cartesian<Output = PS> + Without,
-    PS: Union + FromIterator<(K, K)>,
-    TS: TermToKey<K, V, T, VS, PS, S>,
-    S: TermSystem<K, V, T> + Universe<U>,
-    U: Without<VS> + Cartesian<Output = PS>,
-    E: LocalExtension<K, V, T, VS, PS, TS, S> + Default,
-> ExtensionToOracle<K, V, T, VS, PS, TS, S, U> for E
-{
-}
-
 #[allow(clippy::type_complexity)]
 pub struct ExtensionOracle<
     K: Hash + Eq + Copy,

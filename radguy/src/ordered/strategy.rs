@@ -7,7 +7,7 @@ use std::{
 
 use crate::System;
 
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+#[derive(PartialEq, Eq, Clone, Copy, Hash, Debug)]
 pub enum StrategyWeight {
     Infinity,
     Num(u64),
@@ -128,6 +128,11 @@ pub trait Domain<T: Copy, S>: Strategy<T> {
     fn domain(self) -> S;
 }
 
+pub trait Singleton<T: Copy>: Strategy<T> {
+    /// Return a new strategy where `x -> infinity`
+    fn singleton(x: T) -> Self;
+}
+
 pub type StrategyHeap<T> = BinaryHeap<Reverse<StrategyItem<T>>>;
 
 // TODO: should we just invert the comparison of `StrategyItem`s instead of spamming `Reverse`
@@ -205,5 +210,11 @@ impl<T: Copy, S: FromIterator<T>> Domain<T, S> for StrategyHeap<T> {
         self.into_iter()
             .map(|Reverse(StrategyItem(_, v))| v)
             .collect()
+    }
+}
+
+impl<T: Copy> Singleton<T> for StrategyHeap<T> {
+    fn singleton(x: T) -> Self {
+        Self::from_iter([Reverse(StrategyItem(StrategyWeight::Infinity, x))])
     }
 }

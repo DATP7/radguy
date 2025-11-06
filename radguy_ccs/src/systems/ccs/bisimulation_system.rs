@@ -292,13 +292,11 @@ impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKe
     Arguments<VarKey, HashSet<VarKey>> for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
 {
     fn arguments(&self, var_key: VarKey) -> HashSet<VarKey> {
-        let term_key = {
-            let sys = self.bool_system.borrow();
-            sys.definitions.get(var_key).copied()
-        };
+        let term_key = self.bool_system.borrow().definitions.get(var_key).copied();
 
         if term_key.is_none() {
-            self.expand(self.bool_system.borrow().names.get_value(var_key));
+            let pair = *self.bool_system.borrow().names.get_value(var_key);
+            self.expand(&pair);
         }
 
         self.bool_system.borrow().arguments(var_key)

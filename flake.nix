@@ -25,6 +25,7 @@
             (rust-bin.selectLatestNightlyWith
               (toolchain: toolchain.default))
             samply
+            gnuplot
           ];
         };
       }
