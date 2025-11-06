@@ -1,0 +1,169 @@
+use std::collections::{BTreeMap, BTreeSet};
+use crate::systems::wctl::ast::{Declaration, Formula, Weight, RelationalExpr, Expr};
+use lalrpop_util::ParseError;
+
+grammar;
+
+pub Declarations: Vec<Declaration<'input>> = (<Declaration> ";")*;
+
+Declaration: Declaration<'input> = {
+  <name:Id> "=" <formula:Formula> => Declaration { name, formula },
+}
+
+
+pub Formula: Formula<'input> = Disjunction;
+
+Disjunction: Formula<'input> = {
+  <l:Conjunction> "||" <r:Disjunction> => Formula::Or(Box::new(l), Box::new(r)),
+  <l:Conjunction> "or" <r:Disjunction> => Formula::Or(Box::new(l), Box::new(r)),
+  Conjunction,
+}
+
+Conjunction: Formula<'input> = {
+  <l:UniversalUntil> "&&" <r:Conjunction> => Formula::And(Box::new(l), Box::new(r)),
+  <l:UniversalUntil> "and" <r:Conjunction> => Formula::And(Box::new(l), Box::new(r)),
+
+}
+
+UniversalUntil: Formula<'input> = {
+    "A" <left:Formula> "U" <bound:("[" "<=" <Weight> "]")?> <right:Formula> => Formula::UniversalUntil {
+        left: Box::new(left),
+        right: Box::new(right),
+        bound: bound.map_or_else(|| Weight::Inf, |weight| Weight::Val(weight)),
+    },
+    ExistentialUntil,
+}
+
+ExistentialUntil: Formula<'input> = {
+    "E" <left:Formula> "U" <bound:("[" "<=" <Weight> "]")?> <right:Formula> => Formula::ExistentialUntil {
+        left: Box::new(left),
+        right: Box::new(right),
+        bound: bound.map_or_else(|| Weight::Inf, |weight| Weight::Val(weight)),
+    },
+    UniversalFinally,
+}
+
+UniversalFinally: Formula<'input> = {
+    "AF" <bound:("[" "<=" <Weight> "]")?> <formula:Formula> => Formula::UniversalFinally {
+        formula: Box::new(formula),
+        bound: bound.map_or_else(|| Weight::Inf, |weight| Weight::Val(weight)),
+    },
+    ExistentialFinally,
+}
+
+ExistentialFinally: Formula<'input> = {
+    "EF" <bound:("[" "<=" <Weight> "]")?> <formula:Formula> => Formula::ExistentialFinally {
+        formula: Box::new(formula),
+        bound: bound.map_or_else(|| Weight::Inf, |weight| Weight::Val(weight)),
+    },
+    UniversalNext,
+}
+
+UniversalNext: Formula<'input> = {
+    "AX" <bound:("[" "<=" <Weight> "]")?> <formula:Formula> => Formula::UniversalNext {
+        formula: Box::new(formula),
+        bound: bound.map_or_else(|| Weight::Inf, |weight| Weight::Val(weight)),
+    },
+    ExistentialNext,
+}
+
+ExistentialNext: Formula<'input> = {
+    "EX" <bound:("[" "<=" <Weight> "]")?> <formula:Formula> => Formula::ExistentialNext {
+        formula: Box::new(formula),
+        bound: bound.map_or_else(|| Weight::Inf, |weight| Weight::Val(weight)),
+    },
+    ParenFormula
+}
+
+ParenFormula: Formula<'input> = {
+    "(" <formula:Formula> ")" => formula,
+    RelationalExprFormula
+}
+
+RelationalExprFormula: Formula<'input> = {
+    <rel_expr:RelationalExpr> => Formula::RelationalExpr(rel_expr),
+}
+
+
+RelationalExpr: RelationalExpr<'input> = {
+    <l:Expr> "<" <r:Expr> => RelationalExpr::LessThan(Box::new(l), Box::new(r)),
+    <l:Expr> "<=" <r:Expr> => RelationalExpr::LessThanEq(Box::new(l), Box::new(r)),
+    <l:Expr> ">" <r:Expr> => RelationalExpr::GreaterThan(Box::new(l), Box::new(r)),
+    <l:Expr> ">=" <r:Expr> => RelationalExpr::GreaterThanEq(Box::new(l), Box::new(r)),
+    <l:Expr> "==" <r:Expr> => RelationalExpr::Eq(Box::new(l), Box::new(r)),
+    <l:Expr> "!=" <r:Expr> => RelationalExpr::NotEq(Box::new(l), Box::new(r)),
+    <id:Id> => RelationalExpr::Id(id),
+}
+
+Expr: Expr<'input> = AddExpr;
+
+AddExpr: Expr<'input> = {
+    <l:SubExpr> "+" <r:AddExpr> => Expr::Add(Box::new(l), Box::new(r)),
+    SubExpr,
+}
+
+SubExpr: Expr<'input> = {
+    <l:MultExpr> "-" <r:SubExpr> => Expr::Subtract(Box::new(l), Box::new(r)),
+    MultExpr,
+}
+
+MultExpr: Expr<'input> = {
+    <l:DivExpr> "*" <r:MultExpr> => Expr::Multiply(Box::new(l), Box::new(r)),
+    DivExpr,
+}
+
+DivExpr: Expr<'input> = {
+    <l:InvExpr> "/" <r:DivExpr> => Expr::Divide(Box::new(l), Box::new(r)),
+    InvExpr,
+}
+
+InvExpr: Expr<'input> = {
+    "-" <expr:ParenExpr> => Expr::Inverse(Box::new(expr)),
+    ParenExpr,
+}
+
+ParenExpr: Expr<'input> = {
+    "(" <expr:Expr> ")" => expr,
+    PropExpr,
+}
+
+PropExpr: Expr<'input> = {
+    <id:Id> => Expr::Proposition(id),
+    WeightExpr,
+}
+
+WeightExpr: Expr<'input> = {
+    <weight:Weight> => Expr::Weight(weight),
+}
+
+
+
+Id: &'input str = <r"[A-Z][A-Za-z0-9_']*">;
+
+Weight: i32 = <s:r"[0-9]+"> => s.parse().expect("u32 should parse strings");
+
+Comma<T>: Vec<T> = {
+    <mut v:(<T> ",")*> <e:T?> => match e {
+        None => v,
+        Some(e) => {
+            v.push(e);
+            v
+        }
+    }
+};
+
+OrOp: () = {
+    "||" => (),
+    "or" => (),
+}
+
+AndOp: () = {
+    "&&" => (),
+    "and" => (),
+}
+
+match {
+    r"\s*" => {}, // whitespace
+    r"\*[^\n\r]*[\n\r]*" => {}, // `* comments`
+    _
+}
