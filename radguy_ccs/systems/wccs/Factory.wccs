@@ -1,0 +1,7 @@
+Factory := Producer | (Consumer | Reviews) \ {goodRating,badRating};
+
+Producer := <produce!,10>.Producer;
+
+Consumer := <produce,5>.<review!,2>.(happy:<goodRating!,0>.Consumer + sad:<badRating!,0>.Consumer);
+
+Reviews := <review,2>.(<goodRating,0>.goodproduct:0 + <badRating,0>.badproduct:0);

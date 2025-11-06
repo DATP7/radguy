@@ -32,7 +32,7 @@ pub enum FlatProcess<'a, ProcKey: Key> {
     Sum(ProcKey, ProcKey),
     Compose(ProcKey, ProcKey),
     AtomicProposition {
-        propositions: BTreeSet<&'a str>,
+        propositions: BTreeMap<&'a str, u32>,
         process: ProcKey,
     },
 }
@@ -186,7 +186,7 @@ impl<'a, ProcKey: Key> WCCSTransitionSystem<'a, ProcKey> {
                     restrictions: restriction.clone(),
                 })
             }
-            Process::Relabelling { process, labels } => {
+            Process::ActionRelabelling { process, labels } => {
                 let inner_process_key = self.insert_ast_process(process);
                 self.insert_process(FlatProcess::Relabelling {
                     process: inner_process_key,
@@ -208,9 +208,24 @@ impl<'a, ProcKey: Key> WCCSTransitionSystem<'a, ProcKey> {
                 process,
             } => {
                 let inner_prcess_key = self.insert_ast_process(process);
+                let mut proposition_map = BTreeMap::new();
+
+                for prop in propositions.into_iter().copied() {
+                    proposition_map
+                        .entry(prop)
+                        .and_modify(|val| *val += 1)
+                        .or_insert(1);
+                }
                 self.insert_process(FlatProcess::AtomicProposition {
-                    propositions: propositions.clone(),
+                    propositions: proposition_map,
                     process: inner_prcess_key,
+                })
+            }
+            Process::PropositionRelabelling { process, labels } => {
+                let inner_process_key = self.insert_ast_process(process);
+                self.insert_process(FlatProcess::Relabelling {
+                    process: inner_process_key,
+                    labels: labels.clone(),
                 })
             }
         }

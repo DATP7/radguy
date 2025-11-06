@@ -1,0 +1,5 @@
+F1 = EF (send0 && deliver1) || (send1 && deliver0)
+F3 = AF (send0 && deliver1) || (send1 && deliver0)
+F12 = E true U (send0 && deliver1) || (send1 && deliver0)
+F13 = EX (send0 && deliver1) || (send1 && deliver0)
+F2 = EF[<= 35] delivered == 7

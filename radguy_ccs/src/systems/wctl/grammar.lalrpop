@@ -1,6 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
 use crate::systems::wctl::ast::{Declaration, Formula, Weight, RelationalExpr, Expr};
-use lalrpop_util::ParseError;
 
 grammar;
 
