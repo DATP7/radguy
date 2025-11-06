@@ -1,0 +1,127 @@
+use std::collections::{BTreeMap, BTreeSet};
+use crate::systems::wccs::ast::{Binding, Process, WeightedAction, Action};
+use lalrpop_util::ParseError;
+
+grammar;
+
+pub Program: Vec<Binding<'input>> = (<Binding> ";")*;
+
+
+Binding: Binding<'input> = {
+  <name:Id> ":=" <process:Process> => Binding { name, process },
+}
+
+pub Process: Process<'input> = SummationProcess;
+
+SummationProcess: Process<'input> = {
+  <l:CompositionProcess> "+" <r:SummationProcess> => Process::Sum(Box::new(l), Box::new(r)),
+  CompositionProcess,
+}
+
+CompositionProcess: Process<'input> = {
+  <l:ActionPrefixProcess> "|" <r:CompositionProcess> => Process::Compose(Box::new(l), Box::new(r)),
+  AtomicPropositionProcess,
+}
+
+AtomicPropositionProcess: Process<'input> = {
+    <labels:(<Label> ":")+> <process:ActionPrefixProcess> => Process::AtomicPropositions {
+        propositions: labels.into_iter().collect(),
+        process: Box::new(process),
+    },
+    ActionPrefixProcess
+}
+
+ActionPrefixProcess: Process<'input> = {
+  <action:Action> "." <process:ActionPrefixProcess> => Process::ActionPrefix {action, process: Box::new(process)},
+  RelabeledProcess,
+}
+
+
+
+
+RelabeledProcess: Process<'input> = {
+  <process:RelabeledProcess> "[" <labels:Comma<Relabelling>> "]" =>? if labels.iter().any(|(from, to)| *from == "tau" || *to == "tau") {
+    Err(ParseError::User {
+      error: "cannot relabel tau"
+    })
+  } else {
+    Ok(Process::Relabelling {
+      process: Box::new(process),
+      // The syntax for relabelling is [to/from]
+      labels: BTreeMap::from_iter(labels),
+    })
+  },
+
+  RestrictedProcess,
+}
+
+RestrictedProcess: Process<'input> = {
+  <process:Paren> "\\" <restriction:LabelSet> => Process::Restriction {
+      process: Box::new(process),
+      restriction,
+    },
+  Paren
+}
+
+Paren: Process<'input> = {
+  "(" <Process> ")",
+  "0" => Process::Nil,
+  <Id> => Process::Named(<>),
+}
+
+Relabelling: (&'input str, &'input str) = <Label> "->" <Label>;
+
+LabelSet: BTreeSet<&'input str> = {
+  "{" <labels:Comma<Label>> "}" =>? if labels.iter().any(|l| *l == "tau") {
+    Err(ParseError::User {
+      error: "tau is not allowed in label set"
+    })
+  } else {
+    Ok(BTreeSet::from_iter(labels.into_iter()))
+  },
+}
+
+pub Action: WeightedAction<'input> = {
+    "<" <name:Label> <co:"!"?> <weight:("," <Num>)?> ">" =>? match name {
+        "tau" => if co.is_some() {
+                Err(ParseError::User {
+                    error: "co tau action not allowed"
+                })
+            }
+            else {
+                Ok(WeightedAction {weight: weight.unwrap_or(0), action: Action::Tau})
+            },
+
+        name => Ok(WeightedAction {
+            weight: weight.unwrap_or(0), 
+            action: Action::Label {
+                name,
+                is_complement: co.is_some(),
+            },
+        }),
+   },
+}
+
+
+Label: &'input str = <r"[a-z][A-Za-z0-9?_']*">;
+
+Id: &'input str = <r"[A-Z][A-Za-z0-9_']*">;
+
+Num: u32 = <s:r"[0-9]+"> => s.parse().expect("u32 should parse strings");
+
+Comma<T>: Vec<T> = {
+    <mut v:(<T> ",")*> <e:T?> => match e {
+        None => v,
+        Some(e) => {
+            v.push(e);
+            v
+        }
+    }
+};
+
+
+match {
+    r"\s*" => {}, // whitespace
+    r"\*[^\n\r]*[\n\r]*" => {}, // `* comments`
+    _
+}
