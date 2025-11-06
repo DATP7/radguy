@@ -1,9 +1,6 @@
-use radguy::{
-    Assignment, Universe,
-    extension::{LocalExtension, TermSystem},
-};
+use radguy::{Assignment, Universe, extension::LocalExtension};
 use slotmap::Key;
-use std::{collections::HashSet, hash::Hash, marker::PhantomData};
+use std::{collections::HashSet, fmt::Display, hash::Hash, marker::PhantomData};
 
 use crate::systems::bool::{BoolSystem, BoolTerm};
 
@@ -12,7 +9,12 @@ pub struct BoolExtension<TermKey: Key + Hash, VarName: Hash + Eq + Clone>(
     PhantomData<(TermKey, VarName)>,
 );
 
-impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
+impl<
+    VarKey: Key + Hash,
+    TermKey: Key + Hash,
+    VarName: Hash + Eq + Clone,
+    System: BoolSystem<VarKey, TermKey, VarName> + Universe<HashSet<VarKey>>,
+>
     LocalExtension<
         VarKey,
         bool,
@@ -20,16 +22,15 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
         HashSet<VarKey>,
         HashSet<(VarKey, VarKey)>,
         HashSet<(VarKey, TermKey)>,
+        System,
     > for BoolExtension<TermKey, VarName>
 {
-    type System = BoolSystem<VarKey, TermKey, VarName>;
-
     fn depends(
         &self,
         _visited: &HashSet<VarKey>,
         assignment: &dyn Assignment<VarKey, bool>,
         possible: &HashSet<(VarKey, VarKey)>,
-        system: &Self::System,
+        system: &System,
     ) -> HashSet<(VarKey, TermKey)> {
         let mut deps = HashSet::new();
         for (x, y) in possible.iter().copied() {
@@ -46,12 +47,17 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
     }
 }
 
-fn collect_terms<VarKey: Key, TermKey: Key, VarName: Hash + Eq + Clone>(
+fn collect_terms<
+    VarKey: Key,
+    TermKey: Key,
+    VarName: Hash + Eq + Clone,
+    S: BoolSystem<VarKey, TermKey, VarName> + Universe<HashSet<VarKey>>,
+>(
     x: VarKey,
     term_key: TermKey,
     assignment: &dyn Assignment<VarKey, bool>,
     possible: &HashSet<(VarKey, VarKey)>,
-    system: &BoolSystem<VarKey, TermKey, VarName>,
+    system: &S,
     current: &mut HashSet<(VarKey, TermKey)>,
 ) {
     // TODO: This caching could probably be a bit smarter by also keeping track of what we know to
@@ -59,8 +65,8 @@ fn collect_terms<VarKey: Key, TermKey: Key, VarName: Hash + Eq + Clone>(
     if current.contains(&(x, term_key)) {
         return;
     }
-    let term = system.terms.get_value(term_key);
-    match *term {
+    let term = system.get_term(term_key);
+    match term {
         BoolTerm::True | BoolTerm::False => (),
         BoolTerm::Variable(y) => {
             if possible.contains(&(x, y)) && !assignment.get(&y) {
@@ -109,5 +115,11 @@ fn collect_terms<VarKey: Key, TermKey: Key, VarName: Hash + Eq + Clone>(
                 }
             }
         }
+    }
+}
+
+impl<TermKey: Key + Hash, VarName: Hash + Eq + Clone> Display for BoolExtension<TermKey, VarName> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Bool")
     }
 }

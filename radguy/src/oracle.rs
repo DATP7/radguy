@@ -2,7 +2,7 @@ use crate::{
     Assignment, Cartesian, Diagonal, Intersect, Maximal, PairUniverse, Set, System, Union,
     Universe, Without,
 };
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::{collections::HashSet, hash::Hash, marker::PhantomData};
 
 pub trait LocalOracle<K: Hash + Eq + Copy, V: PartialOrd, VS, PS, S: System<K, V>> {
@@ -15,7 +15,10 @@ pub trait LocalOracle<K: Hash + Eq + Copy, V: PartialOrd, VS, PS, S: System<K, V
     ) -> PS;
 
     #[must_use]
-    fn then(self, other: impl LocalOracle<K, V, VS, PS, S>) -> impl LocalOracle<K, V, VS, PS, S>
+    fn then<O: LocalOracle<K, V, VS, PS, S>>(
+        self,
+        other: O,
+    ) -> ComposeLocal<K, V, VS, PS, S, O, Self>
     where
         Self: std::marker::Sized,
     {
@@ -27,7 +30,10 @@ pub trait LocalOracle<K: Hash + Eq + Copy, V: PartialOrd, VS, PS, S: System<K, V
     }
 
     #[must_use]
-    fn and(self, other: impl LocalOracle<K, V, VS, PS, S>) -> impl LocalOracle<K, V, VS, PS, S>
+    fn and<O: LocalOracle<K, V, VS, PS, S>>(
+        self,
+        other: O,
+    ) -> IntersectLocal<K, V, VS, PS, S, O, Self>
     where
         Self: std::marker::Sized,
         PS: Intersect,
@@ -83,8 +89,20 @@ where
     }
 }
 
+impl<U> Display for LocalMaxR<U> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LocalMaxR")
+    }
+}
+
 #[derive(Default)]
 pub struct SMax<U>(PhantomData<U>);
+
+impl<U> Display for SMax<U> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SMax")
+    }
+}
 
 // TODO: Make this more general than HashSet
 impl<
@@ -150,6 +168,21 @@ impl<
     }
 }
 
+impl<
+    K: Hash + Eq + Copy,
+    V: PartialOrd,
+    VarSet,
+    PairSet,
+    S: System<K, V>,
+    T: LocalOracle<K, V, VarSet, PairSet, S> + Display,
+    U: LocalOracle<K, V, VarSet, PairSet, S> + Display,
+> Display for ComposeLocal<K, V, VarSet, PairSet, S, T, U>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({} ∘ {})", self.outer, self.inner)
+    }
+}
+
 pub struct IntersectLocal<
     K: Hash + Eq + Copy,
     V: PartialOrd,
@@ -188,6 +221,21 @@ impl<
     }
 }
 
+impl<
+    K: Hash + Eq + Copy,
+    V: PartialOrd,
+    VarSet,
+    PairSet,
+    S: System<K, V>,
+    T: LocalOracle<K, V, VarSet, PairSet, S> + Display,
+    U: LocalOracle<K, V, VarSet, PairSet, S> + Display,
+> Display for IntersectLocal<K, V, VarSet, PairSet, S, T, U>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({} ∩ {})", self.left, self.right)
+    }
+}
+
 #[derive(Default)]
 pub struct TrivialOracle;
 
@@ -207,5 +255,11 @@ impl<
         system: &S,
     ) -> PairSet {
         system.pair_universe()
+    }
+}
+
+impl Display for TrivialOracle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Trivial")
     }
 }

@@ -1,29 +1,33 @@
+use criterion::BenchmarkId;
 use criterion::{Criterion, criterion_group, criterion_main};
+use radguy::extension::ExtensionToOracle;
 use radguy::{
     kleene_local,
-    oracle::LocalMaxR,
+    oracle::{LocalMaxR, LocalOracle, SMax},
     ordered::{
         self,
-        oracle::{CountOracle, StrategicLocalOracle, ToConstant},
+        oracle::{CountOracle, InverseCountOracle, StrategicLocalOracle, ToConstant},
         strategy::StrategyWeight,
     },
 };
-use radguy_ccs::systems::ccs::{
-    bisimulation_system::BisimulationSystem, grammar::ProgramParser,
-    transition_system::TransitionSystem, weak_transition_system::WeakTransitionSystem,
+use radguy_ccs::systems::{
+    bool::extension::BoolExtension,
+    ccs::{
+        bisimulation_system::BisimulationSystem, grammar::ProgramParser,
+        transition_system::TransitionSystem, weak_transition_system::WeakTransitionSystem,
+    },
 };
 use slotmap::DefaultKey;
 
-macro_rules! bisim_bench_suite {
-    ($($name:ident: $left:expr, $right:expr => $eq:literal in $ccs:expr;)*) => {
+macro_rules! bisim_bench_oracles_ordered {
+    ($name:ident: using $c:expr, bench $left:expr, $right:expr => $eq:literal in $ccs:expr, with $($oracle:expr,)*) => {{
+        let parser = ProgramParser::new();
+        let ast = parser.parse($ccs).expect("Program should parse");
+        let mut group = $c.benchmark_group(stringify!($name));
         $(
-        fn $name(c: &mut Criterion) {
-            let parser = ProgramParser::new();
-            let ast = parser
-                .parse($ccs)
-                .expect("Program should parse");
-            let mut group = c.benchmark_group(stringify!($name));
-            group.bench_function("unordered", |b| {
+        {
+            let oracle = $oracle;
+            group.bench_with_input(BenchmarkId::new("ordered", &oracle), &oracle, |b, o| {
                 b.iter_batched(
                     || {
                         let mut lts = WeakTransitionSystem::<DefaultKey>::default();
@@ -32,29 +36,88 @@ macro_rules! bisim_bench_suite {
                     },
                     |mut sys| {
                         let target = sys.specify_comparison($left, $right);
-                        let result = !kleene_local(&sys, target, &LocalMaxR::default());
-                        assert_eq!($eq, result, "{} and {} should{} be bisimilar in{}", $left, $right, if !$eq { " not" } else {""}, $ccs)
+                        let result = !ordered::kleene_local(&sys, target, o);
+                        assert_eq!(
+                            $eq,
+                            result,
+                            "{} and {} should{} be bisimilar in{}",
+                            $left,
+                            $right,
+                            if !$eq { " not" } else { "" },
+                            $ccs
+                        )
                     },
                     criterion::BatchSize::SmallInput,
                 );
             });
-            group.bench_function("ordered", |b|{
-                    b.iter_batched(
-                        || {
-                            let mut lts = WeakTransitionSystem::<DefaultKey>::default();
-                            lts.load_ast(ast.clone());
-                            BisimulationSystem::<DefaultKey, DefaultKey, DefaultKey, _>::new(lts)
-                        },
-                        |mut sys| {
-                            let target = sys.specify_comparison($left, $right);
-                            let result = !ordered::kleene_local(&sys, target, &LocalMaxR::default().constant(StrategyWeight::Infinity).and_by(CountOracle, std::cmp::min));
-                            assert_eq!($eq, result, "{} and {} should{} be bisimilar in{}", $left, $right, if !$eq { " not" } else {""}, $ccs)
-                        },
-                        criterion::BatchSize::SmallInput,
-                    );
+        }
+        )*
+    }};
+}
+
+macro_rules! bisim_bench_oracles_unordered {
+    ($name:ident: using $c:expr, bench $left:expr, $right:expr => $eq:literal in $ccs:expr, with $($oracle:expr,)*) => {{
+        let parser = ProgramParser::new();
+        let ast = parser.parse($ccs).expect("Program should parse");
+        let mut group = $c.benchmark_group(stringify!($name));
+        $(
+        {
+            let oracle = $oracle;
+            group.bench_with_input(BenchmarkId::new("unordered", &oracle), &oracle, |b, o| {
+                b.iter_batched(
+                    || {
+                        let mut lts = WeakTransitionSystem::<DefaultKey>::default();
+                        lts.load_ast(ast.clone());
+                        BisimulationSystem::<DefaultKey, DefaultKey, DefaultKey, _>::new(lts)
+                    },
+                    |mut sys| {
+                        let target = sys.specify_comparison($left, $right);
+                        let result = !kleene_local(&sys, target, o);
+                        assert_eq!(
+                            $eq,
+                            result,
+                            "{} and {} should{} be bisimilar in{}",
+                            $left,
+                            $right,
+                            if !$eq { " not" } else { "" },
+                            $ccs
+                        )
+                    },
+                    criterion::BatchSize::SmallInput,
+                );
             });
         }
         )*
+    }};
+}
+
+macro_rules! bisim_bench_suite {
+    ($($name:ident: $left:expr, $right:expr => $eq:literal in $ccs:expr;)*) => {
+        $(
+        fn $name(c: &mut Criterion) {
+        let ccs = $ccs;
+            bisim_bench_oracles_unordered! { $name: using c, bench $left, $right => $eq in ccs, with
+                SMax::default(),
+                LocalMaxR::default(),
+                BoolExtension::oracle(),
+                SMax::default().then(BoolExtension::oracle()),
+                LocalMaxR::default().then(BoolExtension::oracle()),
+            };
+
+            bisim_bench_oracles_ordered! { $name: using c, bench $left, $right => $eq in ccs, with
+                SMax::default().constant(StrategyWeight::Infinity),
+                LocalMaxR::default().constant(StrategyWeight::Infinity),
+                LocalMaxR::default().constant(StrategyWeight::Infinity).and_by(CountOracle, std::cmp::min),
+                BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(CountOracle, std::cmp::min),
+                LocalMaxR::default().constant(StrategyWeight::Infinity).and_by(InverseCountOracle, std::cmp::min),
+                BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(InverseCountOracle, std::cmp::min),
+            };
+        }
+        )*
+        criterion_group!(
+            benches,
+            $($name),*
+        );
     };
 }
 
@@ -64,10 +127,8 @@ bisim_bench_suite! {
     abpl_ok_2: "SPEC", "ABPl_2" => true in include_str!("../systems/ccs/abp_ok.ccs");
     abpl_bad_2: "SPEC", "ABPl_2" => false in include_str!("../systems/ccs/abp_bad.ccs");
     abpl_bad_3: "SPEC", "ABPl_3" => false in include_str!("../systems/ccs/abp_bad.ccs");
-}
 
-// TODO: Parameterize on size of leader election?
-bisim_bench_suite! {
+    // TODO: Parameterize on size of leader election?
     leader_election_bad_6: "Spec", "Ring" => false in r"
             P1 = 'm6r1.P1 + m1r1.leader.0 + m1r2.P1_2 + m1r3.P1_3 + m1r4.P1_4 + m1r5.P1_5 + m1r6.P1_6;
             P1_2 = 'm6r2.P1_2 + m1r1.leader.0 + m1r2.P1_2 + m1r3.P1_3 + m1r4.P1_4 + m1r5.P1_5 + m1r6.P1_6;
@@ -162,15 +223,4 @@ bisim_bench_suite! {
     ";
 }
 
-criterion_group!(
-    benches,
-    abp_ok,
-    abpl_ok,
-    abpl_ok_2,
-    abpl_bad_2,
-    abpl_bad_3,
-    leader_election_bad_6,
-    leader_election_ok_6,
-    dekker_mutual_exclusion
-);
 criterion_main!(benches);

@@ -1,6 +1,7 @@
 use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::fmt::Display;
 use std::hash::Hash;
 use std::marker::PhantomData;
 
@@ -31,10 +32,10 @@ pub trait StrategicLocalOracle<
     ) -> PairStrategy;
 
     #[must_use]
-    fn then(
+    fn then<O: StrategicLocalOracle<K, V, VS, PairStrategy, S>>(
         self,
-        other: impl StrategicLocalOracle<K, V, VS, PairStrategy, S>,
-    ) -> impl StrategicLocalOracle<K, V, VS, PairStrategy, S>
+        other: O,
+    ) -> ComposeStrategic<K, V, VS, PairStrategy, S, O, Self>
     where
         Self: std::marker::Sized,
     {
@@ -46,11 +47,14 @@ pub trait StrategicLocalOracle<
     }
 
     #[must_use]
-    fn and_by(
+    fn and_by<
+        O: StrategicLocalOracle<K, V, VS, PairStrategy, S>,
+        F: Fn(StrategyWeight, StrategyWeight) -> StrategyWeight,
+    >(
         self,
-        other: impl StrategicLocalOracle<K, V, VS, PairStrategy, S>,
-        f: impl Fn(StrategyWeight, StrategyWeight) -> StrategyWeight,
-    ) -> impl StrategicLocalOracle<K, V, VS, PairStrategy, S>
+        other: O,
+        f: F,
+    ) -> IntersectByStrategic<K, V, VS, PairStrategy, S, O, Self, F>
     where
         Self: std::marker::Sized,
         PairStrategy: IntersectBy<(K, K)>,
@@ -98,6 +102,20 @@ impl<
             .into_iter()
             .map(|v| Reverse(StrategyItem(self.value, v)))
             .collect()
+    }
+}
+
+impl<
+    K: Hash + Eq + Copy,
+    V: PartialOrd,
+    VS,
+    PS: IntoIterator<Item = (K, K)> + FromIterator<(K, K)>,
+    S: System<K, V>,
+    O: LocalOracle<K, V, VS, PS, S> + Display,
+> Display for Constant<K, V, VS, PS, S, O>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}_({})", self.oracle, self.value)
     }
 }
 
@@ -163,6 +181,21 @@ impl<
     }
 }
 
+impl<
+    K: Eq + Copy,
+    V: PartialOrd,
+    VS,
+    PairStrategy: Strategy<(K, K)>,
+    S: System<K, V>,
+    T: StrategicLocalOracle<K, V, VS, PairStrategy, S> + Display,
+    U: StrategicLocalOracle<K, V, VS, PairStrategy, S> + Display,
+> Display for ComposeStrategic<K, V, VS, PairStrategy, S, T, U>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({} ∘ {})", self.outer, self.inner)
+    }
+}
+
 pub struct IntersectByStrategic<
     K: Eq + Copy,
     V: PartialOrd,
@@ -210,6 +243,22 @@ impl<
     }
 }
 
+impl<
+    K: Eq + Copy,
+    V: PartialOrd,
+    VS,
+    PairStrategy: Strategy<(K, K)>,
+    S: System<K, V>,
+    T: StrategicLocalOracle<K, V, VS, PairStrategy, S> + Display,
+    U: StrategicLocalOracle<K, V, VS, PairStrategy, S> + Display,
+    F: Fn(StrategyWeight, StrategyWeight) -> StrategyWeight,
+> Display for IntersectByStrategic<K, V, VS, PairStrategy, S, T, U, F>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({} ∩_f {})", self.left, self.right)
+    }
+}
+
 pub struct CountOracle;
 
 // TODO: Make this generic on set/strategy implementation
@@ -237,5 +286,45 @@ impl<K: Eq + Copy + Hash, V: PartialOrd, S: System<K, V>>
                 ))
             })
             .collect()
+    }
+}
+
+impl Display for CountOracle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Count")
+    }
+}
+
+pub struct InverseCountOracle;
+
+// TODO: Make this generic on set/strategy implementation
+impl<K: Eq + Copy + Hash, V: PartialOrd, S: System<K, V>>
+    StrategicLocalOracle<K, V, HashSet<K>, StrategyHeap<(K, K)>, S> for InverseCountOracle
+{
+    fn get_strategy(
+        &self,
+        _visited: &HashSet<K>,
+        _assignment: &impl Assignment<K, V>,
+        strategy: &StrategyHeap<(K, K)>,
+        _system: &S,
+    ) -> StrategyHeap<(K, K)> {
+        let mut lens = HashMap::<K, u64>::new();
+        strategy
+            .iter()
+            .map(|Reverse(StrategyItem(_, (x, y)))| {
+                Reverse(StrategyItem(
+                    StrategyWeight::Num(*lens.entry(*x).or_insert_with(|| {
+                        u64::MAX - (strategy.clone().slice_right(*x).len() as u64)
+                    })),
+                    (*x, *y),
+                ))
+            })
+            .collect()
+    }
+}
+
+impl Display for InverseCountOracle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Count⁻¹")
     }
 }

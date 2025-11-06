@@ -6,15 +6,14 @@ use std::{
 };
 
 use itertools::iproduct;
-use radguy::{
-    Arguments, Assignment, PairUniverse, System, Universe,
-    ordered::strategy::{InitialStrategy, Strategy},
-};
+use radguy::ordered::strategy::{InitialStrategy, Strategy};
+use radguy::{Arguments, Assignment, PairUniverse, System, Universe, extension::TermSystem};
 use slotmap::Key;
 
 use crate::systems::{
-    bool::{BoolSystem, BoolTerm},
-    ccs::{ast::Action, transition_system::TransitionSystem},
+    bool::{BoolSystem, BoolSystemImpl, BoolTerm},
+    ccs::ast::Action,
+    ccs::transition_system::TransitionSystem,
 };
 
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
@@ -47,7 +46,7 @@ pub struct BisimulationSystem<
     TermKey: Key,
     T: TransitionSystem<'a, ProcKey>,
 > {
-    bool_system: RefCell<BoolSystem<VarKey, TermKey, (ProcKey, ProcKey)>>,
+    bool_system: RefCell<BoolSystemImpl<VarKey, TermKey, (ProcKey, ProcKey)>>,
     transition_system: T,
     _lifetime: PhantomData<&'a ()>,
 }
@@ -259,25 +258,28 @@ impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKe
             .terms
             .get_or_insert_key(BoolTerm::Or(left_term_key, right_term_key))
     }
+
+    fn ensure_variable_defined(&self, variable: VarKey) {
+        let term_key = {
+            let sys = self.bool_system.borrow();
+            sys.definitions.get(variable).copied()
+        };
+
+        if term_key.is_none() {
+            let pair = {
+                let sys = self.bool_system.borrow();
+                *sys.names.get_value(variable)
+            };
+            self.expand(&pair);
+        }
+    }
 }
 
 impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKey>>
     System<VarKey, bool> for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
 {
     fn evaluate(&self, var_key: VarKey, assignment: &dyn Assignment<VarKey, bool>) -> bool {
-        let term_key = {
-            let sys = self.bool_system.borrow();
-            sys.definitions.get(var_key).copied()
-        };
-
-        if term_key.is_none() {
-            let pair = {
-                let sys = self.bool_system.borrow();
-                *sys.names.get_value(var_key)
-            };
-            self.expand(&pair);
-        }
-
+        self.ensure_variable_defined(var_key);
         self.bool_system.borrow().evaluate(var_key, assignment)
     }
 
@@ -319,7 +321,6 @@ impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKe
         self.bool_system.borrow().pair_universe()
     }
 }
-
 impl<
     'a,
     ProcKey: Key,
@@ -329,9 +330,33 @@ impl<
     OutStrategy: Strategy<(VarKey, VarKey)>,
 > InitialStrategy<VarKey, bool, OutStrategy> for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
 where
-    BoolSystem<VarKey, TermKey, (ProcKey, ProcKey)>: InitialStrategy<VarKey, bool, OutStrategy>,
+    BoolSystemImpl<VarKey, TermKey, (ProcKey, ProcKey)>: InitialStrategy<VarKey, bool, OutStrategy>,
 {
     fn get_initial_strategy(&self) -> OutStrategy {
         self.bool_system.borrow().get_initial_strategy()
+    }
+}
+
+impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKey>>
+    TermSystem<VarKey, bool, TermKey> for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
+{
+    fn definition(&self, variable: VarKey) -> TermKey {
+        self.ensure_variable_defined(variable);
+        self.bool_system.borrow().definition(variable)
+    }
+}
+
+impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKey>>
+    BoolSystem<VarKey, TermKey, (ProcKey, ProcKey)>
+    for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
+{
+    fn get_term(&self, term_key: TermKey) -> BoolTerm<VarKey, TermKey> {
+        self.bool_system.borrow().get_term(term_key)
+    }
+
+    fn evaluate_term(&self, term_key: TermKey, assignment: &dyn Assignment<VarKey, bool>) -> bool {
+        self.bool_system
+            .borrow()
+            .evaluate_term(term_key, assignment)
     }
 }

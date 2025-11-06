@@ -21,7 +21,8 @@ macro_rules! strong_bisim_test {
                     let start = sys.specify_comparison($left, $right);
 
 
-                    let result = !kleene_local(&sys, start, &SMax::default());
+                    let oracle = SMax::default();
+                    let result = !kleene_local(&sys, start, &oracle);
                     assert_eq!($eq, result, "{} and {} should{} be bisimilar in{}", $left, $right, if !$eq { " not" } else {""}, $ccs);
                 }
             )*

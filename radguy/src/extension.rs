@@ -1,4 +1,4 @@
-use std::{collections::HashSet, hash::Hash, marker::PhantomData};
+use std::{collections::HashSet, fmt::Display, hash::Hash, marker::PhantomData};
 
 use crate::{Assignment, Cartesian, System, Union, Universe, Without, oracle::LocalOracle};
 
@@ -54,32 +54,33 @@ pub trait LocalExtension<
     VarSet,
     PairSet,
     TermSet,
+    System: TermSystem<VarKey, VarValue, TermKey>,
 >
 {
-    type System: TermSystem<VarKey, VarValue, TermKey>;
-
     fn depends(
         &self,
         visited: &VarSet,
         assignment: &dyn Assignment<VarKey, VarValue>,
         possible: &PairSet,
-        system: &Self::System,
+        system: &System,
     ) -> TermSet;
 }
 
-pub struct ExtensionOracle<
+pub trait ExtensionToOracle<
     K: Hash + Eq + Copy,
     V: PartialOrd,
-    T: Copy,
-    VS,
-    PS,
-    TS,
-    S: TermSystem<K, V, T>,
-    E: LocalExtension<K, V, T, VS, PS, TS, System = S>,
-    U,
-> {
-    extension: E,
-    _phantom_data: PhantomData<(K, V, T, VS, PS, TS, U)>,
+    T: Copy + Eq,
+    VS: Cartesian<Output = PS> + Without,
+    PS: Union + FromIterator<(K, K)>,
+    TS: TermToKey<K, V, T, VS, PS, S>,
+    S: TermSystem<K, V, T> + Universe<U>,
+    U: Without<VS> + Cartesian<Output = PS>,
+>: LocalExtension<K, V, T, VS, PS, TS, S> + Default
+{
+    #[must_use]
+    fn oracle() -> ExtensionOracle<K, V, T, VS, PS, TS, S, Self, U> {
+        ExtensionOracle::from(Self::default())
+    }
 }
 
 impl<
@@ -90,7 +91,37 @@ impl<
     PS: Union + FromIterator<(K, K)>,
     TS: TermToKey<K, V, T, VS, PS, S>,
     S: TermSystem<K, V, T> + Universe<U>,
-    E: LocalExtension<K, V, T, VS, PS, TS, System = S>,
+    U: Without<VS> + Cartesian<Output = PS>,
+    E: LocalExtension<K, V, T, VS, PS, TS, S> + Default,
+> ExtensionToOracle<K, V, T, VS, PS, TS, S, U> for E
+{
+}
+
+#[allow(clippy::type_complexity)]
+pub struct ExtensionOracle<
+    K: Hash + Eq + Copy,
+    V: PartialOrd,
+    T: Copy,
+    VS,
+    PS,
+    TS,
+    S: TermSystem<K, V, T>,
+    E: LocalExtension<K, V, T, VS, PS, TS, S>,
+    U,
+> {
+    extension: E,
+    _phantom_data: PhantomData<(K, V, T, VS, PS, TS, S, U)>,
+}
+
+impl<
+    K: Hash + Eq + Copy,
+    V: PartialOrd,
+    T: Copy + Eq,
+    VS: Cartesian<Output = PS> + Without,
+    PS: Union + FromIterator<(K, K)>,
+    TS: TermToKey<K, V, T, VS, PS, S>,
+    S: TermSystem<K, V, T> + Universe<U>,
+    E: LocalExtension<K, V, T, VS, PS, TS, S>,
     U: Without<VS> + Cartesian<Output = PS>,
 > LocalOracle<K, V, VS, PS, S> for ExtensionOracle<K, V, T, VS, PS, TS, S, E, U>
 where
@@ -101,7 +132,7 @@ where
         visited: &VS,
         assignment: &impl Assignment<K, V>,
         possible: &PS,
-        system: &E::System,
+        system: &S,
     ) -> PS {
         let unvisited = system.universe().without(visited);
         let unvisited_dep = system.universe().cartesian(&unvisited);
@@ -119,12 +150,12 @@ impl<
     K: Hash + Eq + Copy,
     V: PartialOrd,
     T: Copy + Eq,
-    PS: FromIterator<(K, K)>,
-    VS,
-    TS,
-    S: TermSystem<K, V, T>,
-    E: LocalExtension<K, V, T, VS, PS, TS, System = S>,
-    U,
+    VS: Cartesian<Output = PS> + Without,
+    PS: Union + FromIterator<(K, K)>,
+    TS: TermToKey<K, V, T, VS, PS, S>,
+    S: TermSystem<K, V, T> + Universe<U>,
+    E: LocalExtension<K, V, T, VS, PS, TS, S>,
+    U: Without<VS> + Cartesian<Output = PS>,
 > From<E> for ExtensionOracle<K, V, T, VS, PS, TS, S, E, U>
 {
     fn from(extension: E) -> Self {
@@ -132,5 +163,22 @@ impl<
             extension,
             _phantom_data: PhantomData,
         }
+    }
+}
+
+impl<
+    K: Hash + Eq + Copy,
+    V: PartialOrd,
+    T: Copy + Eq,
+    VS: Cartesian<Output = PS> + Without,
+    PS: Union + FromIterator<(K, K)>,
+    TS: TermToKey<K, V, T, VS, PS, S>,
+    S: TermSystem<K, V, T> + Universe<U>,
+    E: LocalExtension<K, V, T, VS, PS, TS, S> + Display,
+    U: Without<VS> + Cartesian<Output = PS>,
+> Display for ExtensionOracle<K, V, T, VS, PS, TS, S, E, U>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "E^({})", self.extension)
     }
 }
