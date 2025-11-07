@@ -2,26 +2,15 @@ use crate::systems::wctl::ast::{Declaration, Formula, Weight, RelationalExpr, Ex
 
 grammar;
 
-pub Declarations: Vec<Declaration<'input>> = (<Declaration> ";")*;
+pub Program: Vec<Declaration<'input>> = (<Declaration> "\n")*;
 
-Declaration: Declaration<'input> = {
+pub Declaration: Declaration<'input> = {
   <name:Id> "=" <formula:Formula> => Declaration { name, formula },
 }
 
 
-pub Formula: Formula<'input> = Disjunction;
+pub Formula: Formula<'input> = UniversalUntil;
 
-Disjunction: Formula<'input> = {
-  <l:Conjunction> "||" <r:Disjunction> => Formula::Or(Box::new(l), Box::new(r)),
-  <l:Conjunction> "or" <r:Disjunction> => Formula::Or(Box::new(l), Box::new(r)),
-  Conjunction,
-}
-
-Conjunction: Formula<'input> = {
-  <l:UniversalUntil> "&&" <r:Conjunction> => Formula::And(Box::new(l), Box::new(r)),
-  <l:UniversalUntil> "and" <r:Conjunction> => Formula::And(Box::new(l), Box::new(r)),
-
-}
 
 UniversalUntil: Formula<'input> = {
     "A" <left:Formula> "U" <bound:("[" "<=" <Weight> "]")?> <right:Formula> => Formula::UniversalUntil {
@@ -70,18 +59,47 @@ ExistentialNext: Formula<'input> = {
         formula: Box::new(formula),
         bound: bound.map_or_else(|| Weight::Inf, |weight| Weight::Val(weight)),
     },
-    ParenFormula
+    Disjunction,
+}
+
+Disjunction: Formula<'input> = {
+    <l:Conjunction> "||" <r:Disjunction> => Formula::Or(Box::new(l), Box::new(r)),
+    <l:Conjunction> "or" <r:Disjunction> => Formula::Or(Box::new(l), Box::new(r)),
+    Conjunction,
+}
+
+Conjunction: Formula<'input> = {
+    <l:ConstFormula> "&&" <r:Conjunction> => Formula::And(Box::new(l), Box::new(r)),
+    <l:ConstFormula> "and" <r:Conjunction> => Formula::And(Box::new(l), Box::new(r)),
+    ConstFormula,
+}
+
+ConstFormula: Formula<'input> = {
+    "tt" => Formula::Const(true),
+    "true" => Formula::Const(true),
+    "True" => Formula::Const(true),
+    "ff" => Formula::Const(false),
+    "false" => Formula::Const(false),
+    "False" => Formula::Const(false),
+    RelationalExprFormula,
+}
+
+
+
+
+RelationalExprFormula: Formula<'input> = {
+    <rel_expr:RelationalExpr> => Formula::RelationalExpr(rel_expr),
+    PropositionFormula,
+}
+
+PropositionFormula: Formula<'input> = {
+    <prop:Prop> => Formula::Proposition(prop),
+    ParenFormula,
 }
 
 ParenFormula: Formula<'input> = {
     "(" <formula:Formula> ")" => formula,
-    RelationalExprFormula
 }
-
-RelationalExprFormula: Formula<'input> = {
-    <rel_expr:RelationalExpr> => Formula::RelationalExpr(rel_expr),
-}
-
 
 RelationalExpr: RelationalExpr<'input> = {
     <l:Expr> "<" <r:Expr> => RelationalExpr::LessThan(Box::new(l), Box::new(r)),
@@ -90,7 +108,6 @@ RelationalExpr: RelationalExpr<'input> = {
     <l:Expr> ">=" <r:Expr> => RelationalExpr::GreaterThanEq(Box::new(l), Box::new(r)),
     <l:Expr> "==" <r:Expr> => RelationalExpr::Eq(Box::new(l), Box::new(r)),
     <l:Expr> "!=" <r:Expr> => RelationalExpr::NotEq(Box::new(l), Box::new(r)),
-    <id:Id> => RelationalExpr::Id(id),
 }
 
 Expr: Expr<'input> = AddExpr;
@@ -126,7 +143,7 @@ ParenExpr: Expr<'input> = {
 }
 
 PropExpr: Expr<'input> = {
-    <id:Id> => Expr::Proposition(id),
+    <prop:Prop> => Expr::Proposition(prop),
     WeightExpr,
 }
 
@@ -135,8 +152,10 @@ WeightExpr: Expr<'input> = {
 }
 
 
+Prop: &'input str = <r"[a-z][A-Za-z0-9_']*">;
 
 Id: &'input str = <r"[A-Z][A-Za-z0-9_']*">;
+
 
 Weight: i32 = <s:r"[0-9]+"> => s.parse().expect("u32 should parse strings");
 
