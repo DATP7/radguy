@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
-use crate::systems::wccs::ast::{Binding, Process, WeightedAction, Action};
+use crate::systems::wccs::ast::{Binding, Process, WeightedAction, Action, Relabeling};
 use lalrpop_util::ParseError;
 
 grammar;
@@ -33,36 +33,71 @@ AtomicPropositionProcess: Process<'input> = {
 
 ActionPrefixProcess: Process<'input> = {
     <action:Action> "." <process:AtomicPropositionProcess> => Process::ActionPrefix {action, process: Box::new(process)},
-    ActionRelabeledProcess,
+    RelabeledProcess,
 }
 
 
-
-
-ActionRelabeledProcess: Process<'input> = {
-    <process:ActionRelabeledProcess> "[" <labels:Comma<ActionRelabelling>> "]" =>? if labels.iter().any(|(from, to)| *from == "tau" || *to == "tau") {
-        Err(ParseError::User {
-        error: "cannot relabel tau"
-        })
-    } else {
-        Ok(Process::ActionRelabelling {
-        process: Box::new(process),
-        labels: BTreeMap::from_iter(labels),
-        })
+RelabeledProcess: Process<'input> = {
+    <process:RelabeledProcess> "[" <relabelings:Comma<Relabelling>> "]" =>? {
+        if relabelings.iter().all(|x| matches!(x, Relabeling::Action(l, r))) {
+            let pairs: Vec<_> = relabelings.into_iter().map(|x| match x {
+                Relabeling::Action(from, to) => (from, to),
+                _ => unreachable!("All relabelings should apply to actions"),
+            }).collect();
+            if pairs.iter().any(|(from, to)| *from == "tau" || *to == "tau") {
+                Err(ParseError::User {
+                error: "cannot relabel tau"
+                })
+            } else {
+                Ok(Process::ActionRelabelling {
+                process: Box::new(process),
+                labels: BTreeMap::from_iter(pairs),
+                })
+            }
+        } else if relabelings.iter().all(|x| matches!(x, Relabeling::Proposition(l, r))) {
+            Ok(Process::PropositionRelabelling {
+                process: Box::new(process),
+                labels: BTreeMap::from_iter(relabelings.into_iter().map(|x| match x {
+                    Relabeling::Proposition(from, to) => (from, to),
+                    _ => unreachable!("All relabelings should apply to proposition"),
+                }))
+            })   
+        }
+        else {
+            Err(ParseError::User {
+                    error: "Proposition relabelings can not be combined with action relabelings"
+            })
+        }
     },
-
-    PropositionRelabeledProcess,
-}
-
-PropositionRelabeledProcess: Process<'input> = {
-    <process:PropositionRelabeledProcess> "[" <labels:Comma<PropositionRelabelling>> "]" => 
-        Process::PropositionRelabelling {
-            process: Box::new(process),
-            labels: BTreeMap::from_iter(labels),
-        },
+   
 
     RestrictedProcess,
 }
+
+// ActionRelabeledProcess: Process<'input> = {
+//     <process:ActionRelabeledProcess> "[" <labels:Comma<ActionRelabelling>> "]" =>? if labels.iter().any(|(from, to)| *from == "tau" || *to == "tau") {
+//         Err(ParseError::User {
+//         error: "cannot relabel tau"
+//         })
+//     } else {
+//         Ok(Process::ActionRelabelling {
+//         process: Box::new(process),
+//         labels: BTreeMap::from_iter(labels),
+//         })
+//     },
+
+//     PropositionRelabeledProcess,
+// }
+
+// PropositionRelabeledProcess: Process<'input> = {
+//     <process:PropositionRelabeledProcess> "[" <labels:Comma<PropositionRelabelling>> "]" => 
+//         Process::PropositionRelabelling {
+//             process: Box::new(process),
+//             labels: BTreeMap::from_iter(labels),
+//         },
+
+//     RestrictedProcess,
+// }
 
 RestrictedProcess: Process<'input> = {
   <process:RestrictedProcess> "\\" <restriction:LabelSet> => Process::Restriction {
@@ -78,7 +113,11 @@ Paren: Process<'input> = {
   <Id> => Process::Named(<>),
 }
 
-ActionRelabelling: (&'input str, &'input str) = <Label> "->" <Label>;
+Relabelling: Relabeling<'input> = {
+    <l:Label> "->" <r:Label> => Relabeling::Action(l, r),
+    <l:Label> "=>" <r:Label> => Relabeling::Proposition(l, r),
+};
+
 PropositionRelabelling: (&'input str, &'input str) = <Label> "=>" <Label>;
 
 LabelSet: BTreeSet<&'input str> = {
