@@ -46,6 +46,11 @@ impl<'a> Process<'a> {
     }
 }
 
+pub(crate) enum Relabeling<'a> {
+    Action(&'a str, &'a str),
+    Proposition(&'a str, &'a str),
+}
+
 #[derive(Clone, Debug)]
 pub struct Binding<'a> {
     pub name: &'a str,
@@ -156,17 +161,27 @@ mod tests {
             S := mow:<a, 1>.T;
             T := dump:S;
             ",
-            "S := mow:dump:<a>.mow:S;", //
-            "T := <a,0>.dump:S;",       // This should work
+            "S := mow:dump:<a>.mow:S;",
+            "T := <a,0>.dump:S;",
+            "T := mow:S [mow => dump];",
+            "T := mow:S [mow => dump, dud => bib];",
+            "T := mow:S [mow -> dump];",
+            "T := mow:S [mow -> dump, dud -> bib];",
+            "T := mow:S [mow -> dump] [dud => bib];",
+            "T := mow:S [mow => dump] [dud => bib];",
+            "T := mow:S [mow => dump] [dud -> bib];",
+            "T := mow:S [mow -> dump] [dud -> bib];",
         ];
 
         let bad = [
-            "S := <tau!>.S;",       // No co tau
-            "S = mow:<a>.S;",       // wrong =
-            "S := mow.<a>.S;",      // . instead of :
-            "S := mow.<a, -2>.S;",  // negative num
-            "S := mow.<a, 0.1>.S;", // decimal
-            "S := mow.<a, a>.S;",   // id instead of num
+            "S := <tau!>.S;",                        // No co tau
+            "S = mow:<a>.S;",                        // wrong =
+            "S := mow.<a>.S;",                       // . instead of :
+            "S := mow.<a, -2>.S;",                   // negative num
+            "S := mow.<a, 0.1>.S;",                  // decimal
+            "S := mow.<a, a>.S;",                    // id instead of num
+            "T := mow:S [mow -> dump, dud => bib];", // combining action and proposition relabeling
+            "T := mow:S [mow => dump, dud -> bib];", // combining action and proposition relabeling
         ];
 
         assert_good!(good, parser);
@@ -183,10 +198,12 @@ mod tests {
             let path = entry.expect("invalid dir entry").path();
             let wccs = fs::read_to_string(&path).expect("file should be readable as string");
 
-            parser.parse(&wccs).expect(&format!(
-                "file: \"{}\" should parse",
-                path.to_str().expect("to_str should work")
-            ));
+            parser.parse(&wccs).unwrap_or_else(|_| {
+                panic!(
+                    "file: \"{}\" should parse",
+                    path.to_str().expect("to_str should work")
+                )
+            });
         }
     }
 

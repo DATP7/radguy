@@ -8,4 +8,4 @@ lalrpop_mod!(
 );
 
 pub mod ast;
-pub mod wccs_transition_system;
+pub mod wccs_system;

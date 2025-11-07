@@ -24,7 +24,12 @@ pub enum FlatProcess<'a, ProcKey: Key> {
         // PERF: Make this Rc or borrowed so we don't clone as much
         restrictions: BTreeSet<&'a str>,
     },
-    Relabelling {
+    ActionRelabelling {
+        process: ProcKey,
+        // PERF: Make this Rc or borrowed so we don't clone as much
+        labels: BTreeMap<&'a str, &'a str>,
+    },
+    PropositionRelabelling {
         process: ProcKey,
         // PERF: Make this Rc or borrowed so we don't clone as much
         labels: BTreeMap<&'a str, &'a str>,
@@ -32,19 +37,62 @@ pub enum FlatProcess<'a, ProcKey: Key> {
     Sum(ProcKey, ProcKey),
     Compose(ProcKey, ProcKey),
     AtomicProposition {
-        propositions: BTreeMap<&'a str, u32>,
+        propositions: Vec<&'a str>,
         process: ProcKey,
     },
 }
 
+trait MultiSet<T: Eq> {
+    fn count(&self, elem: T) -> usize;
+}
+
+impl<T: Eq + Copy> MultiSet<T> for Vec<T> {
+    fn count(&self, elem: T) -> usize {
+        self.iter().copied().filter(|x| *x == elem).count()
+    }
+}
+
 #[derive(Default, Debug)]
-struct WCCSTransitionSystem<'a, ProcKey: Key> {
+struct WCCSSystem<'a, ProcKey: Key> {
     process_map: RefCell<BiSlotMap<ProcKey, FlatProcess<'a, ProcKey>>>,
     bindings: HashMap<&'a str, ProcKey>,
     transition_cache: RefCell<SecondaryMap<ProcKey, TransitionMap<'a, ProcKey>>>,
 }
 
-impl<'a, ProcKey: Key> WCCSTransitionSystem<'a, ProcKey> {
+impl<'a, ProcKey: Key> WCCSSystem<'a, ProcKey> {
+    pub fn get_propositions(&self, process_key: ProcKey) -> Vec<&'a str> {
+        let process = self.get_process(process_key);
+
+        match process {
+            FlatProcess::Nil | FlatProcess::ActionPrefix { .. } => Vec::new(),
+            FlatProcess::Named(name) => self.get_propositions(
+                *self
+                    .bindings
+                    .get(name)
+                    .expect("All named processes should have been bound"),
+            ),
+            FlatProcess::Restriction { process, .. }
+            | FlatProcess::ActionRelabelling { process, .. } => self.get_propositions(process),
+            FlatProcess::PropositionRelabelling { process, labels } => self
+                .get_propositions(process)
+                .into_iter()
+                .map(|prop| dbg!(&labels).get(prop).copied().unwrap_or(prop))
+                .collect(),
+            FlatProcess::Sum(left, right) | FlatProcess::Compose(left, right) => self
+                .get_propositions(left)
+                .into_iter()
+                .chain(self.get_propositions(right))
+                .collect(),
+            FlatProcess::AtomicProposition {
+                propositions,
+                process,
+            } => propositions
+                .into_iter()
+                .chain(self.get_propositions(process))
+                .collect(),
+        }
+    }
+
     pub fn get_transitions(&self, process_key: ProcKey) -> TransitionMap<'a, ProcKey> {
         if let Some(transitions) = self.transition_cache.borrow().get(process_key) {
             return transitions.clone();
@@ -57,7 +105,7 @@ impl<'a, ProcKey: Key> WCCSTransitionSystem<'a, ProcKey> {
             FlatProcess::Nil => HashMap::new(),
             FlatProcess::Named(name) => self.get_transitions(self.lookup_process_key(name)),
             FlatProcess::ActionPrefix { action, process } => {
-                HashMap::from([(action.clone(), HashSet::from([process]))])
+                HashMap::from([(action, HashSet::from([process]))])
             }
             FlatProcess::Restriction {
                 process,
@@ -84,7 +132,7 @@ impl<'a, ProcKey: Key> WCCSTransitionSystem<'a, ProcKey> {
                     )
                 })
                 .collect(),
-            FlatProcess::Relabelling { process, labels } => self
+            FlatProcess::ActionRelabelling { process, labels } => self
                 .get_transitions(process)
                 .into_iter()
                 .map(
@@ -102,7 +150,7 @@ impl<'a, ProcKey: Key> WCCSTransitionSystem<'a, ProcKey> {
                             },
                             targets,
                         ),
-                        Action::Tau => (WeightedAction { action, weight }, targets),
+                        Action::Tau => (WeightedAction { weight, action }, targets),
                     },
                 )
                 .map(|(action, targets)| {
@@ -111,7 +159,7 @@ impl<'a, ProcKey: Key> WCCSTransitionSystem<'a, ProcKey> {
                         targets
                             .into_iter()
                             .map(|process| {
-                                self.insert_process(FlatProcess::Relabelling {
+                                self.insert_process(FlatProcess::ActionRelabelling {
                                     process,
                                     labels: labels.clone(),
                                 })
@@ -120,6 +168,25 @@ impl<'a, ProcKey: Key> WCCSTransitionSystem<'a, ProcKey> {
                     )
                 })
                 .collect(),
+            FlatProcess::PropositionRelabelling { process, labels } => self
+                .get_transitions(process)
+                .into_iter()
+                .map(|(action, sucessors)| {
+                    (
+                        action,
+                        sucessors
+                            .into_iter()
+                            .map(|process| {
+                                self.insert_process(FlatProcess::PropositionRelabelling {
+                                    process,
+                                    labels: labels.clone(),
+                                })
+                            })
+                            .collect(),
+                    )
+                })
+                .collect(),
+
             FlatProcess::Sum(left, right) => {
                 let left_transitions = self.get_transitions(left);
                 let right_transitions = self.get_transitions(right);
@@ -165,6 +232,10 @@ impl<'a, ProcKey: Key> WCCSTransitionSystem<'a, ProcKey> {
         }
     }
 
+    pub fn get_process(&self, key: ProcKey) -> FlatProcess<'a, ProcKey> {
+        self.process_map.borrow().get_value(key).clone()
+    }
+
     pub fn insert_ast_process(&mut self, process: &Process<'a>) -> ProcKey {
         match process {
             Process::Nil => self.insert_process(FlatProcess::Nil),
@@ -172,7 +243,7 @@ impl<'a, ProcKey: Key> WCCSTransitionSystem<'a, ProcKey> {
             Process::ActionPrefix { action, process } => {
                 let flat_process_key = self.insert_ast_process(process);
                 self.insert_process(FlatProcess::ActionPrefix {
-                    action: action.clone(),
+                    action: *action,
                     process: flat_process_key,
                 })
             }
@@ -188,7 +259,14 @@ impl<'a, ProcKey: Key> WCCSTransitionSystem<'a, ProcKey> {
             }
             Process::ActionRelabelling { process, labels } => {
                 let inner_process_key = self.insert_ast_process(process);
-                self.insert_process(FlatProcess::Relabelling {
+                self.insert_process(FlatProcess::ActionRelabelling {
+                    process: inner_process_key,
+                    labels: labels.clone(),
+                })
+            }
+            Process::PropositionRelabelling { process, labels } => {
+                let inner_process_key = self.insert_ast_process(process);
+                self.insert_process(FlatProcess::PropositionRelabelling {
                     process: inner_process_key,
                     labels: labels.clone(),
                 })
@@ -207,25 +285,10 @@ impl<'a, ProcKey: Key> WCCSTransitionSystem<'a, ProcKey> {
                 propositions,
                 process,
             } => {
-                let inner_prcess_key = self.insert_ast_process(process);
-                let mut proposition_map = BTreeMap::new();
-
-                for prop in propositions.into_iter().copied() {
-                    proposition_map
-                        .entry(prop)
-                        .and_modify(|val| *val += 1)
-                        .or_insert(1);
-                }
+                let process = self.insert_ast_process(process);
                 self.insert_process(FlatProcess::AtomicProposition {
-                    propositions: proposition_map,
-                    process: inner_prcess_key,
-                })
-            }
-            Process::PropositionRelabelling { process, labels } => {
-                let inner_process_key = self.insert_ast_process(process);
-                self.insert_process(FlatProcess::Relabelling {
-                    process: inner_process_key,
-                    labels: labels.clone(),
+                    propositions: propositions.clone(),
+                    process,
                 })
             }
         }
@@ -245,55 +308,53 @@ impl<'a, ProcKey: Key> WCCSTransitionSystem<'a, ProcKey> {
                 current_succesors_processes.insert(composed_process_key);
 
                 // find sync actions
-                match left_action {
-                    WeightedAction {
-                        weight: left_weight,
-                        action:
-                            Action::Label {
-                                name,
-                                is_complement,
-                            },
-                    } => {
-                        let co_action = Action::Label {
+                if let WeightedAction {
+                    weight: left_weight,
+                    action:
+                        Action::Label {
                             name,
-                            is_complement: !is_complement,
-                        };
-                        let matching_right_transitions = right_tansitions
-                            .iter()
-                            .filter(|(WeightedAction { action, .. }, _)| *action == co_action)
-                            .collect::<Vec<_>>();
-                        if !matching_right_transitions.is_empty() {
-                            for (
-                                WeightedAction {
-                                    weight: right_weight,
-                                    ..
-                                },
-                                right_successors,
-                            ) in matching_right_transitions
-                            {
-                                let current_sync_processes = right_successors
-                                    .into_iter()
-                                    .map(|right_successor| {
-                                        self.insert_process(FlatProcess::Compose(
-                                            left_successor,
-                                            *right_successor,
-                                        ))
-                                    })
-                                    .collect::<Vec<_>>();
+                            is_complement,
+                        },
+                } = left_action
+                {
+                    let co_action = Action::Label {
+                        name,
+                        is_complement: !is_complement,
+                    };
+                    let matching_right_transitions = right_tansitions
+                        .iter()
+                        .filter(|(WeightedAction { action, .. }, _)| *action == co_action)
+                        .collect::<Vec<_>>();
+                    if !matching_right_transitions.is_empty() {
+                        for (
+                            WeightedAction {
+                                weight: right_weight,
+                                ..
+                            },
+                            right_successors,
+                        ) in matching_right_transitions
+                        {
+                            let current_sync_processes = right_successors
+                                .iter()
+                                .map(|right_successor| {
+                                    self.insert_process(FlatProcess::Compose(
+                                        left_successor,
+                                        *right_successor,
+                                    ))
+                                })
+                                .collect::<Vec<_>>();
 
-                                if !current_sync_processes.is_empty() {
-                                    successors
-                                        .entry(WeightedAction {
-                                            action: Action::Tau,
-                                            weight: max(left_weight, *right_weight),
-                                        })
-                                        .or_default()
-                                        .extend(current_sync_processes);
-                                }
+                            if !current_sync_processes.is_empty() {
+                                successors
+                                    .entry(WeightedAction {
+                                        action: Action::Tau,
+                                        weight: max(left_weight, *right_weight),
+                                    })
+                                    .or_default()
+                                    .extend(current_sync_processes);
                             }
                         }
                     }
-                    _ => {}
                 }
             }
 
@@ -346,6 +407,17 @@ mod test {
         }};
     }
 
+    macro_rules! proposition_set {
+        ($lts:expr;) => {Vec::new()};
+        ($lts:expr;$($prop:expr),*) => {{
+            let mut propositions = Vec::new();
+            $(
+                propositions.push($prop);
+            )*
+            propositions
+        }};
+    }
+
     macro_rules! transition_tests {
         ($($name:ident: $proc:expr => [$($action:expr => $target:expr),*] $(in $ccs:expr)?;)*) => {
             $(
@@ -353,7 +425,7 @@ mod test {
             #[allow(unused_variables)]
             fn $name() {
                 #[allow(unused_mut)]
-                let mut lts = WCCSTransitionSystem::<DefaultKey>::default();
+                let mut lts = WCCSSystem::<DefaultKey>::default();
                 $(
                     let parser = ProgramParser::new();
                     let ast_bindings = parser
@@ -365,6 +437,34 @@ mod test {
                 let key = lts.insert_ast_process(&proc);
                 let transitions = lts.get_transitions(key);
                 assert_eq!(transitions, transition_set![lts; $($action => $target),*])
+            }
+            )*
+        };
+    }
+
+    macro_rules! proposition_tests {
+        ($($name:ident: $proc:expr => [$($prop:expr),*] $(in $ccs:expr)?;)*) => {
+            $(
+            #[test]
+            #[allow(unused_variables)]
+            fn $name() {
+                #[allow(unused_mut)]
+                let mut lts = WCCSSystem::<DefaultKey>::default();
+                $(
+                    let parser = ProgramParser::new();
+                    let ast_bindings = parser
+                        .parse(&$ccs)
+                        .expect("Failed to parse CCS program content.");
+                    lts.insert_ast_bindings(ast_bindings);
+                )?
+                let proc = Process::parse($proc);
+                let key = lts.insert_ast_process(&proc);
+                let mut propositions = lts.get_propositions(key);
+                let mut target_propositions = proposition_set![lts; $($prop),*];
+                propositions.sort();
+                target_propositions.sort();
+
+                assert_eq!(propositions, target_propositions);
             }
             )*
         };
@@ -398,7 +498,17 @@ mod test {
         tau_weight: "(<a,1>.0 | <a!,2>.0) \\ {a}" => ["<tau,2>" => "(0 | 0) \\ {a}"];
         co_action: "<a!, 3>.0" => ["<a!, 3>" => "0"];
         co_action_weight: "<a,2>.0 | <a!,1>.0" => ["<tau,2>" => "0 | 0", "<a,2>" => "0 | <a!,1>.0", "<a!,1>" => "<a,2>.0 | 0"];
-        nested_propositions: "mow:<a>.(dump:0)" => ["<a>" => "dump:0"];
+        nested_propositions: "mow:<a>.dump:0" => ["<a>" => "dump:0"];
         multiple_propositions: "mow:dump:<a>.0" => ["<a>" => "0"];
+    }
+
+    proposition_tests! {
+        basic: "mow:dump:0" => ["mow", "dump"];
+        sum: "mow:0 + dump:0" => ["mow", "dump"];
+        composition: "mow:0 | dump:0" => ["mow", "dump"];
+        named: "mow:A" => ["mow", "dump"] in "A := dump:0;";
+        prop_relabeling: "(mow:0) [mow => dump]" => ["dump"];
+        action_relabeling: "(mow:0) [mow -> dump]" => ["mow"];
+        multi_prop: "mow:mow:0" => ["mow", "mow"];
     }
 }
