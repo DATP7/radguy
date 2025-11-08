@@ -8,7 +8,7 @@ use std::{
 use itertools::iproduct;
 use radguy::{
     Arguments, Assignment, PairUniverse, System, Universe,
-    bdd::{SimpleBDDRelation, SimpleBDDSet},
+    bdd::simple_bdd::{BDDRelation, BDDSet},
 };
 use slotmap::{DefaultKey, Key};
 
@@ -324,23 +324,23 @@ impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKe
     }
 }
 
-impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKey>>
-    Universe<SimpleBDDSet> for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
+impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKey>> Universe<BDDSet>
+    for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
 {
-    fn universe(&self) -> SimpleBDDSet {
-        SimpleBDDSet::t()
+    fn universe(&self) -> BDDSet {
+        BDDSet::t()
     }
 }
 
 impl<'a, ProcKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKey>>
-    PairUniverse<DefaultKey, SimpleBDDRelation>
+    PairUniverse<DefaultKey, BDDRelation>
     for BisimulationSystem<'a, ProcKey, DefaultKey, TermKey, T>
 {
-    fn pair_universe(&self) -> SimpleBDDRelation {
-        SimpleBDDRelation::t()
+    fn pair_universe(&self) -> BDDRelation {
+        BDDRelation::t()
     }
 
-    fn diagonal(&self, visited: &HashSet<DefaultKey>) -> SimpleBDDRelation {
-        SimpleBDDRelation::diagonal(visited)
+    fn diagonal(&self, visited: &HashSet<DefaultKey>) -> BDDRelation {
+        BDDRelation::diagonal(visited)
     }
 }

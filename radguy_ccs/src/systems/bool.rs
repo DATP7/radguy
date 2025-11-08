@@ -7,7 +7,7 @@ use std::{
 use itertools::iproduct;
 use radguy::{
     Arguments, Assignment, PairUniverse, Set, System, Universe,
-    bdd::{SimpleBDDRelation, SimpleBDDSet},
+    bdd::simple_bdd::{BDDRelation, BDDSet},
     extension::TermSystem,
 };
 use radguy::{Union, bislotmap::BiSlotMap};
@@ -88,21 +88,21 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone> PairUniverse<K, HashSet<(K, K)>>
     }
 }
 
-impl<K: Key, T: Key, N: Hash + Eq + Clone> Universe<SimpleBDDSet> for BoolSystem<K, T, N> {
-    fn universe(&self) -> SimpleBDDSet {
-        SimpleBDDSet::t()
+impl<K: Key, T: Key, N: Hash + Eq + Clone> Universe<BDDSet> for BoolSystem<K, T, N> {
+    fn universe(&self) -> BDDSet {
+        BDDSet::t()
     }
 }
 
-impl<T: Key, N: Hash + Eq + Clone> PairUniverse<DefaultKey, SimpleBDDRelation>
+impl<T: Key, N: Hash + Eq + Clone> PairUniverse<DefaultKey, BDDRelation>
     for BoolSystem<DefaultKey, T, N>
 {
-    fn pair_universe(&self) -> SimpleBDDRelation {
-        SimpleBDDRelation::t()
+    fn pair_universe(&self) -> BDDRelation {
+        BDDRelation::t()
     }
 
-    fn diagonal(&self, visited: &HashSet<DefaultKey>) -> SimpleBDDRelation {
-        SimpleBDDRelation::diagonal(visited)
+    fn diagonal(&self, visited: &HashSet<DefaultKey>) -> BDDRelation {
+        BDDRelation::diagonal(visited)
     }
 }
 

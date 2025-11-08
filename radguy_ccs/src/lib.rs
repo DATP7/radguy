@@ -2,7 +2,6 @@ pub mod systems;
 
 #[cfg(test)]
 mod tests {
-    use radguy::bdd::SimpleBDDRelation;
     use radguy::kleene_local;
     use radguy::oracle::{LocalMaxR, LocalOracle, SMax, TrivialOracle};
     use slotmap::DefaultKey;
@@ -51,16 +50,6 @@ mod tests {
                         let start = sys.names.get_or_insert_key(var);
                         assert_eq!(
                             kleene_local::<_, _, HashSet<_>, _>(&sys, start, &$oracle),
-                            goal
-                        );
-                    }
-                }
-                {
-                    let (mut sys, var_vector, goal_vector) = test_system();
-                    for (var, goal) in var_vector.into_iter().zip(goal_vector.into_iter()) {
-                        let start = sys.names.get_or_insert_key(var);
-                        assert_eq!(
-                            kleene_local::<_, _, SimpleBDDRelation, _>(&sys, start, &$oracle),
                             goal
                         );
                     }

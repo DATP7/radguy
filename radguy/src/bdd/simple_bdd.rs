@@ -36,12 +36,12 @@ macro_rules! with_simple_manager_exclusive {
 /// all slotmap code? We cannot store a map in the BDD structure, as we would then have to union
 /// different maps, so if we map then a global map is needed. Manager is also required to be global
 /// or we need some factory abstraction, but that is probably what manager does
-pub struct SimpleBDDRelation {
+pub struct BDDRelation {
     bdd: BDDFunction,
     // map_type: BDDMap,
 }
 
-impl SimpleBDDRelation {
+impl BDDRelation {
     fn singleton(map: &'static LocalKey<RefCell<SecondaryMap<K, u32>>>, key: K) -> BDDFunction {
         let i = map.with(|map_ref| {
             *map_ref
@@ -120,13 +120,13 @@ impl SimpleBDDRelation {
     }
 }
 
-impl Default for SimpleBDDRelation {
+impl Default for BDDRelation {
     fn default() -> Self {
         Self::f()
     }
 }
 
-impl Union for SimpleBDDRelation {
+impl Union for BDDRelation {
     fn union(self, other: Self) -> Self {
         Self {
             bdd: self.bdd.or(&other.bdd).expect("oom"),
@@ -134,7 +134,7 @@ impl Union for SimpleBDDRelation {
     }
 }
 
-impl Union<BDDFunction> for SimpleBDDRelation {
+impl Union<BDDFunction> for BDDRelation {
     fn union(self, other: BDDFunction) -> Self {
         Self {
             bdd: self.bdd.or(&other).expect("oom"),
@@ -142,7 +142,7 @@ impl Union<BDDFunction> for SimpleBDDRelation {
     }
 }
 
-impl Intersect for SimpleBDDRelation {
+impl Intersect for BDDRelation {
     fn intersect(self, other: &Self) -> Self {
         Self {
             bdd: self.bdd.and(&other.bdd).expect("oom"),
@@ -150,7 +150,7 @@ impl Intersect for SimpleBDDRelation {
     }
 }
 
-impl Without for SimpleBDDRelation {
+impl Without for BDDRelation {
     fn without(self, other: &Self) -> Self {
         Self {
             // PERF: Does this increase the size of the bdd?
@@ -159,33 +159,33 @@ impl Without for SimpleBDDRelation {
     }
 }
 
-impl IsSubset for SimpleBDDRelation {
+impl IsSubset for BDDRelation {
     fn is_subset(&self, other: &Self) -> bool {
         self.bdd <= other.bdd
     }
 }
 
 #[derive(Default)]
-pub struct SimpleBDDSet {
-    rel: SimpleBDDRelation,
+pub struct BDDSet {
+    rel: BDDRelation,
 }
 
-impl SimpleBDDSet {
+impl BDDSet {
     #[must_use]
     pub fn t() -> Self {
         Self {
-            rel: SimpleBDDRelation::t(),
+            rel: BDDRelation::t(),
         }
     }
     #[must_use]
     pub fn f() -> Self {
         Self {
-            rel: SimpleBDDRelation::f(),
+            rel: BDDRelation::f(),
         }
     }
 }
 
-impl Set<K> for SimpleBDDSet {
+impl Set<K> for BDDSet {
     fn contains(&self, item: &K) -> bool {
         self.rel.contains_left(*item)
     }
@@ -194,21 +194,21 @@ impl Set<K> for SimpleBDDSet {
         if self.contains(&item) {
             return false;
         }
-        self.rel.union_mut(&SimpleBDDRelation::left_singleton(item));
+        self.rel.union_mut(&BDDRelation::left_singleton(item));
         true
     }
 }
 
-impl<T> Cartesian<T> for SimpleBDDSet
+impl<T> Cartesian<T> for BDDSet
 where
     for<'a> &'a T: IntoIterator<Item = &'a K>,
 {
-    type Output = SimpleBDDRelation;
+    type Output = BDDRelation;
 
     fn cartesian(mut self, other: &T) -> Self::Output {
         let rhs = other
             .into_iter()
-            .map(|key| SimpleBDDRelation::right_singleton(*key))
+            .map(|key| BDDRelation::right_singleton(*key))
             .reduce(|rel, var| rel.or(&var).expect("oom"));
 
         if let Some(rhs) = rhs {
@@ -217,13 +217,6 @@ where
         self.rel
     }
 }
-
-/// Binarily compressed BDD
-///
-/// In `BinaryhBDD` each system variable is represented as the interpretation of the binary string
-/// representation of that variable's id. I.e. the inclusion of the 6th variable is represented by
-/// `110` being an interpretation of the bdd
-pub struct BinaryBDDSet {}
 
 #[cfg(test)]
 mod test {
@@ -242,6 +235,7 @@ mod test {
     }
 
     #[test]
+    #[ignore = "deprecated"]
     fn are_bdds_dumb() {
         let manager_ref = new_manager(2048, 1024, 1);
         let empty = manager_ref.with_manager_exclusive(|manager| BDDFunction::f(manager));
@@ -264,11 +258,12 @@ mod test {
     }
 
     #[test]
+    #[ignore = "deprecated"]
     fn simple_bdd_map_contains_only_inserted_keys() {
         let mut proxy_map = SlotMap::default();
         let in_key = proxy_map.insert(3);
         let out_key = proxy_map.insert(6);
-        let mut set = SimpleBDDSet::f();
+        let mut set = BDDSet::f();
 
         assert!(!set.contains(&out_key), "in_key should not be in set early");
         assert!(
@@ -277,9 +272,9 @@ mod test {
         );
 
         set.insert(in_key);
-        let var = SimpleBDDRelation::get_left(out_key);
+        let var = BDDRelation::get_left(out_key);
         assert_eq!(var, None, "out_key should not be in global map");
-        let var = SimpleBDDRelation::get_left(in_key);
+        let var = BDDRelation::get_left(in_key);
         assert_ne!(var, None, "in_key should be in global map");
 
         assert!(set.contains(&in_key), "in_key should be in set late");
@@ -287,11 +282,12 @@ mod test {
     }
 
     #[test]
+    #[ignore = "deprecated"]
     fn simple_bbd_t_contains_all_variables() {
         let mut proxy_map = SlotMap::default();
         let real_key = proxy_map.insert(3);
         let fake_key = DefaultKey::default();
-        let bdd = SimpleBDDSet::t();
+        let bdd = BDDSet::t();
 
         // Keys created with default cannot be used to insert into secondary maps. Thus even if
         // this key had been used in an insert call, nothing would happen.

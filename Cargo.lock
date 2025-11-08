@@ -323,7 +323,8 @@ checksum = "5419bdc4f6a9207fbeba6d11b604d481addf78ecd10c11ad51e76c2f6482748d"
 [[package]]
 name = "hugealloc"
 version = "0.1.1"
-source = "git+https://github.com/DATP7/oxidd#9a49830446ba3555995215e3a082e1baa1942aa6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "542733215a252c27c674e5d875a910d7de509cb74123d0bdbaa050f871ec84c2"
 dependencies = [
  "allocator-api2",
  "libc",
@@ -430,7 +431,8 @@ checksum = "2874a2af47a2325c2001a6e6fad9b16a53b802102b528163885171cf92b15976"
 [[package]]
 name = "linear-hashtbl"
 version = "0.1.4"
-source = "git+https://github.com/DATP7/oxidd#9a49830446ba3555995215e3a082e1baa1942aa6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b11269ceb6867559e0fce487ff8148933040c7ac091ee4ecc904821f1db1e0fa"
 
 [[package]]
 name = "litrs"
@@ -495,15 +497,16 @@ checksum = "d6790f58c7ff633d8771f42965289203411a5e5c68388703c06e14f24770b41e"
 [[package]]
 name = "oxidd"
 version = "0.11.0"
-source = "git+https://github.com/DATP7/oxidd#9a49830446ba3555995215e3a082e1baa1942aa6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c984e2c820ff1306f7bd10ac166a542c69cce2d87331eb4caa1b78ca381e5c0b"
 dependencies = [
  "cfg-if",
  "derive-where",
  "document-features",
  "oxidd-cache",
- "oxidd-core 0.11.0 (git+https://github.com/DATP7/oxidd)",
- "oxidd-derive 0.11.0 (git+https://github.com/DATP7/oxidd)",
- "oxidd-dump 0.6.0 (git+https://github.com/DATP7/oxidd)",
+ "oxidd-core",
+ "oxidd-derive",
+ "oxidd-dump",
  "oxidd-manager-index",
  "oxidd-reorder",
  "oxidd-rules-bdd",
@@ -516,12 +519,13 @@ dependencies = [
 [[package]]
 name = "oxidd-cache"
 version = "0.11.1"
-source = "git+https://github.com/DATP7/oxidd#9a49830446ba3555995215e3a082e1baa1942aa6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea87b04767bd71ec9a0f0f1b95b3e1be822365d611ae692734bf84dffdc1aae9"
 dependencies = [
  "allocator-api2",
  "document-features",
  "hugealloc",
- "oxidd-core 0.11.0 (git+https://github.com/DATP7/oxidd)",
+ "oxidd-core",
  "parking_lot",
 ]
 
@@ -530,14 +534,6 @@ name = "oxidd-core"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c4ce8a17e276f5df5a9a2aabdc0fd1ccf2b3b73bc3b5ef7627f26f6ecc9afee3"
-dependencies = [
- "nanorand",
-]
-
-[[package]]
-name = "oxidd-core"
-version = "0.11.0"
-source = "git+https://github.com/DATP7/oxidd#9a49830446ba3555995215e3a082e1baa1942aa6"
 dependencies = [
  "nanorand",
 ]
@@ -555,17 +551,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "oxidd-derive"
-version = "0.11.0"
-source = "git+https://github.com/DATP7/oxidd#9a49830446ba3555995215e3a082e1baa1942aa6"
-dependencies = [
- "proc-macro-error",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "oxidd-dump"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -575,35 +560,22 @@ dependencies = [
  "fixedbitset",
  "is_sorted",
  "memchr",
- "oxidd-core 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "oxidd-derive 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "rustc-hash",
-]
-
-[[package]]
-name = "oxidd-dump"
-version = "0.6.0"
-source = "git+https://github.com/DATP7/oxidd#9a49830446ba3555995215e3a082e1baa1942aa6"
-dependencies = [
- "document-features",
- "fixedbitset",
- "is_sorted",
- "memchr",
- "oxidd-core 0.11.0 (git+https://github.com/DATP7/oxidd)",
- "oxidd-derive 0.11.0 (git+https://github.com/DATP7/oxidd)",
+ "oxidd-core",
+ "oxidd-derive",
  "rustc-hash",
 ]
 
 [[package]]
 name = "oxidd-manager-index"
 version = "0.11.0"
-source = "git+https://github.com/DATP7/oxidd#9a49830446ba3555995215e3a082e1baa1942aa6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1339eb2952e23d62d3421f444fdf36d7f36b6a63707ae3d4fef1d1bfb007a47"
 dependencies = [
  "crossbeam-utils",
  "derive-where",
  "fixedbitset",
  "linear-hashtbl",
- "oxidd-core 0.11.0 (git+https://github.com/DATP7/oxidd)",
+ "oxidd-core",
  "parking_lot",
  "rayon",
  "rustc-hash",
@@ -612,11 +584,12 @@ dependencies = [
 [[package]]
 name = "oxidd-reorder"
 version = "0.6.1"
-source = "git+https://github.com/DATP7/oxidd#9a49830446ba3555995215e3a082e1baa1942aa6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6863dd156fb2713ad1f6b7528d08da3cc675ae27e24b6e9a0df9d0fea8d9a839"
 dependencies = [
  "flume",
  "is_sorted",
- "oxidd-core 0.11.0 (git+https://github.com/DATP7/oxidd)",
+ "oxidd-core",
  "rayon",
  "smallvec",
 ]
@@ -624,48 +597,52 @@ dependencies = [
 [[package]]
 name = "oxidd-rules-bdd"
 version = "0.11.0"
-source = "git+https://github.com/DATP7/oxidd#9a49830446ba3555995215e3a082e1baa1942aa6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c56b5465552bdc2c1f38c433f8751703d1561396f4be16315999cc47eed6e2ce"
 dependencies = [
  "document-features",
  "fixedbitset",
- "oxidd-core 0.11.0 (git+https://github.com/DATP7/oxidd)",
- "oxidd-derive 0.11.0 (git+https://github.com/DATP7/oxidd)",
- "oxidd-dump 0.6.0 (git+https://github.com/DATP7/oxidd)",
+ "oxidd-core",
+ "oxidd-derive",
+ "oxidd-dump",
 ]
 
 [[package]]
 name = "oxidd-rules-mtbdd"
 version = "0.6.0"
-source = "git+https://github.com/DATP7/oxidd#9a49830446ba3555995215e3a082e1baa1942aa6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "49740035de417b58fad2fe420b5539081604e601c266841f3092ca8bb5db1da7"
 dependencies = [
  "document-features",
  "fixedbitset",
- "oxidd-core 0.11.0 (git+https://github.com/DATP7/oxidd)",
- "oxidd-derive 0.11.0 (git+https://github.com/DATP7/oxidd)",
- "oxidd-dump 0.6.0 (git+https://github.com/DATP7/oxidd)",
+ "oxidd-core",
+ "oxidd-derive",
+ "oxidd-dump",
 ]
 
 [[package]]
 name = "oxidd-rules-tdd"
 version = "0.6.0"
-source = "git+https://github.com/DATP7/oxidd#9a49830446ba3555995215e3a082e1baa1942aa6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb13c585037127f6066e3ca928e96bdc21df19a41b0242dfcb9e95faf723558c"
 dependencies = [
  "document-features",
- "oxidd-core 0.11.0 (git+https://github.com/DATP7/oxidd)",
- "oxidd-derive 0.11.0 (git+https://github.com/DATP7/oxidd)",
- "oxidd-dump 0.6.0 (git+https://github.com/DATP7/oxidd)",
+ "oxidd-core",
+ "oxidd-derive",
+ "oxidd-dump",
 ]
 
 [[package]]
 name = "oxidd-rules-zbdd"
 version = "0.11.0"
-source = "git+https://github.com/DATP7/oxidd#9a49830446ba3555995215e3a082e1baa1942aa6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "917c941a721e884817a5b510ff818cb6d7033216817c0fd1e0b154f4cc7cfe5b"
 dependencies = [
  "document-features",
  "fixedbitset",
- "oxidd-core 0.11.0 (git+https://github.com/DATP7/oxidd)",
- "oxidd-derive 0.11.0 (git+https://github.com/DATP7/oxidd)",
- "oxidd-dump 0.6.0 (git+https://github.com/DATP7/oxidd)",
+ "oxidd-core",
+ "oxidd-derive",
+ "oxidd-dump",
 ]
 
 [[package]]
@@ -797,7 +774,7 @@ version = "0.1.0"
 dependencies = [
  "itertools 0.14.0",
  "oxidd",
- "oxidd-dump 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "oxidd-dump",
  "slotmap",
 ]
 
