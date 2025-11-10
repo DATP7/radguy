@@ -53,7 +53,7 @@ impl<T: Eq + Copy> MultiSet<T> for Vec<T> {
 }
 
 #[derive(Default, Debug)]
-struct WCCSSystem<'a, ProcKey: Key> {
+pub struct WCCSSystem<'a, ProcKey: Key> {
     process_map: RefCell<BiSlotMap<ProcKey, FlatProcess<'a, ProcKey>>>,
     bindings: HashMap<&'a str, ProcKey>,
     transition_cache: RefCell<SecondaryMap<ProcKey, TransitionMap<'a, ProcKey>>>,
