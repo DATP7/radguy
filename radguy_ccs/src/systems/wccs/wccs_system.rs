@@ -1,3 +1,4 @@
+#![allow(clippy::vec_init_then_push)]
 use std::{
     cell::RefCell,
     cmp::max,
@@ -408,7 +409,9 @@ mod test {
     }
 
     macro_rules! proposition_set {
-        ($lts:expr;) => {Vec::new()};
+        ($lts:expr;) => {
+            Vec::new()
+        };
         ($lts:expr;$($prop:expr),*) => {{
             let mut propositions = Vec::new();
             $(

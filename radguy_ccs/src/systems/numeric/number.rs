@@ -14,25 +14,24 @@ pub enum Number {
 
 impl PartialOrd for Number {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match (self, other) {
-            (Number::Val(l), Number::Val(r)) => l.partial_cmp(r),
-            (Number::Val(_), Number::Inf) => Some(Ordering::Less),
-            (Number::Inf, Number::Val(_)) => Some(Ordering::Greater),
-            (Number::Inf, Number::Inf) => Some(Ordering::Equal),
-        }
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for Number {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other)
-            .expect("All ordering cases should have been covered by PartialOrd")
+        match (self, other) {
+            (Self::Val(l), Self::Val(r)) => l.cmp(r),
+            (Self::Val(_), Self::Inf) => Ordering::Less,
+            (Self::Inf, Self::Val(_)) => Ordering::Greater,
+            (Self::Inf, Self::Inf) => Ordering::Equal,
+        }
     }
 }
 
 impl Maximal for Number {
     fn is_maximal(&self) -> bool {
-        *self == Number::Val(0)
+        *self == Self::Val(0)
     }
 }
 
@@ -41,8 +40,8 @@ impl Add for Number {
 
     fn add(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
-            (Number::Val(l), Number::Val(r)) => Number::Val(l + r),
-            _ => Number::Inf,
+            (Self::Val(l), Self::Val(r)) => Self::Val(l + r),
+            _ => Self::Inf,
         }
     }
 }
@@ -52,8 +51,8 @@ impl Mul for Number {
 
     fn mul(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
-            (Number::Val(l), Number::Val(r)) => Number::Val(l * r),
-            _ => Number::Inf,
+            (Self::Val(l), Self::Val(r)) => Self::Val(l * r),
+            _ => Self::Inf,
         }
     }
 }
@@ -63,8 +62,8 @@ impl Div for Number {
 
     fn div(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
-            (Number::Val(l), Number::Val(r)) => Number::Val(l / r),
-            _ => Number::Inf,
+            (Self::Val(l), Self::Val(r)) => Self::Val(l / r),
+            _ => Self::Inf,
         }
     }
 }
@@ -74,23 +73,23 @@ impl Sub for Number {
 
     fn sub(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
-            (Number::Val(l), Number::Val(r)) => Number::Val(l - r),
-            _ => Number::Inf,
+            (Self::Val(l), Self::Val(r)) => Self::Val(l - r),
+            _ => Self::Inf,
         }
     }
 }
 
 impl Bottom for Number {
     fn bottom() -> Self {
-        Number::Inf
+        Self::Inf
     }
 }
 
 impl Display for Number {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Number::Val(num) => write!(f, "{num}"),
-            Number::Inf => write!(f, "inf"),
+            Self::Val(num) => write!(f, "{num}"),
+            Self::Inf => write!(f, "inf"),
         }
     }
 }

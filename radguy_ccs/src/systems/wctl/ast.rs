@@ -63,9 +63,6 @@ pub struct Declaration<'a> {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, path::Path};
-
-    use super::*;
     use crate::systems::wctl::grammar::DeclarationParser;
     use crate::{assert_bad, assert_good};
 
