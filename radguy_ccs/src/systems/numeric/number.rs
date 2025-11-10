@@ -4,9 +4,9 @@ use std::{
     ops::{Add, Div, Mul, Sub},
 };
 
-use radguy::Bottom;
+use radguy::{Bottom, Maximal};
 
-#[derive(Hash, PartialEq, Eq, Clone, Debug)]
+#[derive(Hash, PartialEq, Eq, Clone, Debug, Copy)]
 pub enum Number {
     Val(u32),
     Inf,
@@ -27,6 +27,12 @@ impl Ord for Number {
     fn cmp(&self, other: &Self) -> Ordering {
         self.partial_cmp(other)
             .expect("All ordering cases should have been covered by PartialOrd")
+    }
+}
+
+impl Maximal for Number {
+    fn is_maximal(&self) -> bool {
+        *self == Number::Val(0)
     }
 }
 
@@ -76,7 +82,7 @@ impl Sub for Number {
 
 impl Bottom for Number {
     fn bottom() -> Self {
-        Number::Val(0)
+        Number::Inf
     }
 }
 

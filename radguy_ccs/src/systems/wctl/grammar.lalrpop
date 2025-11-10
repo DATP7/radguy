@@ -133,12 +133,7 @@ DivExpr: Expr<'input> = {
 }
 
 InvExpr: Expr<'input> = {
-    "-" <expr:ParenExpr> => Expr::Inverse(Box::new(expr)),
-    ParenExpr,
-}
-
-ParenExpr: Expr<'input> = {
-    "(" <expr:Expr> ")" => expr,
+    "-" <expr:PropExpr> => Expr::Inverse(Box::new(expr)),
     PropExpr,
 }
 
