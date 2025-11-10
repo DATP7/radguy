@@ -100,8 +100,9 @@ macro_rules! bisim_bench_suite {
                 SMax::default(),
                 LocalMaxR::default(),
                 BoolExtension::oracle(),
-                SMax::default().then(BoolExtension::oracle()),
-                LocalMaxR::default().then(BoolExtension::oracle()),
+                // TODO: Figure out why these do not terminate
+                // SMax::default().then(BoolExtension::oracle()),
+                // LocalMaxR::default().then(BoolExtension::oracle()),
             };
 
             bisim_bench_oracles_ordered! { $name: using c, bench $left, $right => $eq in ccs, with
