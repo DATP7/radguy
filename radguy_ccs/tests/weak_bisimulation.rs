@@ -1,5 +1,7 @@
+use radguy::extension::ExtensionToOracle;
 use radguy::kleene_local;
 use radguy::oracle::SMax;
+use radguy_ccs::systems::bool::extension::BoolExtension;
 use radguy_ccs::systems::ccs::bisimulation_system::BisimulationSystem;
 use radguy_ccs::systems::ccs::grammar::ProgramParser;
 use radguy_ccs::systems::ccs::transition_system::TransitionSystem;
@@ -20,7 +22,7 @@ macro_rules! weak_bisim_test {
                     let mut sys = BisimulationSystem::<DefaultKey, DefaultKey, DefaultKey, WeakTransitionSystem<DefaultKey>>::new(weak_transition_system);
                     let start = sys.specify_comparison($left, $right);
 
-                    let result = !kleene_local(&sys, start, &SMax::default());
+                    let result = !kleene_local(&sys, start, &BoolExtension::oracle());
                     assert_eq!($eq, result, "{} and {} should{} be bisimilar in{}", $left, $right, if !$eq { " not" } else {""}, $ccs);
                 }
             )*

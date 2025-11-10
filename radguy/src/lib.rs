@@ -142,8 +142,8 @@ impl<K: Hash + Eq, V: Bottom + Clone, S: std::hash::BuildHasher> Assignment<K, V
 pub fn kleene_local<
     K: Copy + Hash + Eq + Debug,
     V: Eq + PartialOrd,
-    PS,
-    VS: Set<K> + Union + IsSubset + FromIterator<K>,
+    PS: Union<PS>,
+    VS: Set<K> + Union + IsSubset + FromIterator<K> + Cartesian<Output = PS>,
     S: System<K, V> + PairUniverse<PS> + Arguments<K, VS>,
 >(
     system: &S,
@@ -154,16 +154,50 @@ where
     for<'a> &'a PS: IntoIterator<Item = &'a (K, K)>,
 {
     let mut assignment = system.bottom_assignment();
-    let mut visited = std::iter::once(target).collect();
-    let mut rel = system.pair_universe();
-    let mut todo = local_dependencies(target, &visited, &assignment, oracle, system, &mut rel);
+    let mut visited = std::iter::empty().collect();
+    let mut discovered: VS = std::iter::once(target).collect();
+    // let mut rel = system.pair_universe();
+    let mut rel = discovered.cartesian(&discovered);
+    let mut todo = local_dependencies(
+        target,
+        &visited,
+        &discovered,
+        &assignment,
+        oracle,
+        system,
+        &mut rel,
+    );
     let mut iter = todo.iter();
     while let Some(&x) = iter.next() {
+        println!("loop");
         let evaluated = system.evaluate(x, &assignment);
-        if assignment.get(&x) != evaluated || !system.arguments(x).is_subset(&visited) {
+        visited.insert(x);
+        if assignment.get(&x) != evaluated || !system.arguments(x).is_subset(&discovered) {
+            // TODO: reuse rel with square update
+            // let args = system.arguments(x);
+            // let axa = args.cartesian(&args);
+            // let axd = args.cartesian(&discovered);
+            // let dxa = discovered.cartesian(&args);
+            // rel = rel;
+            // rel = rel.union(axa);
+            // rel = rel.union(axd);
+            // rel = rel.union(dxa);
+            // rel = rel.union(axa).union(axd);
+            // rel = rel.union(axa);
+            // rel = rel.union(axa).union(axd).union(dxa);
+            // rel = discovered.cartesian(&discovered);
             assignment.update(x, evaluated);
-            visited = visited.union(system.arguments(x));
-            todo = local_dependencies(target, &visited, &assignment, oracle, system, &mut rel);
+            discovered = discovered.union(system.arguments(x));
+            rel = system.pair_universe();
+            todo = local_dependencies(
+                target,
+                &visited,
+                &discovered,
+                &assignment,
+                oracle,
+                system,
+                &mut rel,
+            );
             iter = todo.iter();
         }
     }
@@ -174,6 +208,7 @@ where
 fn local_dependencies<K: Hash + Copy + Eq, V: PartialOrd, VS: Set<K>, PS, S: System<K, V>>(
     variable: K,
     visited: &VS,
+    discovered: &VS,
     assignment: &impl Assignment<K, V>,
     oracle: &impl LocalOracle<K, V, VS, PS, S>,
     system: &S,
@@ -186,7 +221,7 @@ where
     rel.into_iter()
         .copied()
         .filter_map(|(x, y)| if y == variable { Some(x) } else { None })
-        .filter(|x| visited.contains(x))
+        .filter(|x| discovered.contains(x))
         .collect()
 }
 

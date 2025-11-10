@@ -3,7 +3,7 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use radguy::extension::ExtensionToOracle;
 use radguy::{
     kleene_local,
-    oracle::{LocalMaxR, LocalOracle, SMax},
+    oracle::{LocalMaxR, SMax},
     ordered::{
         self,
         oracle::{CountOracle, InverseCountOracle, StrategicLocalOracle, ToConstant},
@@ -100,8 +100,9 @@ macro_rules! bisim_bench_suite {
                 SMax::default(),
                 LocalMaxR::default(),
                 BoolExtension::oracle(),
-                SMax::default().then(BoolExtension::oracle()),
-                LocalMaxR::default().then(BoolExtension::oracle()),
+                // TODO: Why these no terminate?
+                // SMax::default().then(BoolExtension::oracle()),
+                // LocalMaxR::default().then(BoolExtension::oracle()),
             };
 
             bisim_bench_oracles_ordered! { $name: using c, bench $left, $right => $eq in ccs, with

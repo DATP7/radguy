@@ -107,13 +107,14 @@ macro_rules! test_oracles_ordered {
 mod unordered {
     use radguy::{
         extension::ExtensionOracle,
-        oracle::{LocalMaxR, LocalOracle, SMax, TrivialOracle},
+        oracle::{IdentityOracle, LocalMaxR, LocalOracle, SMax, TrivialOracle},
     };
     use radguy_ccs::systems::bool::extension::BoolExtension;
 
     test_oracles_unordered! {
         SMax::default(), smax;
         TrivialOracle, trivialoracle;
+        IdentityOracle, identityoracle;
         LocalMaxR::default(), localmaxr;
         TrivialOracle.and(SMax::default()), trivialoracle_and_smax;
         LocalMaxR::default().and(SMax::default()), localmaxr_and_smax;
@@ -134,7 +135,7 @@ mod unordered {
 
 mod ordered {
     use radguy::{
-        oracle::SMax,
+        oracle::{IdentityOracle, SMax},
         ordered::{
             oracle::{CountOracle, StrategicLocalOracle, ToConstant},
             strategy::StrategyWeight,
@@ -142,6 +143,8 @@ mod ordered {
     };
 
     test_oracles_ordered! {
+        IdentityOracle.constant(StrategyWeight::Num(0)), identity_const_0;
+        IdentityOracle.constant(StrategyWeight::Infinity), identity_const_infinity;
         SMax::default().constant(StrategyWeight::Num(0)), smax_const_0;
         SMax::default().constant(StrategyWeight::Infinity), smax_const_infinity;
         SMax::default().constant(StrategyWeight::Num(0)).then(CountOracle), smax_then_count;

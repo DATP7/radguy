@@ -263,3 +263,31 @@ impl Display for TrivialOracle {
         write!(f, "Trivial")
     }
 }
+
+#[derive(Default)]
+pub struct IdentityOracle;
+
+impl<
+    K: Hash + Eq + Copy,
+    V: Maximal,
+    VarSet: Cartesian<Output = PairSet>,
+    PairSet: Clone,
+    S: System<K, V> + PairUniverse<PairSet>,
+> LocalOracle<K, V, VarSet, PairSet, S> for IdentityOracle
+{
+    fn approximate_flow(
+        &self,
+        _visited: &VarSet,
+        _assignment: &impl Assignment<K, V>,
+        possible: &PairSet,
+        _system: &S,
+    ) -> PairSet {
+        possible.clone()
+    }
+}
+
+impl Display for IdentityOracle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Identity")
+    }
+}

@@ -359,4 +359,8 @@ impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKe
             .borrow()
             .evaluate_term(term_key, assignment)
     }
+
+    fn inner(&self) -> BoolSystemImpl<VarKey, TermKey, (ProcKey, ProcKey)> {
+        self.bool_system.borrow().clone()
+    }
 }

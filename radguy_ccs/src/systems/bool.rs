@@ -20,9 +20,12 @@ pub trait BoolSystem<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone>:
 {
     fn get_term(&self, term_key: T) -> BoolTerm<V, T>;
     fn evaluate_term(&self, term_key: T, assignment: &dyn Assignment<V, bool>) -> bool;
+    fn inner(&self) -> BoolSystemImpl<V, T, N> {
+        todo!()
+    }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Clone, Debug)]
 pub struct BoolSystemImpl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone> {
     pub names: BiSlotMap<V, N>,
     pub definitions: SecondaryMap<V, T>,
@@ -128,6 +131,10 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
                 self.evaluate_term(*lhs, assignment) && self.evaluate_term(*rhs, assignment)
             }
         }
+    }
+
+    fn inner(&self) -> Self {
+        self.clone()
     }
 }
 

@@ -2,7 +2,7 @@ use std::{collections::HashMap, hash::Hash};
 
 use slotmap::{Key, SlotMap};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct BiSlotMap<K: Key, V: Hash + Eq + Clone> {
     vals: SlotMap<K, V>,
     keys: HashMap<V, K>,

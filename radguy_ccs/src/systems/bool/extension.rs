@@ -1,6 +1,12 @@
-use radguy::{Assignment, Universe, extension::LocalExtension};
+use itertools::iproduct;
+use radguy::{Assignment, PairUniverse, Universe, extension::LocalExtension};
 use slotmap::Key;
-use std::{collections::HashSet, fmt::Display, hash::Hash, marker::PhantomData};
+use std::{
+    collections::HashSet,
+    fmt::{Debug, Display},
+    hash::Hash,
+    marker::PhantomData,
+};
 
 use crate::systems::bool::{BoolSystem, BoolTerm};
 
@@ -12,7 +18,7 @@ pub struct BoolExtension<TermKey: Key + Hash, VarName: Hash + Eq + Clone>(
 impl<
     VarKey: Key + Hash,
     TermKey: Key + Hash,
-    VarName: Hash + Eq + Clone,
+    VarName: Hash + Eq + Clone + Debug,
     System: BoolSystem<VarKey, TermKey, VarName> + Universe<HashSet<VarKey>>,
 >
     LocalExtension<
@@ -50,7 +56,7 @@ impl<
 fn collect_terms<
     VarKey: Key,
     TermKey: Key,
-    VarName: Hash + Eq + Clone,
+    VarName: Hash + Eq + Clone + Debug,
     S: BoolSystem<VarKey, TermKey, VarName> + Universe<HashSet<VarKey>>,
 >(
     x: VarKey,
@@ -84,21 +90,28 @@ fn collect_terms<
             }
         }
         BoolTerm::And(lhs, rhs) => {
+            // dbg!(x);
+            // println!("{}", term.to_string_debug(&system.inner()));
+            // println!("start and");
             collect_terms(x, lhs, assignment, possible, system, current);
             collect_terms(x, rhs, assignment, possible, system, current);
-
+            // println!("collected");
+            //
             // Case 1
             if [(lhs, rhs), (rhs, lhs)].into_iter().any(|(i, j)| {
                 current.contains(&(x, i))
                     && !system.evaluate_term(i, assignment)
                     && system.evaluate_term(j, assignment)
             }) {
+                // println!("end case 1");
                 current.insert((x, term_key));
                 return;
             }
+            // println!("start case 2");
 
             // Case 2
             if system.evaluate_term(lhs, assignment) || system.evaluate_term(rhs, assignment) {
+                // println!("end case 2 early");
                 return;
             }
             for (i, j) in [(lhs, rhs), (rhs, lhs)] {
@@ -106,14 +119,16 @@ fn collect_terms<
                     continue;
                 }
                 let universe: HashSet<VarKey> = system.universe();
-                for z in universe {
-                    collect_terms(z, j, assignment, possible, system, current);
-                    if current.contains(&(z, j)) {
+                for z in &universe {
+                    collect_terms(*z, j, assignment, possible, system, current);
+                    if current.contains(&(*z, j)) {
+                        // println!("end case 2 mid");
                         current.insert((x, term_key));
                         return;
                     }
                 }
             }
+            // println!("end case 2 late");
         }
     }
 }
