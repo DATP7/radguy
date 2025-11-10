@@ -21,7 +21,7 @@ pub struct NumericSystem<K: Key, T: Key, N: Hash + Eq + Clone> {
 impl<K: Key, T: Key, N: Hash + Eq + Clone> NumericSystem<K, T, N> {
     pub fn evaluate_term(&self, term_key: T, assignment: &dyn Assignment<K, Number>) -> Number {
         match self.terms.get_value(term_key) {
-            NumericTerm::Const(num) => num.clone(),
+            NumericTerm::Const(num) => *num,
             NumericTerm::Var(k) => assignment.get(k),
             NumericTerm::Add(lhs, rhs) => {
                 self.evaluate_term(*lhs, assignment) + self.evaluate_term(*rhs, assignment)
