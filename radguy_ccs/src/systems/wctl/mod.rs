@@ -8,4 +8,5 @@ lalrpop_mod!(
 );
 
 pub mod ast;
+pub mod flat_formula;
 pub mod system;
