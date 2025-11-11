@@ -255,8 +255,12 @@ macro_rules! bool_system {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
+    use radguy::System;
+
     #[test]
-    fn test_bool_system_and_or() {
+    fn bool_system_and_or() {
         let sys = bool_system! {
             x = (z || y);
             z = (k && b);
@@ -289,7 +293,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bool_system_variables() {
+    fn bool_system_variables() {
         let sys = bool_system! {
             x = z;
             z = y;
@@ -307,7 +311,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bool_system_tt_ff() {
+    fn bool_system_tt_ff() {
         let sys = bool_system! {
             x = tt;
             y = ff;
@@ -323,5 +327,106 @@ mod tests {
                 &_ => panic!("{var} not found"),
             }
         }
+    }
+
+    #[test]
+    fn bool_system_evaluate_const() {
+        let mut sys = bool_system! {
+            x = tt;
+            y = ff;
+        };
+        let x = sys.names.get_or_insert_key("x");
+        let y = sys.names.get_or_insert_key("y");
+        assert!(sys.evaluate(x, &HashMap::new()));
+        assert!(!sys.evaluate(y, &HashMap::new()));
+    }
+
+    #[test]
+    fn bool_system_evaluate_var() {
+        let mut sys = bool_system! {
+            x = y;
+            y = tt;
+            z = k;
+            k = ff;
+        };
+        let x = sys.names.get_or_insert_key("x");
+        let y = sys.names.get_or_insert_key("y");
+        let z = sys.names.get_or_insert_key("z");
+        let k = sys.names.get_or_insert_key("k");
+        let mut map = HashMap::new();
+        map.insert(y, true);
+        map.insert(k, false);
+        assert!(sys.evaluate(x, &map));
+        assert!(!sys.evaluate(z, &map));
+    }
+
+    #[test]
+    fn bool_system_evaluate_and() {
+        let mut sys = bool_system! {
+            x = (tt && tt);
+            y = (ff && tt);
+            z = (tt && ff);
+            k = (ff && ff);
+        };
+        let x = sys.names.get_or_insert_key("x");
+        let y = sys.names.get_or_insert_key("y");
+        let z = sys.names.get_or_insert_key("z");
+        let k = sys.names.get_or_insert_key("k");
+        assert!(sys.evaluate(x, &HashMap::new()));
+        assert!(!sys.evaluate(y, &HashMap::new()));
+        assert!(!sys.evaluate(z, &HashMap::new()));
+        assert!(!sys.evaluate(k, &HashMap::new()));
+    }
+
+    #[test]
+    fn bool_system_evaluate_or() {
+        let mut sys = bool_system! {
+            x = (tt || tt);
+            y = (ff || tt);
+            z = (tt || ff);
+            k = (ff || ff);
+        };
+        let x = sys.names.get_or_insert_key("x");
+        let y = sys.names.get_or_insert_key("y");
+        let z = sys.names.get_or_insert_key("z");
+        let k = sys.names.get_or_insert_key("k");
+        assert!(sys.evaluate(x, &HashMap::new()));
+        assert!(sys.evaluate(y, &HashMap::new()));
+        assert!(sys.evaluate(z, &HashMap::new()));
+        assert!(!sys.evaluate(k, &HashMap::new()));
+    }
+
+    #[test]
+    #[allow(clippy::many_single_char_names)]
+    fn bool_system_evaluate() {
+        let mut sys = bool_system! {
+            x = (z || y);
+            y = (k && a);
+            z = ((z || x) && (k && a));
+            k = tt;
+            b = a;
+            a = tt;
+            h = (((z || x) && k) && a);
+        };
+        let x = sys.names.get_or_insert_key("x");
+        let y = sys.names.get_or_insert_key("y");
+        let z = sys.names.get_or_insert_key("z");
+        let k = sys.names.get_or_insert_key("k");
+        let b = sys.names.get_or_insert_key("b");
+        let a = sys.names.get_or_insert_key("a");
+        let h = sys.names.get_or_insert_key("h");
+        let mut map = HashMap::new();
+        map.insert(x, false);
+        map.insert(z, false);
+        map.insert(k, true);
+        map.insert(b, false);
+        map.insert(a, true);
+        assert!(!sys.evaluate(x, &map));
+        assert!(sys.evaluate(y, &map));
+        assert!(!sys.evaluate(z, &map));
+        assert!(sys.evaluate(k, &map));
+        assert!(sys.evaluate(b, &map));
+        assert!(sys.evaluate(a, &map));
+        assert!(!sys.evaluate(h, &map));
     }
 }
