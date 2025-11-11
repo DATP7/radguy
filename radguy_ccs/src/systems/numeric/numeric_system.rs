@@ -35,18 +35,26 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone> NumericSystem<K, T, N> {
             NumericTerm::Div(lhs, rhs) => {
                 self.evaluate_term(*lhs, assignment) / self.evaluate_term(*rhs, assignment)
             }
-            NumericTerm::Min(lhs, rhs) => min(
-                self.evaluate_term(*lhs, assignment),
-                self.evaluate_term(*rhs, assignment),
-            ),
-            NumericTerm::Max(lhs, rhs) => max(
-                self.evaluate_term(*lhs, assignment),
-                self.evaluate_term(*rhs, assignment),
-            ),
+            NumericTerm::Min(keys) => keys
+                .iter()
+                .map(|key| self.evaluate_term(*key, assignment))
+                .min()
+                .expect("Min should not be empty"),
+
+            NumericTerm::Max(keys) => keys
+                .iter()
+                .map(|key| self.evaluate_term(*key, assignment))
+                .max()
+                .expect("Max should not be empty"),
         }
     }
 
-    pub fn term_arguments<ArgSet: Set<K> + Union + Default>(&self, term_key: T) -> ArgSet {
+    pub fn term_arguments<
+        ArgSet: Set<K> + Union + Default + FromIterator<K> + IntoIterator<Item = K>,
+    >(
+        &self,
+        term_key: T,
+    ) -> ArgSet {
         match self.terms.get_value(term_key) {
             NumericTerm::Const(_) => ArgSet::default(),
             NumericTerm::Var(k) => {
@@ -57,11 +65,13 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone> NumericSystem<K, T, N> {
             NumericTerm::Add(lhs, rhs)
             | NumericTerm::Mult(lhs, rhs)
             | NumericTerm::Sub(lhs, rhs)
-            | NumericTerm::Div(lhs, rhs)
-            | NumericTerm::Max(lhs, rhs)
-            | NumericTerm::Min(lhs, rhs) => self
+            | NumericTerm::Div(lhs, rhs) => self
                 .term_arguments::<ArgSet>(*lhs)
                 .union(self.term_arguments(*rhs)),
+            NumericTerm::Max(keys) | NumericTerm::Min(keys) => keys
+                .iter()
+                .flat_map(|&key| self.term_arguments::<ArgSet>(key))
+                .collect(),
         }
     }
 }
@@ -171,16 +181,20 @@ macro_rules! numeric_term {
         $system.terms.get_or_insert_key($crate::systems::numeric::numeric_term::NumericTerm::Div(lhs, rhs))
     }};
     // min
-    ((min($lhs:tt, $rhs:tt)); $system:expr) => {{
-        let lhs = numeric_term!($lhs; $system);
-        let rhs = numeric_term!($rhs; $system);
-        $system.terms.get_or_insert_key($crate::systems::numeric::numeric_term::NumericTerm::Min(lhs, rhs))
+    ((min($($elem:tt),*)); $system:expr) => {{
+        let mut terms = std::collections::BTreeSet::new();
+        $(
+            terms.insert(numeric_term!($elem; $system));
+        )*
+        $system.terms.get_or_insert_key($crate::systems::numeric::numeric_term::NumericTerm::Min(terms))
     }};
     // max
-    ((max($lhs:tt, $rhs:tt)); $system:expr) => {{
-        let lhs = numeric_term!($lhs; $system);
-        let rhs = numeric_term!($rhs; $system);
-        $system.terms.get_or_insert_key($crate::systems::numeric::numeric_term::NumericTerm::Max(lhs, rhs))
+    ((max($($elem:tt),*)); $system:expr) => {{
+        let mut terms = std::collections::BTreeSet::new();
+        $(
+            terms.insert(numeric_term!($elem; $system));
+        )*
+        $system.terms.get_or_insert_key($crate::systems::numeric::numeric_term::NumericTerm::Max(terms))
     }};
 }
 
@@ -564,11 +578,15 @@ mod tests {
             y = (min(inf, 3));
             z = (min(7, inf));
             k = (min(inf, inf));
+            t = (min(4, 0, 0));
+            u = (min(4, 4, inf, 2, 3));
         };
         let x = sys.names.get_or_insert_key("x");
         let y = sys.names.get_or_insert_key("y");
         let z = sys.names.get_or_insert_key("z");
         let k = sys.names.get_or_insert_key("k");
+        let t = sys.names.get_or_insert_key("t");
+        let u = sys.names.get_or_insert_key("u");
         assert_eq!(
             sys.evaluate(x, &HashMap::new()),
             crate::systems::numeric::number::Number::Val(3)
@@ -584,6 +602,14 @@ mod tests {
         assert_eq!(
             sys.evaluate(k, &HashMap::new()),
             crate::systems::numeric::number::Number::Inf
+        );
+        assert_eq!(
+            sys.evaluate(t, &HashMap::new()),
+            crate::systems::numeric::number::Number::Val(0)
+        );
+        assert_eq!(
+            sys.evaluate(u, &HashMap::new()),
+            crate::systems::numeric::number::Number::Val(2)
         );
     }
 
@@ -594,11 +620,15 @@ mod tests {
             y = (max(inf, 3));
             z = (max(7, inf));
             k = (max(inf, inf));
+            t = (max(1, 3, 2));
+            u = (max(1, 3, inf, 10, 40));
         };
         let x = sys.names.get_or_insert_key("x");
         let y = sys.names.get_or_insert_key("y");
         let z = sys.names.get_or_insert_key("z");
         let k = sys.names.get_or_insert_key("k");
+        let t = sys.names.get_or_insert_key("t");
+        let u = sys.names.get_or_insert_key("u");
         assert_eq!(
             sys.evaluate(x, &HashMap::new()),
             crate::systems::numeric::number::Number::Val(7)
@@ -613,6 +643,14 @@ mod tests {
         );
         assert_eq!(
             sys.evaluate(k, &HashMap::new()),
+            crate::systems::numeric::number::Number::Inf
+        );
+        assert_eq!(
+            sys.evaluate(t, &HashMap::new()),
+            crate::systems::numeric::number::Number::Val(3)
+        );
+        assert_eq!(
+            sys.evaluate(u, &HashMap::new()),
             crate::systems::numeric::number::Number::Inf
         );
     }

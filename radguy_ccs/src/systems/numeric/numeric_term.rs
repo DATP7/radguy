@@ -1,4 +1,5 @@
 use slotmap::Key;
+use std::collections::BTreeSet;
 use std::fmt::Debug;
 use std::fmt::Display;
 use std::hash::Hash;
@@ -13,8 +14,8 @@ pub enum NumericTerm<V: Key, T: Key> {
     Mult(T, T),
     Sub(T, T),
     Div(T, T),
-    Min(T, T),
-    Max(T, T),
+    Min(BTreeSet<T>),
+    Max(BTreeSet<T>),
 }
 
 impl<V: Key, T: Key> NumericTerm<V, T> {
@@ -45,15 +46,19 @@ impl<V: Key, T: Key> NumericTerm<V, T> {
                 sys.terms.get_value(*lhs).to_string_debug(sys),
                 sys.terms.get_value(*rhs).to_string_debug(sys)
             ),
-            Self::Min(lhs, rhs) => format!(
-                "min({}, {})",
-                sys.terms.get_value(*lhs).to_string_debug(sys),
-                sys.terms.get_value(*rhs).to_string_debug(sys)
+            Self::Min(keys) => format!(
+                "min({})",
+                keys.iter()
+                    .map(|key| sys.terms.get_value(*key).to_string_debug(sys))
+                    .collect::<Vec<_>>()
+                    .join(", "),
             ),
-            Self::Max(lhs, rhs) => format!(
-                "max({}, {})",
-                sys.terms.get_value(*lhs).to_string_debug(sys),
-                sys.terms.get_value(*rhs).to_string_debug(sys)
+            Self::Max(keys) => format!(
+                "max({})",
+                keys.iter()
+                    .map(|key| sys.terms.get_value(*key).to_string_debug(sys))
+                    .collect::<Vec<_>>()
+                    .join(", "),
             ),
         }
     }
@@ -85,15 +90,19 @@ impl<V: Key, T: Key> NumericTerm<V, T> {
                 sys.terms.get_value(*lhs).to_string(sys),
                 sys.terms.get_value(*rhs).to_string(sys)
             ),
-            Self::Min(lhs, rhs) => format!(
-                "min({}, {})",
-                sys.terms.get_value(*lhs).to_string(sys),
-                sys.terms.get_value(*rhs).to_string(sys)
+            Self::Min(keys) => format!(
+                "min({})",
+                keys.iter()
+                    .map(|key| sys.terms.get_value(*key).to_string(sys))
+                    .collect::<Vec<_>>()
+                    .join(", "),
             ),
-            Self::Max(lhs, rhs) => format!(
-                "max({}, {})",
-                sys.terms.get_value(*lhs).to_string(sys),
-                sys.terms.get_value(*rhs).to_string(sys)
+            Self::Max(keys) => format!(
+                "max({})",
+                keys.iter()
+                    .map(|key| sys.terms.get_value(*key).to_string(sys))
+                    .collect::<Vec<_>>()
+                    .join(", "),
             ),
         }
     }

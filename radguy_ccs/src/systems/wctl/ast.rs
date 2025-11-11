@@ -1,3 +1,13 @@
+use slotmap::Key;
+
+use crate::systems::{
+    numeric::number::Number,
+    wctl::{
+        flat_formula::{FlatExpr, FlatFormula, FlatRelationalExpr},
+        system::WCTLSystem,
+    },
+};
+
 pub enum Formula<'a> {
     Const(bool),
     And(Box<Formula<'a>>, Box<Formula<'a>>),
@@ -5,36 +15,31 @@ pub enum Formula<'a> {
     UniversalUntil {
         left: Box<Formula<'a>>,
         right: Box<Formula<'a>>,
-        bound: Weight,
+        bound: Number,
     },
     ExistentialUntil {
         left: Box<Formula<'a>>,
         right: Box<Formula<'a>>,
-        bound: Weight,
+        bound: Number,
     },
     UniversalFinally {
         formula: Box<Formula<'a>>,
-        bound: Weight,
+        bound: Number,
     },
     ExistentialFinally {
         formula: Box<Formula<'a>>,
-        bound: Weight,
+        bound: Number,
     },
     UniversalNext {
         formula: Box<Formula<'a>>,
-        bound: Weight,
+        bound: Number,
     },
     ExistentialNext {
         formula: Box<Formula<'a>>,
-        bound: Weight,
+        bound: Number,
     },
     RelationalExpr(RelationalExpr<'a>),
     Proposition(&'a str),
-}
-
-pub enum Weight {
-    Val(i32),
-    Inf,
 }
 
 pub enum RelationalExpr<'a> {
@@ -53,12 +58,139 @@ pub enum Expr<'a> {
     Divide(Box<Expr<'a>>, Box<Expr<'a>>),
     Inverse(Box<Expr<'a>>),
     Proposition(&'a str),
-    Weight(i32),
+    Weight(Number),
 }
 
 pub struct Declaration<'a> {
     pub name: &'a str,
     pub formula: Formula<'a>,
+}
+
+impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
+    WCTLSystem<'a, ProcKey, FormKey, ExprKey, VarKey, TermKey>
+{
+    pub fn insert_ast_formula(&mut self, formula: Formula<'a>) -> FormKey {
+        match formula {
+            Formula::Const(bool) => self.insert_formula(FlatFormula::Const(bool)),
+            Formula::And(left, right) => {
+                let left = self.insert_ast_formula(*left);
+                let right = self.insert_ast_formula(*right);
+                self.insert_formula(FlatFormula::And(right, left))
+            }
+            Formula::Or(left, right) => {
+                let left = self.insert_ast_formula(*left);
+                let right = self.insert_ast_formula(*right);
+                self.insert_formula(FlatFormula::Or(right, left))
+            }
+            Formula::UniversalUntil { left, right, bound } => {
+                let left = self.insert_ast_formula(*left);
+                let right = self.insert_ast_formula(*right);
+                self.insert_formula(FlatFormula::UniversalUntil { right, left, bound })
+            }
+            Formula::ExistentialUntil { left, right, bound } => {
+                let left = self.insert_ast_formula(*left);
+                let right = self.insert_ast_formula(*right);
+                self.insert_formula(FlatFormula::ExistentialUntil { right, left, bound })
+            }
+            Formula::UniversalFinally { formula, bound } => {
+                let formula = self.insert_ast_formula(*formula);
+                self.insert_formula(FlatFormula::UniversalFinally { formula, bound })
+            }
+            Formula::ExistentialFinally { formula, bound } => {
+                let formula = self.insert_ast_formula(*formula);
+                self.insert_formula(FlatFormula::ExistentialFinally { formula, bound })
+            }
+            Formula::UniversalNext { formula, bound } => {
+                let formula = self.insert_ast_formula(*formula);
+                self.insert_formula(FlatFormula::UniversalNext { formula, bound })
+            }
+            Formula::ExistentialNext { formula, bound } => {
+                let formula = self.insert_ast_formula(*formula);
+                self.insert_formula(FlatFormula::ExistentialNext { formula, bound })
+            }
+            Formula::RelationalExpr(relational_expr) => {
+                let relational_expr = self.convert_relational_expr(relational_expr);
+                self.insert_formula(FlatFormula::RelationalExpr(relational_expr))
+            }
+            Formula::Proposition(prop) => self.insert_formula(FlatFormula::Proposition(prop)),
+        }
+    }
+
+    fn convert_relational_expr(
+        &mut self,
+        relexpr: RelationalExpr<'a>,
+    ) -> FlatRelationalExpr<ExprKey> {
+        match relexpr {
+            RelationalExpr::LessThan(left, right) => {
+                let left = self.insert_ast_expr(*left);
+                let right = self.insert_ast_expr(*right);
+                FlatRelationalExpr::LessThan(left, right)
+            }
+            RelationalExpr::LessThanEq(left, right) => {
+                let left = self.insert_ast_expr(*left);
+                let right = self.insert_ast_expr(*right);
+                FlatRelationalExpr::LessThanEq(left, right)
+            }
+            RelationalExpr::GreaterThan(left, right) => {
+                let left = self.insert_ast_expr(*left);
+                let right = self.insert_ast_expr(*right);
+                FlatRelationalExpr::GreaterThan(left, right)
+            }
+            RelationalExpr::GreaterThanEq(left, right) => {
+                let left = self.insert_ast_expr(*left);
+                let right = self.insert_ast_expr(*right);
+                FlatRelationalExpr::GreaterThanEq(left, right)
+            }
+            RelationalExpr::Eq(left, right) => {
+                let left = self.insert_ast_expr(*left);
+                let right = self.insert_ast_expr(*right);
+                FlatRelationalExpr::Eq(left, right)
+            }
+            RelationalExpr::NotEq(left, right) => {
+                let left = self.insert_ast_expr(*left);
+                let right = self.insert_ast_expr(*right);
+                FlatRelationalExpr::NotEq(left, right)
+            }
+        }
+    }
+
+    fn insert_ast_expr(&mut self, expr: Expr<'a>) -> ExprKey {
+        match expr {
+            Expr::Multiply(left, right) => {
+                let left = self.insert_ast_expr(*left);
+                let right = self.insert_ast_expr(*right);
+                self.insert_expr(FlatExpr::Multiply(left, right))
+            }
+            Expr::Add(left, right) => {
+                let left = self.insert_ast_expr(*left);
+                let right = self.insert_ast_expr(*right);
+                self.insert_expr(FlatExpr::Add(left, right))
+            }
+            Expr::Subtract(left, right) => {
+                let left = self.insert_ast_expr(*left);
+                let right = self.insert_ast_expr(*right);
+                self.insert_expr(FlatExpr::Subtract(left, right))
+            }
+            Expr::Divide(left, right) => {
+                let left = self.insert_ast_expr(*left);
+                let right = self.insert_ast_expr(*right);
+                self.insert_expr(FlatExpr::Divide(left, right))
+            }
+            Expr::Inverse(expr) => {
+                let expr = self.insert_ast_expr(*expr);
+                self.insert_expr(FlatExpr::Inverse(expr))
+            }
+            Expr::Proposition(prop) => self.insert_expr(FlatExpr::Proposition(prop)),
+            Expr::Weight(number) => self.insert_expr(FlatExpr::Weight(number)),
+        }
+    }
+    fn insert_formula(&mut self, formula: FlatFormula<'a, FormKey, ExprKey>) -> FormKey {
+        self.formulas.get_or_insert_key(formula)
+    }
+
+    fn insert_expr(&mut self, expr: FlatExpr<'a, ExprKey>) -> ExprKey {
+        self.expresions.get_or_insert_key(expr)
+    }
 }
 
 #[cfg(test)]

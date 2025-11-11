@@ -1,4 +1,5 @@
-use crate::systems::wctl::ast::{Declaration, Formula, Weight, RelationalExpr, Expr};
+use crate::systems::wctl::ast::{Declaration, Formula, RelationalExpr, Expr};
+use crate::systems::numeric::number::Number;
 
 grammar;
 
@@ -16,7 +17,7 @@ UniversalUntil: Formula<'input> = {
     "A" <left:Formula> "U" <bound:("[" "<=" <Weight> "]")?> <right:Formula> => Formula::UniversalUntil {
         left: Box::new(left),
         right: Box::new(right),
-        bound: bound.map_or_else(|| Weight::Inf, |weight| Weight::Val(weight)),
+        bound: bound.map_or_else(|| Number::Inf, |weight| Number::Val(weight)),
     },
     ExistentialUntil,
 }
@@ -25,7 +26,7 @@ ExistentialUntil: Formula<'input> = {
     "E" <left:Formula> "U" <bound:("[" "<=" <Weight> "]")?> <right:Formula> => Formula::ExistentialUntil {
         left: Box::new(left),
         right: Box::new(right),
-        bound: bound.map_or_else(|| Weight::Inf, |weight| Weight::Val(weight)),
+        bound: bound.map_or_else(|| Number::Inf, |weight| Number::Val(weight)),
     },
     UniversalFinally,
 }
@@ -33,7 +34,7 @@ ExistentialUntil: Formula<'input> = {
 UniversalFinally: Formula<'input> = {
     "AF" <bound:("[" "<=" <Weight> "]")?> <formula:Formula> => Formula::UniversalFinally {
         formula: Box::new(formula),
-        bound: bound.map_or_else(|| Weight::Inf, |weight| Weight::Val(weight)),
+        bound: bound.map_or_else(|| Number::Inf, |weight| Number::Val(weight)),
     },
     ExistentialFinally,
 }
@@ -41,7 +42,7 @@ UniversalFinally: Formula<'input> = {
 ExistentialFinally: Formula<'input> = {
     "EF" <bound:("[" "<=" <Weight> "]")?> <formula:Formula> => Formula::ExistentialFinally {
         formula: Box::new(formula),
-        bound: bound.map_or_else(|| Weight::Inf, |weight| Weight::Val(weight)),
+        bound: bound.map_or_else(|| Number::Inf, |weight| Number::Val(weight)),
     },
     UniversalNext,
 }
@@ -49,7 +50,7 @@ ExistentialFinally: Formula<'input> = {
 UniversalNext: Formula<'input> = {
     "AX" <bound:("[" "<=" <Weight> "]")?> <formula:Formula> => Formula::UniversalNext {
         formula: Box::new(formula),
-        bound: bound.map_or_else(|| Weight::Inf, |weight| Weight::Val(weight)),
+        bound: bound.map_or_else(|| Number::Inf, |weight| Number::Val(weight)),
     },
     ExistentialNext,
 }
@@ -57,7 +58,7 @@ UniversalNext: Formula<'input> = {
 ExistentialNext: Formula<'input> = {
     "EX" <bound:("[" "<=" <Weight> "]")?> <formula:Formula> => Formula::ExistentialNext {
         formula: Box::new(formula),
-        bound: bound.map_or_else(|| Weight::Inf, |weight| Weight::Val(weight)),
+        bound: bound.map_or_else(|| Number::Inf, |weight| Number::Val(weight)),
     },
     Disjunction,
 }
@@ -143,7 +144,7 @@ PropExpr: Expr<'input> = {
 }
 
 WeightExpr: Expr<'input> = {
-    <weight:Weight> => Expr::Weight(weight),
+    <weight:Weight> => Expr::Weight(Number::Val(weight)),
 }
 
 
@@ -152,7 +153,7 @@ Prop: &'input str = <r"[a-z][A-Za-z0-9_']*">;
 Id: &'input str = <r"[A-Z][A-Za-z0-9_']*">;
 
 
-Weight: i32 = <s:r"[0-9]+"> => s.parse().expect("u32 should parse strings");
+Weight: u32 = <s:r"[0-9]+"> => s.parse().expect("u32 should parse strings");
 
 Comma<T>: Vec<T> = {
     <mut v:(<T> ",")*> <e:T?> => match e {
