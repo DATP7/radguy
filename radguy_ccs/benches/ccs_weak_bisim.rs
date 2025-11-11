@@ -3,7 +3,7 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use radguy::extension::ExtensionToOracle;
 use radguy::{
     kleene_local,
-    oracle::{LocalMaxR, LocalOracle, SMax},
+    oracle::{LocalMaxR, SMax},
     ordered::{
         self,
         oracle::{CountOracle, InverseCountOracle, StrategicLocalOracle, ToConstant},
