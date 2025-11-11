@@ -130,3 +130,490 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
             .expect("variable should have a definition")
     }
 }
+
+#[macro_export]
+macro_rules! numeric_term {
+    // Infinity
+    (inf; $system:expr) => {
+        $system.terms.get_or_insert_key($crate::systems::numeric::numeric_term::NumericTerm::Const($crate::systems::numeric::number::Number::Inf))
+    };
+    // const
+    ($num:literal; $system:expr) => {
+        $system.terms.get_or_insert_key($crate::systems::numeric::numeric_term::NumericTerm::Const($crate::systems::numeric::number::Number::Val($num)))
+    };
+    // var
+    ($id:ident; $system:expr) => {{
+        let var_key = $system.names.get_or_insert_key(stringify!($id));
+        $system.terms.get_or_insert_key($crate::systems::numeric::numeric_term::NumericTerm::Var(var_key))
+    }};
+    // add
+    (($lhs:tt + $rhs:tt); $system:expr) => {{
+        let lhs = numeric_term!($lhs; $system);
+        let rhs = numeric_term!($rhs; $system);
+        $system.terms.get_or_insert_key($crate::systems::numeric::numeric_term::NumericTerm::Add(lhs, rhs))
+    }};
+    // mult
+    (($lhs:tt * $rhs:tt); $system:expr) => {{
+        let lhs = numeric_term!($lhs; $system);
+        let rhs = numeric_term!($rhs; $system);
+        $system.terms.get_or_insert_key($crate::systems::numeric::numeric_term::NumericTerm::Mult(lhs, rhs))
+    }};
+    // sub
+    (($lhs:tt - $rhs:tt); $system:expr) => {{
+        let lhs = numeric_term!($lhs; $system);
+        let rhs = numeric_term!($rhs; $system);
+        $system.terms.get_or_insert_key($crate::systems::numeric::numeric_term::NumericTerm::Sub(lhs, rhs))
+    }};
+    // div
+    (($lhs:tt / $rhs:tt); $system:expr) => {{
+        let lhs = numeric_term!($lhs; $system);
+        let rhs = numeric_term!($rhs; $system);
+        $system.terms.get_or_insert_key($crate::systems::numeric::numeric_term::NumericTerm::Div(lhs, rhs))
+    }};
+    // min
+    ((min($lhs:tt, $rhs:tt)); $system:expr) => {{
+        let lhs = numeric_term!($lhs; $system);
+        let rhs = numeric_term!($rhs; $system);
+        $system.terms.get_or_insert_key($crate::systems::numeric::numeric_term::NumericTerm::Min(lhs, rhs))
+    }};
+    // max
+    ((max($lhs:tt, $rhs:tt)); $system:expr) => {{
+        let lhs = numeric_term!($lhs; $system);
+        let rhs = numeric_term!($rhs; $system);
+        $system.terms.get_or_insert_key($crate::systems::numeric::numeric_term::NumericTerm::Max(lhs, rhs))
+    }};
+}
+
+#[macro_export]
+macro_rules! numeric_def {
+    ($id:ident = $term:tt; $system:expr) => {{
+        let term = numeric_term!($term; $system);
+        let key = $system.names.get_or_insert_key(stringify!($id));
+        $system.definitions.insert(key, term)
+    }};
+}
+
+#[macro_export]
+macro_rules! numeric_system {
+    ($($id:ident = $term:tt;)*) => {
+        {
+            let mut system = $crate::systems::numeric::numeric_system::NumericSystem::<slotmap::DefaultKey, slotmap::DefaultKey, &str>::default();
+            $(
+                numeric_def!($id = $term; system);
+            )*
+            system
+        }
+    };
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use radguy::System;
+
+    #[test]
+    fn numeric_system_infinity() {
+        let sys = numeric_system! {
+            x = inf;
+        };
+        for (key, term) in &sys.definitions {
+            let var = *sys.names.get_value(key);
+            match var {
+                "x" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "inf"),
+                &_ => panic!("{var} not found"),
+            }
+        }
+    }
+
+    #[test]
+    fn numeric_system_literals() {
+        let sys = numeric_system! {
+            x = 3;
+            y = 2;
+            z = 5;
+        };
+        for (key, term) in &sys.definitions {
+            let var = *sys.names.get_value(key);
+            match var {
+                "x" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "3"),
+                "y" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "2"),
+                "z" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "5"),
+                &_ => panic!("{var} not found"),
+            }
+        }
+    }
+
+    #[test]
+    fn numeric_system_variables() {
+        let sys = numeric_system! {
+            x = y;
+            y = z;
+            z = 5;
+        };
+        for (key, term) in &sys.definitions {
+            let var = *sys.names.get_value(key);
+            match var {
+                "x" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "y"),
+                "y" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "z"),
+                "z" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "5"),
+                &_ => panic!("{var} not found"),
+            }
+        }
+    }
+
+    #[test]
+    fn numeric_system_add() {
+        let sys = numeric_system! {
+            x = (y + k);
+            y = z;
+            z = 5;
+            k = t;
+            t = (v + 3);
+            v = (4 + 2);
+        };
+        for (key, term) in &sys.definitions {
+            let var = *sys.names.get_value(key);
+            match var {
+                "x" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "(y + k)"),
+                "y" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "z"),
+                "z" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "5"),
+                "k" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "t"),
+                "t" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "(v + 3)"),
+                "v" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "(4 + 2)"),
+                &_ => panic!("{var} not found"),
+            }
+        }
+    }
+
+    #[test]
+    fn numeric_system_mult() {
+        let sys = numeric_system! {
+            x = (y * k);
+            y = z;
+            z = 5;
+            k = t;
+            t = (v * 3);
+            v = (4 * 2);
+        };
+        for (key, term) in &sys.definitions {
+            let var = *sys.names.get_value(key);
+            match var {
+                "x" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "(y * k)"),
+                "y" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "z"),
+                "z" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "5"),
+                "k" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "t"),
+                "t" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "(v * 3)"),
+                "v" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "(4 * 2)"),
+                &_ => panic!("{var} not found"),
+            }
+        }
+    }
+
+    #[test]
+    fn numeric_system_sub() {
+        let sys = numeric_system! {
+            x = (y - k);
+            y = z;
+            z = 5;
+            k = t;
+            t = (v - 3);
+            v = (4 - 2);
+        };
+        for (key, term) in &sys.definitions {
+            let var = *sys.names.get_value(key);
+            match var {
+                "x" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "(y - k)"),
+                "y" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "z"),
+                "z" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "5"),
+                "k" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "t"),
+                "t" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "(v - 3)"),
+                "v" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "(4 - 2)"),
+                &_ => panic!("{var} not found"),
+            }
+        }
+    }
+
+    #[test]
+    fn numeric_system_div() {
+        let sys = numeric_system! {
+            x = (y / k);
+            y = z;
+            z = 5;
+            k = t;
+            t = (v / 3);
+            v = (4 / 2);
+        };
+        for (key, term) in &sys.definitions {
+            let var = *sys.names.get_value(key);
+            match var {
+                "x" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "(y / k)"),
+                "y" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "z"),
+                "z" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "5"),
+                "k" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "t"),
+                "t" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "(v / 3)"),
+                "v" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "(4 / 2)"),
+                &_ => panic!("{var} not found"),
+            }
+        }
+    }
+
+    #[test]
+    fn numeric_system_min() {
+        let sys = numeric_system! {
+            x = (min(y, k));
+            y = z;
+            z = 5;
+            k = t;
+            t = (min(v, 3));
+            v = (min(4, 2));
+        };
+        for (key, term) in &sys.definitions {
+            let var = *sys.names.get_value(key);
+            match var {
+                "x" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "min(y, k)"),
+                "y" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "z"),
+                "z" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "5"),
+                "k" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "t"),
+                "t" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "min(v, 3)"),
+                "v" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "min(4, 2)"),
+                &_ => panic!("{var} not found"),
+            }
+        }
+    }
+
+    #[test]
+    fn numeric_system_max() {
+        let sys = numeric_system! {
+            x = (max(y, k));
+            y = z;
+            z = 5;
+            k = t;
+            t = (max(v, 3));
+            v = (max(4, 2));
+        };
+        for (key, term) in &sys.definitions {
+            let var = *sys.names.get_value(key);
+            match var {
+                "x" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "max(y, k)"),
+                "y" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "z"),
+                "z" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "5"),
+                "k" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "t"),
+                "t" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "max(v, 3)"),
+                "v" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "max(4, 2)"),
+                &_ => panic!("{var} not found"),
+            }
+        }
+    }
+
+    #[test]
+    fn numeric_system_evaluate_const() {
+        let mut sys = numeric_system! {
+            x = 1;
+            z = inf;
+        };
+        let x = sys.names.get_or_insert_key("x");
+        let z = sys.names.get_or_insert_key("z");
+        assert_eq!(
+            sys.evaluate(x, &HashMap::new()),
+            crate::systems::numeric::number::Number::Val(1)
+        );
+        assert_eq!(
+            sys.evaluate(z, &HashMap::new()),
+            crate::systems::numeric::number::Number::Inf
+        );
+    }
+
+    #[test]
+    fn numeric_system_evaluate_var() {
+        let mut sys = numeric_system! {
+            x = z;
+            z = 1;
+            y = k;
+            k = inf;
+        };
+        let x = sys.names.get_or_insert_key("x");
+        let z = sys.names.get_or_insert_key("z");
+        let y = sys.names.get_or_insert_key("y");
+        let k = sys.names.get_or_insert_key("k");
+        let mut map = HashMap::new();
+        map.insert(z, crate::systems::numeric::number::Number::Val(1));
+        map.insert(k, crate::systems::numeric::number::Number::Inf);
+        assert_eq!(
+            sys.evaluate(x, &map),
+            crate::systems::numeric::number::Number::Val(1)
+        );
+        assert_eq!(
+            sys.evaluate(y, &map),
+            crate::systems::numeric::number::Number::Inf
+        );
+    }
+
+    #[test]
+    fn numeric_system_evaluate_add() {
+        let mut sys = numeric_system! {
+            x = (1 + 2);
+            y = (1 + inf);
+            z = (inf + inf);
+        };
+        let x = sys.names.get_or_insert_key("x");
+        let y = sys.names.get_or_insert_key("y");
+        let z = sys.names.get_or_insert_key("z");
+        assert_eq!(
+            sys.evaluate(x, &HashMap::new()),
+            crate::systems::numeric::number::Number::Val(3)
+        );
+        assert_eq!(
+            sys.evaluate(y, &HashMap::new()),
+            crate::systems::numeric::number::Number::Inf
+        );
+        assert_eq!(
+            sys.evaluate(z, &HashMap::new()),
+            crate::systems::numeric::number::Number::Inf
+        );
+    }
+
+    #[test]
+    fn numeric_system_evaluate_mult() {
+        let mut sys = numeric_system! {
+            x = (3 * 2);
+            y = (1 * inf);
+            z = (inf * inf);
+        };
+        let x = sys.names.get_or_insert_key("x");
+        let y = sys.names.get_or_insert_key("y");
+        let z = sys.names.get_or_insert_key("z");
+        assert_eq!(
+            sys.evaluate(x, &HashMap::new()),
+            crate::systems::numeric::number::Number::Val(6)
+        );
+        assert_eq!(
+            sys.evaluate(y, &HashMap::new()),
+            crate::systems::numeric::number::Number::Inf
+        );
+        assert_eq!(
+            sys.evaluate(z, &HashMap::new()),
+            crate::systems::numeric::number::Number::Inf
+        );
+    }
+
+    #[test]
+    fn numeric_system_evaluate_sub() {
+        let mut sys = numeric_system! {
+            x = (4 - 2);
+            y = (4 - inf);
+            z = (inf - 2);
+            k = (inf - inf);
+        };
+        let x = sys.names.get_or_insert_key("x");
+        let y = sys.names.get_or_insert_key("y");
+        let z = sys.names.get_or_insert_key("z");
+        let k = sys.names.get_or_insert_key("k");
+        assert_eq!(
+            sys.evaluate(x, &HashMap::new()),
+            crate::systems::numeric::number::Number::Val(2)
+        );
+        assert_eq!(
+            sys.evaluate(y, &HashMap::new()),
+            crate::systems::numeric::number::Number::Inf
+        );
+        assert_eq!(
+            sys.evaluate(z, &HashMap::new()),
+            crate::systems::numeric::number::Number::Inf
+        );
+        assert_eq!(
+            sys.evaluate(k, &HashMap::new()),
+            crate::systems::numeric::number::Number::Inf
+        );
+    }
+
+    #[test]
+    fn numeric_system_evaluate_div() {
+        let mut sys = numeric_system! {
+            x = (4 / 2);
+            y = (inf / 2);
+            z = (2 / inf);
+            k = (inf / inf);
+        };
+        let x = sys.names.get_or_insert_key("x");
+        let y = sys.names.get_or_insert_key("y");
+        let z = sys.names.get_or_insert_key("z");
+        let k = sys.names.get_or_insert_key("k");
+        assert_eq!(
+            sys.evaluate(x, &HashMap::new()),
+            crate::systems::numeric::number::Number::Val(2)
+        );
+        assert_eq!(
+            sys.evaluate(y, &HashMap::new()),
+            crate::systems::numeric::number::Number::Inf
+        );
+        assert_eq!(
+            sys.evaluate(z, &HashMap::new()),
+            crate::systems::numeric::number::Number::Inf
+        );
+        assert_eq!(
+            sys.evaluate(k, &HashMap::new()),
+            crate::systems::numeric::number::Number::Inf
+        );
+    }
+
+    #[test]
+    fn numeric_system_evaluate_min() {
+        let mut sys = numeric_system! {
+            x = (min(7, 3));
+            y = (min(inf, 3));
+            z = (min(7, inf));
+            k = (min(inf, inf));
+        };
+        let x = sys.names.get_or_insert_key("x");
+        let y = sys.names.get_or_insert_key("y");
+        let z = sys.names.get_or_insert_key("z");
+        let k = sys.names.get_or_insert_key("k");
+        assert_eq!(
+            sys.evaluate(x, &HashMap::new()),
+            crate::systems::numeric::number::Number::Val(3)
+        );
+        assert_eq!(
+            sys.evaluate(y, &HashMap::new()),
+            crate::systems::numeric::number::Number::Val(3)
+        );
+        assert_eq!(
+            sys.evaluate(z, &HashMap::new()),
+            crate::systems::numeric::number::Number::Val(7)
+        );
+        assert_eq!(
+            sys.evaluate(k, &HashMap::new()),
+            crate::systems::numeric::number::Number::Inf
+        );
+    }
+
+    #[test]
+    fn numeric_system_evaluate_max() {
+        let mut sys = numeric_system! {
+            x = (max(7, 3));
+            y = (max(inf, 3));
+            z = (max(7, inf));
+            k = (max(inf, inf));
+        };
+        let x = sys.names.get_or_insert_key("x");
+        let y = sys.names.get_or_insert_key("y");
+        let z = sys.names.get_or_insert_key("z");
+        let k = sys.names.get_or_insert_key("k");
+        assert_eq!(
+            sys.evaluate(x, &HashMap::new()),
+            crate::systems::numeric::number::Number::Val(7)
+        );
+        assert_eq!(
+            sys.evaluate(y, &HashMap::new()),
+            crate::systems::numeric::number::Number::Inf
+        );
+        assert_eq!(
+            sys.evaluate(z, &HashMap::new()),
+            crate::systems::numeric::number::Number::Inf
+        );
+        assert_eq!(
+            sys.evaluate(k, &HashMap::new()),
+            crate::systems::numeric::number::Number::Inf
+        );
+    }
+}
