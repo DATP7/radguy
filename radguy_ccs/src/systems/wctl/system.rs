@@ -38,10 +38,13 @@ impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
         let formula = self.formulas.borrow().get_value(formula_key).clone();
 
         let term_key = match formula {
-            FlatFormula::Const(c) => match c {
-                true => self.insert_term(NumericTerm::Const(Number::Val(0))),
-                false => self.insert_term(NumericTerm::Const(Number::Inf)),
-            },
+            FlatFormula::Const(c) => {
+                if c {
+                    self.insert_term(NumericTerm::Const(Number::Val(0)))
+                } else {
+                    self.insert_term(NumericTerm::Const(Number::Inf))
+                }
+            }
             FlatFormula::And(left, right) => {
                 let left_var_key = self.get_var(process_key, left);
                 let right_var_key = self.get_var(process_key, right);
@@ -152,8 +155,8 @@ impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
     }
 }
 
-impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key> System<VarKey, Number>
-    for WCTLSystem<'a, ProcKey, FormKey, ExprKey, VarKey, TermKey>
+impl<ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key> System<VarKey, Number>
+    for WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
 {
     fn evaluate(&self, key: VarKey, assignment: &dyn Assignment<VarKey, Number>) -> Number {
         let Some(term_key) = self.numeric_system.borrow().definitions.get(key) else {
