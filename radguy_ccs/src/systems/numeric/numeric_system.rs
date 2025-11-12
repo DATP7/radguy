@@ -47,14 +47,20 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone> NumericSystem<K, T, N> {
             NumericTerm::Bound { bound, term } => {
                 let term_val = self.evaluate_term(*term, assignment);
                 match bound {
-                    Number::Val(_) => match term_val <= *bound {
-                        true => Number::Val(0),
-                        false => Number::Inf,
-                    },
-                    Number::Inf => match term_val < Number::Inf {
-                        true => Number::Val(0),
-                        false => Number::Inf,
-                    },
+                    Number::Val(_) => {
+                        if term_val <= *bound {
+                            Number::Val(0)
+                        } else {
+                            Number::Inf
+                        }
+                    }
+                    Number::Inf => {
+                        if term_val < Number::Inf {
+                            Number::Val(0)
+                        } else {
+                            Number::Inf
+                        }
+                    }
                 }
             }
         }
@@ -583,6 +589,7 @@ mod tests {
         );
     }
 
+    #[allow(clippy::many_single_char_names)]
     #[test]
     fn numeric_system_evaluate_min() {
         let mut sys = numeric_system! {
@@ -625,6 +632,7 @@ mod tests {
         );
     }
 
+    #[allow(clippy::many_single_char_names)]
     #[test]
     fn numeric_system_evaluate_max() {
         let mut sys = numeric_system! {
