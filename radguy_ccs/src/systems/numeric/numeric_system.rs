@@ -616,4 +616,46 @@ mod tests {
             crate::systems::numeric::number::Number::Inf
         );
     }
+
+    #[allow(clippy::many_single_char_names)]
+    #[test]
+    fn numeric_system_evaluate() {
+        let mut sys = numeric_system! {
+            x = (max(y, z));
+            y = (k * t);
+            z = inf;
+            k = 10;
+            t = 3;
+        };
+        let x = sys.names.get_or_insert_key("x");
+        let y = sys.names.get_or_insert_key("y");
+        let z = sys.names.get_or_insert_key("z");
+        let k = sys.names.get_or_insert_key("k");
+        let t = sys.names.get_or_insert_key("t");
+        let mut map = HashMap::new();
+        map.insert(y, crate::systems::numeric::number::Number::Inf);
+        map.insert(z, crate::systems::numeric::number::Number::Inf);
+        map.insert(k, crate::systems::numeric::number::Number::Val(10));
+        map.insert(t, crate::systems::numeric::number::Number::Val(3));
+        assert_eq!(
+            sys.evaluate(x, &map),
+            crate::systems::numeric::number::Number::Inf
+        );
+        assert_eq!(
+            sys.evaluate(y, &map),
+            crate::systems::numeric::number::Number::Val(30)
+        );
+        assert_eq!(
+            sys.evaluate(z, &map),
+            crate::systems::numeric::number::Number::Inf
+        );
+        assert_eq!(
+            sys.evaluate(k, &map),
+            crate::systems::numeric::number::Number::Val(10)
+        );
+        assert_eq!(
+            sys.evaluate(t, &map),
+            crate::systems::numeric::number::Number::Val(3)
+        );
+    }
 }
