@@ -1,6 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Display;
 
+use crate::systems::numeric::number::Number;
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Process<'a> {
     Nil,
@@ -65,7 +67,7 @@ pub enum Action<'a> {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Copy)]
 pub struct WeightedAction<'a> {
-    pub weight: u32,
+    pub weight: Number,
     pub action: Action<'a>,
 }
 
@@ -179,7 +181,7 @@ mod tests {
         let parsed_action = parser.parse(action_str).expect("Action should parse");
 
         let actual_action = WeightedAction {
-            weight: 8,
+            weight: Number::Val(8),
             action: Action::Label {
                 name: "dud",
                 is_complement: true,

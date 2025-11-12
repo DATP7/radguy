@@ -69,7 +69,7 @@ pub struct Declaration<'a> {
 impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
     WCTLSystem<'a, ProcKey, FormKey, ExprKey, VarKey, TermKey>
 {
-    pub fn insert_ast_formula(&mut self, formula: Formula<'a>) -> FormKey {
+    pub fn insert_ast_formula(&self, formula: Formula<'a>) -> FormKey {
         match formula {
             Formula::Const(bool) => self.insert_formula(FlatFormula::Const(bool)),
             Formula::And(left, right) => {
@@ -116,10 +116,7 @@ impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
         }
     }
 
-    fn convert_relational_expr(
-        &mut self,
-        relexpr: RelationalExpr<'a>,
-    ) -> FlatRelationalExpr<ExprKey> {
+    fn convert_relational_expr(&self, relexpr: RelationalExpr<'a>) -> FlatRelationalExpr<ExprKey> {
         match relexpr {
             RelationalExpr::LessThan(left, right) => {
                 let left = self.insert_ast_expr(*left);
@@ -154,7 +151,7 @@ impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
         }
     }
 
-    fn insert_ast_expr(&mut self, expr: Expr<'a>) -> ExprKey {
+    fn insert_ast_expr(&self, expr: Expr<'a>) -> ExprKey {
         match expr {
             Expr::Multiply(left, right) => {
                 let left = self.insert_ast_expr(*left);
@@ -184,12 +181,12 @@ impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
             Expr::Weight(number) => self.insert_expr(FlatExpr::Weight(number)),
         }
     }
-    fn insert_formula(&mut self, formula: FlatFormula<'a, FormKey, ExprKey>) -> FormKey {
-        self.formulas.get_or_insert_key(formula)
+    fn insert_formula(&self, formula: FlatFormula<'a, FormKey, ExprKey>) -> FormKey {
+        self.formulas.borrow_mut().get_or_insert_key(formula)
     }
 
-    fn insert_expr(&mut self, expr: FlatExpr<'a, ExprKey>) -> ExprKey {
-        self.expresions.get_or_insert_key(expr)
+    fn insert_expr(&self, expr: FlatExpr<'a, ExprKey>) -> ExprKey {
+        self.expresions.borrow_mut().get_or_insert_key(expr)
     }
 }
 

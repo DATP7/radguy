@@ -16,6 +16,7 @@ pub enum NumericTerm<V: Key, T: Key> {
     Div(T, T),
     Min(BTreeSet<T>),
     Max(BTreeSet<T>),
+    Bound { bound: Number, term: T },
 }
 
 impl<V: Key, T: Key> NumericTerm<V, T> {
@@ -60,6 +61,10 @@ impl<V: Key, T: Key> NumericTerm<V, T> {
                     .collect::<Vec<_>>()
                     .join(", "),
             ),
+            Self::Bound { bound, term } => format!(
+                "(bound: {bound}, term: {})",
+                sys.terms.get_value(*term).to_string_debug(sys)
+            ),
         }
     }
 
@@ -103,6 +108,10 @@ impl<V: Key, T: Key> NumericTerm<V, T> {
                     .map(|key| sys.terms.get_value(*key).to_string(sys))
                     .collect::<Vec<_>>()
                     .join(", "),
+            ),
+            Self::Bound { bound, term } => format!(
+                "(bound: {bound}, term: {})",
+                sys.terms.get_value(*term).to_string(sys)
             ),
         }
     }
