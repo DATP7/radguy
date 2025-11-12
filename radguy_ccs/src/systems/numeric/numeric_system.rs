@@ -3,7 +3,6 @@ use radguy::extension::TermSystem;
 use radguy::{Arguments, PairUniverse, System, Universe};
 use radguy::{Assignment, Set, Union, bislotmap::BiSlotMap};
 use slotmap::{Key, SecondaryMap};
-use std::cmp::{max, min};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -40,12 +39,24 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone> NumericSystem<K, T, N> {
                 .map(|key| self.evaluate_term(*key, assignment))
                 .min()
                 .expect("Min should not be empty"),
-
             NumericTerm::Max(keys) => keys
                 .iter()
                 .map(|key| self.evaluate_term(*key, assignment))
                 .max()
                 .expect("Max should not be empty"),
+            NumericTerm::Bound { bound, term } => {
+                let term_val = self.evaluate_term(*term, assignment);
+                match bound {
+                    Number::Val(_) => match term_val <= *bound {
+                        true => Number::Val(0),
+                        false => Number::Inf,
+                    },
+                    Number::Inf => match term_val < Number::Inf {
+                        true => Number::Val(0),
+                        false => Number::Inf,
+                    },
+                }
+            }
         }
     }
 
@@ -72,6 +83,7 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone> NumericSystem<K, T, N> {
                 .iter()
                 .flat_map(|&key| self.term_arguments::<ArgSet>(key))
                 .collect(),
+            NumericTerm::Bound { term, .. } => self.term_arguments(*term),
         }
     }
 }
