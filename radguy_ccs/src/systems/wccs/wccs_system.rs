@@ -61,6 +61,9 @@ pub struct WCCSSystem<'a, ProcKey: Key> {
 }
 
 impl<'a, ProcKey: Key> WCCSSystem<'a, ProcKey> {
+    pub fn lookup_process(&self, process_name: &'a str) -> Option<&ProcKey> {
+        self.bindings.get(process_name)
+    }
     pub fn get_propositions(&self, process_key: ProcKey) -> Vec<&'a str> {
         let process = self.get_process(process_key);
 

@@ -22,6 +22,18 @@ pub struct WCTLSystem<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key,
 impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
     WCTLSystem<'a, ProcKey, FormKey, ExprKey, VarKey, TermKey>
 {
+    pub fn lookup_process(&self, process_name: &'a str) -> Option<&ProcKey> {
+        self.wccs_system.lookup_process(process_name)
+    }
+
+    pub fn new(wccs_system: WCCSSystem<'a, ProcKey>) -> Self {
+        WCTLSystem {
+            wccs_system,
+            numeric_system: RefCell::new(NumericSystem::default()),
+            formulas: RefCell::new(BiSlotMap::default()),
+            expresions: RefCell::new(BiSlotMap::default()),
+        }
+    }
     fn insert_term(&self, term: NumericTerm<VarKey, TermKey>) -> TermKey {
         self.numeric_system
             .borrow_mut()
@@ -219,7 +231,7 @@ impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
             })
     }
 
-    fn get_var(&self, process_key: ProcKey, formula_key: FormKey) -> VarKey {
+    pub fn get_var(&self, process_key: ProcKey, formula_key: FormKey) -> VarKey {
         self.numeric_system
             .borrow_mut()
             .names
