@@ -235,7 +235,23 @@ mod tests {
             "T = a / 3 == -b",          // Expresions
         ];
 
-        let bad = [];
+        let bad = [
+            "T = ",
+            "T != tf",
+            "T := tf",
+            "T == tf",
+            "T = A false",
+            "T = A true U [<=] false",
+            "T = A true U [<=x] false",
+            "T = A tf U [<=x] false",
+            "T = x < ==",
+            "T = 3 || 4",
+            "T = 3 && 4",
+            "T = E true 3",
+            "T = DX[<=8] true",
+            "T = DX true",
+            "T = a / 3 = -b",
+        ];
 
         assert_good!(good, parser);
         assert_bad!(bad, parser);
