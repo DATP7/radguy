@@ -1,6 +1,7 @@
 use slotmap::Key;
 
-use crate::systems::numeric::number::Number;
+use crate::systems::wccs::wccs_system::MultiSet;
+use crate::systems::{numeric::number::Number, wctl::system::WCTLSystem};
 
 #[derive(Hash, PartialEq, Eq, Clone)]
 pub enum FlatFormula<'a, FormKey: Key, ExprKey: Key> {
@@ -70,4 +71,63 @@ pub enum FlatExpr<'a, ExprKey: Key> {
     Inverse(ExprKey),
     Proposition(&'a str),
     Weight(Number),
+}
+
+impl<ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
+    WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
+{
+    fn evaluate_expr(&self, process_key: ProcKey, expr_key: ExprKey) -> i64 {
+        let expr = self.expresions.borrow().get_value(expr_key).clone();
+
+        match expr {
+            FlatExpr::Multiply(l, r) => {
+                self.evaluate_expr(process_key, l) * self.evaluate_expr(process_key, r)
+            }
+            FlatExpr::Add(l, r) => {
+                self.evaluate_expr(process_key, l) + self.evaluate_expr(process_key, r)
+            }
+            FlatExpr::Subtract(l, r) => {
+                self.evaluate_expr(process_key, l) - self.evaluate_expr(process_key, r)
+            }
+            FlatExpr::Divide(l, r) => {
+                self.evaluate_expr(process_key, l) / self.evaluate_expr(process_key, r)
+            }
+            FlatExpr::Inverse(inner) => -self.evaluate_expr(process_key, inner),
+            FlatExpr::Proposition(prop) => {
+                i64::try_from(self.wccs_system.get_propositions(process_key).count(prop))
+                    .expect("Number of propostions should not exceed i64 limits")
+            }
+            FlatExpr::Weight(number) => match number {
+                Number::Val(value) => i64::from(value),
+                Number::Inf => panic!("Number in expr can not be infinity"),
+            },
+        }
+    }
+
+    pub(crate) fn evaluate_relexpr(
+        &self,
+        process_key: ProcKey,
+        relexpr: &FlatRelationalExpr<ExprKey>,
+    ) -> bool {
+        match relexpr {
+            FlatRelationalExpr::LessThan(left, right) => {
+                self.evaluate_expr(process_key, *left) < self.evaluate_expr(process_key, *right)
+            }
+            FlatRelationalExpr::LessThanEq(left, right) => {
+                self.evaluate_expr(process_key, *left) <= self.evaluate_expr(process_key, *right)
+            }
+            FlatRelationalExpr::GreaterThan(left, right) => {
+                self.evaluate_expr(process_key, *left) > self.evaluate_expr(process_key, *right)
+            }
+            FlatRelationalExpr::GreaterThanEq(left, right) => {
+                self.evaluate_expr(process_key, *left) >= self.evaluate_expr(process_key, *right)
+            }
+            FlatRelationalExpr::Eq(left, right) => {
+                self.evaluate_expr(process_key, *left) == self.evaluate_expr(process_key, *right)
+            }
+            FlatRelationalExpr::NotEq(left, right) => {
+                self.evaluate_expr(process_key, *left) != self.evaluate_expr(process_key, *right)
+            }
+        }
+    }
 }

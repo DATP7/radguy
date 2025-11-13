@@ -43,7 +43,7 @@ pub enum FlatProcess<'a, ProcKey: Key> {
     },
 }
 
-trait MultiSet<T: Eq> {
+pub trait MultiSet<T: Eq> {
     fn count(&self, elem: T) -> usize;
 }
 
