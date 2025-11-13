@@ -2,107 +2,126 @@
 
 use std::{
     cell::RefCell,
-    cmp::Reverse,
     collections::{HashMap, HashSet},
     fmt::{Debug, Display},
     hash::Hash,
+    marker::PhantomData,
 };
+
+use orx_priority_queue::PriorityQueueDecKey;
 
 use crate::{
     Arguments, Assignment, System,
     ordered::{
         StrategicLocalOracle,
-        strategy::{SliceRight, StrategyHeap, StrategyItem, StrategyWeight},
+        strategy::{
+            Length, OrxStrategy, Retain, SliceRight, Strategy, StrategyItem, StrategyWeight,
+        },
     },
 };
 
-#[derive(Clone)]
-pub struct CountOracle;
+#[derive(Default, Clone, Debug)]
+pub struct CountOracle<VS>(PhantomData<VS>);
 
-// TODO: Make this generic on set/strategy implementation
-impl<K: Eq + Copy + Hash + Debug, V: PartialOrd, S: System<K, V>>
-    StrategicLocalOracle<K, V, HashSet<K>, StrategyHeap<(K, K)>, S> for CountOracle
+impl<
+    K: Eq + Copy + Hash,
+    V: PartialOrd,
+    VS: Strategy<K> + Length,
+    PS: Strategy<(K, K)> + SliceRight<K, K, VS> + FromIterator<StrategyItem<(K, K)>> + Clone,
+    S: System<K, V>,
+> StrategicLocalOracle<K, V, HashSet<K>, PS, S> for CountOracle<VS>
+where
+    for<'a> &'a PS: IntoIterator<Item = StrategyItem<(K, K)>>,
 {
     fn get_strategy(
         &self,
         _visited: &HashSet<K>,
         _assignment: &impl Assignment<K, V>,
-        strategy: &StrategyHeap<(K, K)>,
+        strategy: &PS,
         _system: &S,
-    ) -> StrategyHeap<(K, K)> {
+    ) -> PS {
         let mut lens = HashMap::<K, u64>::new();
         strategy
-            .iter()
-            .map(|Reverse(StrategyItem(_, (x, y)))| {
-                Reverse(StrategyItem(
+            .into_iter()
+            .map(|StrategyItem(_, (x, y))| {
+                StrategyItem(
                     StrategyWeight::Num(
                         *lens
-                            .entry(*x)
-                            .or_insert_with(|| strategy.clone().slice_right(*x).len() as u64),
+                            .entry(x)
+                            .or_insert_with(|| strategy.clone().slice_right(x).length() as u64),
                     ),
-                    (*x, *y),
-                ))
+                    (x, y),
+                )
             })
             .collect()
     }
 }
 
-impl Display for CountOracle {
+impl<VS> Display for CountOracle<VS> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Count")
     }
 }
 
-#[derive(Clone)]
-pub struct InverseCountOracle;
+#[derive(Clone, Default)]
+pub struct InverseCountOracle<VS>(PhantomData<VS>);
 
-// TODO: Make this generic on set/strategy implementation
-impl<K: Eq + Copy + Hash, V: PartialOrd, S: System<K, V>>
-    StrategicLocalOracle<K, V, HashSet<K>, StrategyHeap<(K, K)>, S> for InverseCountOracle
+impl<
+    K: Eq + Copy + Hash,
+    V: PartialOrd,
+    VS: Strategy<K> + Length,
+    PS: Strategy<(K, K)> + SliceRight<K, K, VS> + FromIterator<StrategyItem<(K, K)>> + Clone,
+    S: System<K, V>,
+> StrategicLocalOracle<K, V, HashSet<K>, PS, S> for InverseCountOracle<VS>
+where
+    for<'a> &'a PS: IntoIterator<Item = StrategyItem<(K, K)>>,
 {
     fn get_strategy(
         &self,
         _visited: &HashSet<K>,
         _assignment: &impl Assignment<K, V>,
-        strategy: &StrategyHeap<(K, K)>,
+        strategy: &PS,
         _system: &S,
-    ) -> StrategyHeap<(K, K)> {
+    ) -> PS {
         let mut lens = HashMap::<K, u64>::new();
         strategy
-            .iter()
-            .map(|Reverse(StrategyItem(_, (x, y)))| {
-                Reverse(StrategyItem(
-                    StrategyWeight::Num(*lens.entry(*x).or_insert_with(|| {
-                        u64::MAX - (strategy.clone().slice_right(*x).len() as u64)
+            .into_iter()
+            .map(|StrategyItem(_, (x, y))| {
+                StrategyItem(
+                    StrategyWeight::Num(*lens.entry(x).or_insert_with(|| {
+                        u64::MAX - (strategy.clone().slice_right(x).length() as u64)
                     })),
-                    (*x, *y),
-                ))
+                    (x, y),
+                )
             })
             .collect()
     }
 }
 
-impl Display for InverseCountOracle {
+impl<VS> Display for InverseCountOracle<VS> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Count⁻¹")
     }
 }
 
 #[derive(Default, Clone, Debug)]
-pub struct StrategicArgumentsOracle<VarKey: Eq + Copy + Hash> {
+pub struct StrategicArgumentsOracle<VarKey: Eq + Copy + Hash, PS: Strategy<(VarKey, VarKey)>> {
     successors: RefCell<HashMap<VarKey, HashSet<VarKey>>>,
     ancestors: RefCell<HashMap<VarKey, HashSet<VarKey>>>,
     previous_visited: RefCell<HashSet<VarKey>>,
-    strategy_cache: RefCell<StrategyHeap<(VarKey, VarKey)>>,
+    strategy_cache: RefCell<PS>,
 }
 
-impl<K: Eq + Copy + Hash + Debug> StrategicArgumentsOracle<K> {
-    fn get_updated_closure<S: Arguments<K, HashSet<K>>>(
+impl<
+    K: Eq + Copy + Hash + Debug,
+    PS: Strategy<(K, K)> + Extend<StrategyItem<(K, K)>> + Retain<(K, K)> + Clone,
+> StrategicArgumentsOracle<K, PS>
+{
+    fn get_updated_closure_generic<S: Arguments<K, HashSet<K>>>(
         &self,
         visited: &HashSet<K>,
         system: &S,
-    ) -> StrategyHeap<(K, K)> {
-        // TODO: Test on-the-fly transitive closure
+    ) -> PS {
         let mut successors = self.successors.borrow_mut();
         let mut ancestors = self.ancestors.borrow_mut();
         let mut previous_visited = self.previous_visited.borrow_mut();
@@ -182,7 +201,7 @@ impl<K: Eq + Copy + Hash + Debug> StrategicArgumentsOracle<K> {
         // TODO: this could probably be more efficient if we could have keys into the heap
         // remove all ancestors that could have been updated by `variable`, and reinsert them
         // with the new weight
-        strategy.retain(|Reverse(StrategyItem(_, (x, y)))| {
+        strategy.retain(|StrategyItem(_, (x, y))| {
             if updated_ancestors.contains(x) || to_add.contains(&(*x, *y)) {
                 to_add.insert((*x, *y));
                 false
@@ -191,10 +210,10 @@ impl<K: Eq + Copy + Hash + Debug> StrategicArgumentsOracle<K> {
             }
         });
         strategy.extend(to_add.into_iter().map(|(x, y)| {
-            Reverse(StrategyItem(
+            StrategyItem(
                 StrategyWeight::Num(successors.get(&x).map_or(1, HashSet::len) as u64),
                 (x, y),
-            ))
+            )
         }));
 
         // PERF: maybe collect to smallvec
@@ -204,23 +223,152 @@ impl<K: Eq + Copy + Hash + Debug> StrategicArgumentsOracle<K> {
     }
 }
 
+impl<K: Eq + Copy + Hash + Debug, H: PriorityQueueDecKey<(K, K), StrategyWeight> + Clone>
+    StrategicArgumentsOracle<K, OrxStrategy<(K, K), H>>
+{
+    fn get_updated_closure_orx<S: Arguments<K, HashSet<K>>>(
+        &self,
+        visited: &HashSet<K>,
+        system: &S,
+    ) -> OrxStrategy<(K, K), H> {
+        let mut successors = self.successors.borrow_mut();
+        let mut ancestors = self.ancestors.borrow_mut();
+        let mut previous_visited = self.previous_visited.borrow_mut();
+
+        if previous_visited.len() == visited.len() {
+            return self.strategy_cache.borrow().clone();
+        }
+
+        let new_variables: Vec<_> = visited.difference(&previous_visited).copied().collect();
+        let mut updated_ancestors = HashSet::new();
+
+        let mut to_update = HashSet::new();
+        for &variable in &new_variables {
+            let args = system.arguments(variable);
+            let var_ancestors = ancestors
+                .entry(variable)
+                .or_insert_with(|| HashSet::from([variable]))
+                .clone();
+
+            let new_successors: Vec<_> = args
+                .iter()
+                .copied()
+                .flat_map(|a| {
+                    successors
+                        .entry(a)
+                        .or_insert_with(|| HashSet::from([a]))
+                        .clone()
+                })
+                .chain([variable])
+                .collect();
+
+            let var_successors = successors.entry(variable).or_default();
+
+            var_successors.extend(new_successors);
+
+            let var_successors = var_successors.clone();
+
+            // each new variable has its parent's ancestors as ancestors, and itself
+            for &succ in &var_successors {
+                ancestors
+                    .entry(succ)
+                    .or_default()
+                    .extend(var_ancestors.iter().copied().chain([succ]));
+            }
+
+            for &ancestor in &var_ancestors {
+                if ancestor == variable {
+                    continue;
+                }
+                // TODO: we don't actually need to update the weight of `ancestor` if extending its
+                // successors added nothing
+                successors
+                    .get_mut(&ancestor)
+                    .expect("ancestor must have successors")
+                    .extend(&var_successors);
+            }
+
+            // TODO: this is probably very inefficient
+            for &arg in successors
+                .get(&variable)
+                .expect("variable should have successors")
+            {
+                to_update.extend(
+                    ancestors
+                        .get(&arg)
+                        .expect("argument should have ancestors")
+                        .iter()
+                        .copied()
+                        .map(|anc| (arg, anc)),
+                );
+            }
+
+            updated_ancestors.extend(var_ancestors.iter().copied());
+        }
+        let mut strategy = self.strategy_cache.borrow_mut();
+
+        to_update.extend(
+            strategy
+                .iter()
+                .map(|StrategyItem(_, v)| v)
+                .filter(|(x, _)| updated_ancestors.contains(x)),
+        );
+
+        for (x, y) in to_update {
+            strategy.update_key_or_push(
+                &(x, y),
+                StrategyWeight::Num(successors.get(&x).map_or(1, HashSet::len) as u64),
+            );
+        }
+
+        previous_visited.extend(new_variables);
+
+        strategy.clone()
+    }
+}
+
 // TODO: Make this generic on set/strategy implementation
-impl<K: Eq + Copy + Hash + Debug, V: PartialOrd, S: System<K, V> + Arguments<K, HashSet<K>>>
-    StrategicLocalOracle<K, V, HashSet<K>, StrategyHeap<(K, K)>, S>
-    for StrategicArgumentsOracle<K>
+impl<
+    K: Eq + Copy + Hash + Debug,
+    V: PartialOrd,
+    PS: Strategy<(K, K)> + Retain<(K, K)> + Extend<StrategyItem<(K, K)>> + Clone,
+    S: System<K, V> + Arguments<K, HashSet<K>>,
+> StrategicLocalOracle<K, V, HashSet<K>, PS, S> for StrategicArgumentsOracle<K, PS>
 {
     fn get_strategy(
         &self,
         visited: &HashSet<K>,
         _assignment: &impl Assignment<K, V>,
-        _strategy: &StrategyHeap<(K, K)>,
+        _strategy: &PS,
         system: &S,
-    ) -> StrategyHeap<(K, K)> {
-        self.get_updated_closure(visited, system)
+    ) -> PS {
+        self.get_updated_closure_generic(visited, system)
     }
 }
 
-impl<VarKey: Eq + Copy + Hash> Display for StrategicArgumentsOracle<VarKey> {
+// TODO: Make this generic on set/strategy implementation
+impl<
+    K: Eq + Copy + Hash + Debug,
+    V: PartialOrd,
+    H: PriorityQueueDecKey<(K, K), StrategyWeight> + Clone,
+    S: System<K, V> + Arguments<K, HashSet<K>>,
+> StrategicLocalOracle<K, V, HashSet<K>, OrxStrategy<(K, K), H>, S>
+    for StrategicArgumentsOracle<K, OrxStrategy<(K, K), H>>
+{
+    fn get_strategy(
+        &self,
+        visited: &HashSet<K>,
+        _assignment: &impl Assignment<K, V>,
+        _strategy: &OrxStrategy<(K, K), H>,
+        system: &S,
+    ) -> OrxStrategy<(K, K), H> {
+        self.get_updated_closure_orx(visited, system)
+    }
+}
+
+impl<VarKey: Eq + Copy + Hash, PS: Strategy<(VarKey, VarKey)>> Display
+    for StrategicArgumentsOracle<VarKey, PS>
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Args_c")
     }
@@ -229,7 +377,6 @@ impl<VarKey: Eq + Copy + Hash> Display for StrategicArgumentsOracle<VarKey> {
 #[cfg(test)]
 mod tests {
     mod arguments {
-        use std::cmp::Reverse;
         use std::collections::{HashMap, HashSet};
 
         use slotmap::{DefaultKey, SlotMap};
@@ -238,7 +385,7 @@ mod tests {
             Arguments,
             ordered::{
                 oracle::StrategicArgumentsOracle,
-                strategy::{Domain, StrategyHeap, StrategyItem, StrategyWeight},
+                strategy::{BinaryHeapStrategy, Domain, StrategyItem, StrategyWeight},
             },
         };
 
@@ -305,7 +452,7 @@ mod tests {
                             $var_name = {$($dep,)*};
                         )*};
                         $(
-                        let oracle = StrategicArgumentsOracle::default();
+                        let oracle = StrategicArgumentsOracle::<_, BinaryHeapStrategy<_>>::default();
                         assert!(
                             oracle.strategy_cache.borrow().is_empty(),
                             "strategy should start empty"
@@ -316,8 +463,8 @@ mod tests {
                         $(
                             visited.extend(HashSet::from([$($visited_var,)*]));
                             visit_seq.push(stringify!($($visited_var),*));
-                            let expected = StrategyHeap::from([$(StrategyItem(StrategyWeight::Num($w), ($l, $r)).reversed(),)*]);
-                            let got = oracle.get_updated_closure(&visited, &system);
+                            let expected = BinaryHeapStrategy::from_iter([$(StrategyItem(StrategyWeight::Num($w), ($l, $r)),)*]);
+                            let got = oracle.get_updated_closure_generic(&visited, &system);
 
                             let expected_domain: HashSet<_> = expected.clone().domain();
                             let got_domain: HashSet<_> = got.clone().domain();
@@ -333,15 +480,15 @@ mod tests {
                             );
                             let got_map = got
                                     .into_iter()
-                                    .map(|Reverse(StrategyItem(w, (x, y)))| ((x, y), w))
+                                    .map(|StrategyItem(w, (x, y))| ((x, y), w))
                                     .collect::<HashMap<_, _>>();
-                            for Reverse(StrategyItem(w, v)) in expected.iter() {
-                                let w_got = got_map.get(v).expect(&*format!("{v:?} does not exist in got"));
-                                assert_eq!(w, w_got, "wrong weight for {v:?}");
+                            for StrategyItem(w, v) in expected.iter() {
+                                let w_got = got_map.get(&v).expect(&*format!("{v:?} does not exist in got"));
+                                assert_eq!(w, *w_got, "wrong weight for {v:?}");
                             }
 
                             assert_eq!(
-                                expected.into_iter().map(|Reverse(StrategyItem(w, (x, y)))| ((x, y), w)).collect::<HashMap<_, _>>(),
+                                expected.into_iter().map(|StrategyItem(w, (x, y))| ((x, y), w)).collect::<HashMap<_, _>>(),
                                 got_map,
                                 "wrong strategy when visiting {{{}}}. sequence: {visit_seq:#?} state: {oracle:#?}", stringify!($($visited_var),*)
                             );

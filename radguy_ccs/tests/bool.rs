@@ -52,11 +52,10 @@ macro_rules! test_oracles_unordered {
     };
 }
 
-macro_rules! test_oracle_system_ordered {
-    (test $oracle:expr, on: $($spec:ident),* $(,)?) => {
-        $(
+macro_rules! test_oracle_system_strategy {
+    ($name:ident: test $oracle:expr, with $strategy:ty, on: $spec:ident) => {
         #[test]
-        fn $spec() {
+        fn $name() {
             let $crate::systems::bool::SystemSpec {
                 mut system,
                 variables,
@@ -64,7 +63,34 @@ macro_rules! test_oracle_system_ordered {
             } = $crate::systems::bool::$spec();
             for (var, goal) in variables.into_iter().zip(goal.into_iter()) {
                 let start = system.names.get_or_insert_key(var);
-                assert_eq!(::radguy::ordered::kleene_local(&system, start, &$oracle), goal, "{var} did not have the expected value");
+                assert_eq!(
+                    ::radguy::ordered::kleene_local::<_, _, $strategy, $strategy, _, _, _>(
+                        &system, start, &$oracle
+                    ),
+                    goal,
+                    "{var} did not have the expected value"
+                );
+            }
+        }
+    };
+}
+macro_rules! test_oracle_system_ordered {
+    (test $oracle:expr, on: $($spec:ident),* $(,)?) => {
+        $(
+        mod $spec {
+            use super::*;
+
+            use radguy::ordered::strategy::{BinaryHeapStrategy, HashMapStrategy, OrxStrategy};
+            use orx_priority_queue::DaryHeapWithMap;
+
+            test_oracle_system_strategy! {
+                std_binary: test $oracle, with BinaryHeapStrategy<_>, on: $spec
+            }
+            test_oracle_system_strategy! {
+                std_hashmap: test $oracle, with HashMapStrategy<_>, on: $spec
+            }
+            test_oracle_system_strategy! {
+                orx_quad: test $oracle, with OrxStrategy<_, DaryHeapWithMap<_, StrategyWeight, 4>>, on: $spec
             }
         }
         )*
@@ -150,14 +176,14 @@ mod ordered {
     test_oracles_ordered! {
         SMax::default().constant(StrategyWeight::Num(0)), smax_const_0;
         SMax::default().constant(StrategyWeight::Infinity), smax_const_infinity;
-        SMax::default().constant(StrategyWeight::Num(0)).then(CountOracle), smax_then_count;
-        SMax::default().constant(StrategyWeight::Num(10)).and_by(CountOracle, std::cmp::min), smax_10_and_min_count;
+        SMax::default().constant(StrategyWeight::Num(0)).then(CountOracle::default()), smax_then_count;
+        SMax::default().constant(StrategyWeight::Num(10)).and_by(CountOracle::default(), std::cmp::min), smax_10_and_min_count;
         BoolExtension::oracle().constant(StrategyWeight::Num(0)), bool_extension_0;
-        BoolExtension::oracle().constant(StrategyWeight::Num(0)).and_by(CountOracle, std::cmp::min), bool_extension_0_and_min_count;
-        CountOracle, count;
-        InverseCountOracle, count_inverse;
+        BoolExtension::oracle().constant(StrategyWeight::Num(0)).and_by(CountOracle::default(), std::cmp::min), bool_extension_0_and_min_count;
+        CountOracle::default(), count;
+        InverseCountOracle::default(), count_inverse;
         StrategicArgumentsOracle::default(), arguments_s;
-        StrategicArgumentsOracle::default().and_by(CountOracle, std::cmp::min), args_s_and_min_count;
-        StrategicArgumentsOracle::default().and_by(InverseCountOracle, std::cmp::min), args_s_and_min_count_inverse;
+        StrategicArgumentsOracle::default().and_by(CountOracle::default(), std::cmp::min), args_s_and_min_count;
+        StrategicArgumentsOracle::default().and_by(InverseCountOracle::default(), std::cmp::min), args_s_and_min_count_inverse;
     }
 }
