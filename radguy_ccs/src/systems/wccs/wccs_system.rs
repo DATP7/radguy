@@ -229,7 +229,7 @@ impl<'a, ProcKey: Key> WCCSSystem<'a, ProcKey> {
         self.process_map.borrow_mut().get_or_insert_key(process)
     }
 
-    fn insert_ast_bindings(&mut self, bindings: Vec<Binding<'a>>) {
+    pub fn insert_ast_bindings(&mut self, bindings: Vec<Binding<'a>>) {
         for binding in bindings {
             let process_key = self.insert_ast_process(&binding.process);
             self.bindings.insert(binding.name, process_key);

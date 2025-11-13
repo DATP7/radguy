@@ -38,12 +38,12 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone> NumericSystem<K, T, N> {
                 .iter()
                 .map(|key| self.evaluate_term(*key, assignment))
                 .min()
-                .expect("Min should not be empty"),
+                .unwrap_or(Number::Inf),
             NumericTerm::Max(keys) => keys
                 .iter()
                 .map(|key| self.evaluate_term(*key, assignment))
                 .max()
-                .expect("Max should not be empty"),
+                .unwrap_or(Number::Val(0)),
             NumericTerm::Bound { bound, term } => {
                 let term_val = self.evaluate_term(*term, assignment);
                 match bound {

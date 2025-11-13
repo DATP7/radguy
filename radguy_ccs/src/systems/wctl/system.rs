@@ -3,7 +3,7 @@ use std::{
     collections::{BTreeSet, HashMap, HashSet},
 };
 
-use radguy::{Arguments, Assignment, System, bislotmap::BiSlotMap};
+use radguy::{Arguments, Assignment, PairUniverse, System, bislotmap::BiSlotMap};
 use slotmap::Key;
 
 use crate::systems::{
@@ -17,6 +17,7 @@ pub struct WCTLSystem<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key,
     numeric_system: RefCell<NumericSystem<VarKey, TermKey, (ProcKey, FormKey)>>,
     pub(crate) formulas: RefCell<BiSlotMap<FormKey, FlatFormula<'a, FormKey, ExprKey>>>,
     pub(crate) expresions: RefCell<BiSlotMap<ExprKey, FlatExpr<'a, ExprKey>>>,
+    visited: RefCell<HashSet<VarKey>>,
 }
 
 impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
@@ -32,6 +33,7 @@ impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
             numeric_system: RefCell::new(NumericSystem::default()),
             formulas: RefCell::new(BiSlotMap::default()),
             expresions: RefCell::new(BiSlotMap::default()),
+            visited: RefCell::new(HashSet::default()),
         }
     }
     fn insert_term(&self, term: NumericTerm<VarKey, TermKey>) -> TermKey {
@@ -45,6 +47,11 @@ impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
         if let Some(term_key) = self.numeric_system.borrow().definitions.get(key) {
             return *term_key;
         }
+
+        if self.visited.borrow().contains(&key) {
+            return self.insert_term(NumericTerm::Var(key));
+        }
+        self.visited.borrow_mut().insert(key);
 
         let (process_key, formula_key) = *self.numeric_system.borrow().names.get_value(key);
         let formula = self.formulas.borrow().get_value(formula_key).clone();
@@ -296,5 +303,14 @@ impl<ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
 
         let term_key = self.get_term(key);
         self.numeric_system.borrow().term_arguments(term_key)
+    }
+}
+
+impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key>
+    PairUniverse<HashSet<(VarKey, VarKey)>>
+    for WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
+{
+    fn pair_universe(&self) -> HashSet<(VarKey, VarKey)> {
+        self.numeric_system.borrow().pair_universe()
     }
 }

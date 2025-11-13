@@ -8,7 +8,7 @@ use crate::systems::{
     },
 };
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Clone)]
 pub enum Formula<'a> {
     Const(bool),
     And(Box<Formula<'a>>, Box<Formula<'a>>),
@@ -43,7 +43,7 @@ pub enum Formula<'a> {
     Proposition(&'a str),
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Clone)]
 pub enum RelationalExpr<'a> {
     LessThan(Box<Expr<'a>>, Box<Expr<'a>>),
     LessThanEq(Box<Expr<'a>>, Box<Expr<'a>>),
@@ -53,7 +53,7 @@ pub enum RelationalExpr<'a> {
     NotEq(Box<Expr<'a>>, Box<Expr<'a>>),
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Clone)]
 pub enum Expr<'a> {
     Multiply(Box<Expr<'a>>, Box<Expr<'a>>),
     Add(Box<Expr<'a>>, Box<Expr<'a>>),
