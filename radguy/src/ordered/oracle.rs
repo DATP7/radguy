@@ -1,11 +1,11 @@
-use std::{cmp::Reverse, fmt::Display, hash::Hash, marker::PhantomData};
+use std::{fmt::Display, hash::Hash, marker::PhantomData};
 
 use crate::{
     Assignment, System,
     oracle::LocalOracle,
     ordered::{
         Strategy,
-        strategy::{Domain, IntersectBy, StrategyHeap, StrategyItem, StrategyWeight},
+        strategy::{Domain, IntersectBy, StrategyItem, StrategyWeight},
     },
 };
 
@@ -83,21 +83,22 @@ impl<
     V: PartialOrd,
     VS,
     PS: IntoIterator<Item = (K, K)> + FromIterator<(K, K)>,
+    PairStrategy: Domain<(K, K), PS> + FromIterator<StrategyItem<(K, K)>> + Clone,
     S: System<K, V>,
     O: LocalOracle<K, V, VS, PS, S>,
-> StrategicLocalOracle<K, V, VS, StrategyHeap<(K, K)>, S> for Constant<K, V, VS, PS, S, O>
+> StrategicLocalOracle<K, V, VS, PairStrategy, S> for Constant<K, V, VS, PS, S, O>
 {
     fn get_strategy(
         &self,
         visited: &VS,
         assignment: &impl Assignment<K, V>,
-        strategy: &StrategyHeap<(K, K)>,
+        strategy: &PairStrategy,
         system: &S,
-    ) -> StrategyHeap<(K, K)> {
+    ) -> PairStrategy {
         self.oracle
             .approximate_flow(visited, assignment, &strategy.clone().domain(), system)
             .into_iter()
-            .map(|v| Reverse(StrategyItem(self.value, v)))
+            .map(|v| StrategyItem(self.value, v))
             .collect()
     }
 }

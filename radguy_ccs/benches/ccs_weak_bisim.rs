@@ -1,5 +1,5 @@
-use criterion::BenchmarkId;
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
+use orx_priority_queue::DaryHeapWithMap;
 use radguy::{
     kleene_local,
     oracle::{ArgumentsOracle, LocalMaxR, LocalOracle, SMax},
@@ -9,7 +9,7 @@ use radguy::{
             CountOracle, InverseCountOracle, StrategicArgumentsOracle, StrategicLocalOracle,
             ToConstant,
         },
-        strategy::StrategyWeight,
+        strategy::{BinaryHeapStrategy, HashMapStrategy, OrxStrategy, StrategyWeight},
     },
 };
 use radguy_ccs::systems::ccs::{
@@ -19,14 +19,14 @@ use radguy_ccs::systems::ccs::{
 use slotmap::DefaultKey;
 
 macro_rules! bisim_bench_oracles_ordered {
-    ($name:ident: using $c:expr, bench $left:expr, $right:expr => $eq:literal in $ccs:expr, with $($oracle:expr,)*) => {{
+    ($name:ident: using $c:expr, strategy $s:ty; $sname:literal; bench $left:expr, $right:expr => $eq:literal in $ccs:expr, with $($oracle:expr,)*) => {{
         let parser = ProgramParser::new();
         let ast = parser.parse($ccs).expect("Program should parse");
         let mut group = $c.benchmark_group(stringify!($name));
         $(
         {
             let oracle = $oracle;
-            group.bench_with_input(BenchmarkId::new("ordered", &oracle), &oracle, |b, o| {
+            group.bench_with_input(BenchmarkId::new("ordered", format!("{}/{}", $sname, &oracle)), &oracle, |b, o| {
                 b.iter_batched(
                     || {
                         let mut lts = WeakTransitionSystem::<DefaultKey>::default();
@@ -35,7 +35,7 @@ macro_rules! bisim_bench_oracles_ordered {
                     },
                     |(mut sys, o)| {
                         let target = sys.specify_comparison($left, $right);
-                        let result = !ordered::kleene_local(&sys, target, &o);
+                        let result = !ordered::kleene_local::<_, _, $s, $s, _, _, _>(&sys, target, &o);
                         assert_eq!(
                             $eq,
                             result,
@@ -52,6 +52,11 @@ macro_rules! bisim_bench_oracles_ordered {
         }
         )*
     }};
+    ($name:ident: using $c:expr, strategies $($s:ty),+; bench $left:expr, $right:expr => $eq:literal in $ccs:expr, with $($oracle:expr,)*) => {
+        $(
+            bisim_bench_oracles_ordered(using $c, strategy $s; bench $left, $right => $eq in $css, with $($oracle,)*);
+        )+
+    }
 }
 
 macro_rules! bisim_bench_oracles_unordered {
@@ -89,43 +94,58 @@ macro_rules! bisim_bench_oracles_unordered {
         )*
     }};
 }
+macro_rules! bisim_bench_problem_ordered {
+    ($name:ident: using $c:expr, strategy $s:ty; $sname:literal; $left:expr, $right:expr => $eq:literal in $ccs:expr) => {
+        let ccs = $ccs;
+
+        bisim_bench_oracles_ordered! {
+            $name: using $c, strategy $s; $sname; bench $left, $right => $eq in ccs, with
+            SMax::default().constant(StrategyWeight::Infinity),
+            LocalMaxR::default().constant(StrategyWeight::Infinity),
+            LocalMaxR::default().constant(StrategyWeight::Infinity).then(CountOracle::default()),
+            LocalMaxR::default().constant(StrategyWeight::Infinity).then(InverseCountOracle::default()),
+            // BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(InverseCountOracle, std::cmp::min),
+            // BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(CountOracle, std::cmp::min),
+            StrategicArgumentsOracle::default(),
+            StrategicArgumentsOracle::default().and_by(CountOracle::default(), std::cmp::min),
+            StrategicArgumentsOracle::default().and_by(InverseCountOracle::default(), std::cmp::min),
+            CountOracle::default().then(StrategicArgumentsOracle::default()),
+            InverseCountOracle::default().then(StrategicArgumentsOracle::default()),
+            StrategicArgumentsOracle::default().then(CountOracle::default()),
+            StrategicArgumentsOracle::default().then(InverseCountOracle::default()),
+            StrategicArgumentsOracle::default().and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(CountOracle::default()),
+            StrategicArgumentsOracle::default().and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(InverseCountOracle::default()),
+        };
+    };
+}
+
+macro_rules! bisim_bench_problem {
+    ($name:ident: using $c:expr, $left:expr, $right:expr => $eq:literal in $ccs:expr) => {
+        let ccs = $ccs;
+        bisim_bench_oracles_unordered! { $name: using $c, bench $left, $right => $eq in ccs, with
+            SMax::default(),
+            LocalMaxR::default(),
+            ArgumentsOracle::default(),
+            ArgumentsOracle::default().then(SMax::default()),
+            ArgumentsOracle::default().then(LocalMaxR::default()),
+            ArgumentsOracle::default().and(SMax::default()),
+            ArgumentsOracle::default().and(LocalMaxR::default()),
+            // TODO: Reenable when bool extension works again
+            // BoolExtension::oracle(),
+            // SMax::default().then(BoolExtension::oracle()),
+            // LocalMaxR::default().then(BoolExtension::oracle()),
+        };
+        bisim_bench_problem_ordered!($name: using $c, strategy BinaryHeapStrategy<_>; "std_binary"; $left, $right => $eq in $ccs);
+        bisim_bench_problem_ordered!($name: using $c, strategy HashMapStrategy<_>; "hashmap"; $left, $right => $eq in $ccs);
+        bisim_bench_problem_ordered!($name: using $c, strategy OrxStrategy<_, DaryHeapWithMap<_, _, 4>>; "orx_quad"; $left, $right => $eq in $ccs);
+    };
+}
 
 macro_rules! bisim_bench_suite {
     ($($name:ident: $left:expr, $right:expr => $eq:literal in $ccs:expr;)*) => {
         $(
         fn $name(c: &mut Criterion) {
-        let ccs = $ccs;
-            bisim_bench_oracles_unordered! { $name: using c, bench $left, $right => $eq in ccs, with
-                SMax::default(),
-                LocalMaxR::default(),
-                ArgumentsOracle::default(),
-                ArgumentsOracle::default().then(SMax::default()),
-                ArgumentsOracle::default().then(LocalMaxR::default()),
-                ArgumentsOracle::default().and(SMax::default()),
-                ArgumentsOracle::default().and(LocalMaxR::default()),
-                // TODO: Reenable when bool extension works again
-                // BoolExtension::oracle(),
-                // SMax::default().then(BoolExtension::oracle()),
-                // LocalMaxR::default().then(BoolExtension::oracle()),
-            };
-
-            bisim_bench_oracles_ordered! { $name: using c, bench $left, $right => $eq in ccs, with
-                SMax::default().constant(StrategyWeight::Infinity),
-                LocalMaxR::default().constant(StrategyWeight::Infinity),
-                LocalMaxR::default().constant(StrategyWeight::Infinity).then(CountOracle),
-                LocalMaxR::default().constant(StrategyWeight::Infinity).then(InverseCountOracle),
-                // BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(InverseCountOracle, std::cmp::min),
-                // BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(CountOracle, std::cmp::min),
-                StrategicArgumentsOracle::default(),
-                StrategicArgumentsOracle::default().and_by(CountOracle, std::cmp::min),
-                StrategicArgumentsOracle::default().and_by(InverseCountOracle, std::cmp::min),
-                CountOracle.then(StrategicArgumentsOracle::default()),
-                InverseCountOracle.then(StrategicArgumentsOracle::default()),
-                StrategicArgumentsOracle::default().then(CountOracle),
-                StrategicArgumentsOracle::default().then(InverseCountOracle),
-                StrategicArgumentsOracle::default().and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(CountOracle),
-                StrategicArgumentsOracle::default().and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(InverseCountOracle),
-            };
+            bisim_bench_problem!($name: using c, $left, $right => $eq in $ccs);
         }
         )*
         criterion_group!(
@@ -141,8 +161,8 @@ bisim_bench_suite! {
     abpl_ok: "SPEC", "ABPl" => true in include_str!("../systems/ccs/abp_ok.ccs");
     abpl_ok_2: "SPEC", "ABPl_2" => true in include_str!("../systems/ccs/abp_ok.ccs");
     abpl_bad_2: "SPEC", "ABPl_2" => false in include_str!("../systems/ccs/abp_bad.ccs");
-    abpl_ok_3: "SPEC", "ABPl_3" => true in include_str!("../systems/ccs/abp_ok.ccs");
-    abpl_bad_3: "SPEC", "ABPl_3" => false in include_str!("../systems/ccs/abp_bad.ccs");
+    // abpl_ok_3: "SPEC", "ABPl_3" => true in include_str!("../systems/ccs/abp_ok.ccs");
+    // abpl_bad_3: "SPEC", "ABPl_3" => false in include_str!("../systems/ccs/abp_bad.ccs");
     // NOTE: these two actually *are* weakly bisimilar, so should not be used
     // abp_bad: "SPEC", "ABP" => false in include_str!("../systems/ccs/abp_bad.ccs");
     // abpl_bad: "SPEC", "ABPl" => false in include_str!("../systems/ccs/abp_bad.ccs");

@@ -1,11 +1,18 @@
 use std::{
     cmp::{Ordering, Reverse},
-    collections::{BinaryHeap, HashMap, HashSet},
     fmt::Display,
     hash::Hash,
 };
 
 use crate::System;
+
+mod binary_heap;
+mod hashmap;
+mod orx;
+
+pub use binary_heap::BinaryHeapStrategy;
+pub use hashmap::HashMapStrategy;
+pub use orx::OrxStrategy;
 
 #[derive(PartialEq, Eq, Clone, Copy, Hash, Debug)]
 pub enum StrategyWeight {
@@ -39,7 +46,7 @@ impl Display for StrategyWeight {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct StrategyItem<T>(pub StrategyWeight, pub T);
 
 impl<T> StrategyItem<T> {
@@ -128,93 +135,17 @@ pub trait Domain<T: Copy, S>: Strategy<T> {
     fn domain(self) -> S;
 }
 
-pub trait Singleton<T: Copy>: Strategy<T> {
+pub trait Singleton<T: Copy> {
     /// Return a new strategy where `x -> infinity`
     fn singleton(x: T) -> Self;
 }
 
-pub type StrategyHeap<T> = BinaryHeap<Reverse<StrategyItem<T>>>;
-
-// TODO: should we just invert the comparison of `StrategyItem`s instead of spamming `Reverse`
-// everywhere?
-impl<T: Copy> Strategy<T> for StrategyHeap<T> {
-    fn extract_min(&mut self) -> Option<T> {
-        self.pop().map(|Reverse(StrategyItem(_, v))| v)
-    }
+pub trait Length {
+    fn length(&self) -> usize;
 }
 
-impl<T: Eq + Copy + Hash> Intersect<T, HashSet<T>> for StrategyHeap<T> {
-    fn intersect(self, other: &HashSet<T>) -> Self {
-        self.into_iter()
-            .filter(|Reverse(StrategyItem(_, v))| other.contains(v))
-            .collect()
-    }
-}
-
-impl<T: Eq + Copy + Hash> IntersectBy<T, Self> for StrategyHeap<T> {
-    fn intersect_by(
-        self,
-        other: &Self,
-        f: impl Fn(StrategyWeight, StrategyWeight) -> StrategyWeight,
-    ) -> Self {
-        let other_map: HashMap<_, _> = other
-            .iter()
-            .map(|Reverse(StrategyItem(w, v))| (v, w))
-            .collect();
-        self.into_iter()
-            .filter_map(|Reverse(StrategyItem(w_self, v))| {
-                other_map
-                    .get(&v)
-                    .map(|&w_other| Reverse(StrategyItem(f(w_self, *w_other), v)))
-            })
-            .collect()
-    }
-}
-
-impl<T: Eq, U: Copy> SliceLeft<T, U, StrategyHeap<U>> for StrategyHeap<(T, U)>
-where
-    (T, U): Copy,
-{
-    fn slice_left(self, left: T) -> StrategyHeap<U> {
-        self.into_iter()
-            .filter_map(|Reverse(StrategyItem(w, (t, u)))| {
-                if t == left {
-                    Some(Reverse(StrategyItem(w, u)))
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-}
-
-impl<T: Copy, U: Eq> SliceRight<T, U, StrategyHeap<T>> for StrategyHeap<(T, U)>
-where
-    (T, U): Copy,
-{
-    fn slice_right(self, right: U) -> StrategyHeap<T> {
-        self.into_iter()
-            .filter_map(|Reverse(StrategyItem(w, (t, u)))| {
-                if u == right {
-                    Some(Reverse(StrategyItem(w, t)))
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-}
-
-impl<T: Copy, S: FromIterator<T>> Domain<T, S> for StrategyHeap<T> {
-    fn domain(self) -> S {
-        self.into_iter()
-            .map(|Reverse(StrategyItem(_, v))| v)
-            .collect()
-    }
-}
-
-impl<T: Copy> Singleton<T> for StrategyHeap<T> {
-    fn singleton(x: T) -> Self {
-        Self::from_iter([Reverse(StrategyItem(StrategyWeight::Infinity, x))])
-    }
+pub trait Retain<T> {
+    fn retain<F>(&mut self, f: F)
+    where
+        F: FnMut(&StrategyItem<T>) -> bool;
 }

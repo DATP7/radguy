@@ -9,7 +9,7 @@ use itertools::iproduct;
 use radguy::{
     Arguments, Assignment, PairUniverse, System, Universe,
     extension::TermSystem,
-    ordered::strategy::{InitialStrategy, StrategyHeap, StrategyItem},
+    ordered::strategy::{InitialStrategy, Strategy, StrategyItem},
 };
 use radguy::{Union, bislotmap::BiSlotMap};
 use slotmap::{Key, SecondaryMap};
@@ -142,13 +142,16 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
     }
 }
 
-impl<VarKey: Key + Hash + Clone, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
-    InitialStrategy<VarKey, bool, StrategyHeap<(VarKey, VarKey)>>
-    for BoolSystemImpl<VarKey, TermKey, VarName>
+impl<
+    VarKey: Key + Hash + Clone,
+    TermKey: Key + Hash,
+    VarName: Hash + Eq + Clone,
+    PS: Strategy<(VarKey, VarKey)> + FromIterator<StrategyItem<(VarKey, VarKey)>>,
+> InitialStrategy<VarKey, bool, PS> for BoolSystemImpl<VarKey, TermKey, VarName>
 {
-    fn get_initial_strategy(&self) -> StrategyHeap<(VarKey, VarKey)> {
+    fn get_initial_strategy(&self) -> PS {
         iproduct!(self.names.keys(), self.names.keys())
-            .map(|(x, y)| StrategyItem::infinite((x, y)).reversed())
+            .map(|(x, y)| StrategyItem::infinite((x, y)))
             .collect()
     }
 }

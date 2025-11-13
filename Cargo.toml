@@ -4,3 +4,4 @@ resolver = "3"
 
 [workspace.dependencies]
 radguy = {path = "radguy"}
+orx-priority-queue = { git = "https://github.com/TheMagzuz/orx-priority-queue.git" }
