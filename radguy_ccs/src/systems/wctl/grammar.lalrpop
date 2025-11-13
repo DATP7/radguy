@@ -1,12 +1,15 @@
-use crate::systems::wctl::ast::{Declaration, Formula, RelationalExpr, Expr};
+use crate::systems::wctl::ast::{Formula, RelationalExpr, Expr};
 use crate::systems::numeric::number::Number;
+use std::collections::HashMap;
 
 grammar;
 
-pub Program: Vec<Declaration<'input>> = (<Declaration> "\n")*;
+pub Program: HashMap<&'input str, Formula<'input>> = {
+    <declarations:(<Declaration> "\n")*> => HashMap::from_iter(declarations),
+}
 
-pub Declaration: Declaration<'input> = {
-  <name:Id> "=" <formula:Formula> => Declaration { name, formula },
+pub Declaration: (&'input str, Formula<'input>) = {
+  <name:Id> "=" <formula:Formula> => (name, formula),
 }
 
 

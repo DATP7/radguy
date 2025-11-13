@@ -9,3 +9,4 @@ lalrpop_mod!(
 
 pub mod ast;
 pub mod wccs_system;
+pub use grammar::ProgramParser;
