@@ -52,7 +52,7 @@ macro_rules! bisim_bench_oracles_ordered {
                         assert_eq!(
                             $sat,
                             result,
-                            "{} and {} should{} be bisimilar in{}",
+                            "{} should{} satisfy {} in {}",
                             $process_name,
                             $formula_str,
                             if !$sat { " not" } else { "" },
@@ -96,7 +96,7 @@ macro_rules! bisim_bench_oracles_unordered {
                         assert_eq!(
                             $sat,
                             result,
-                            "{} and {} should{} be bisimilar in{}",
+                            "{} should{} satisfy {} in {}",
                             $process_name,
                             $formula_str,
                             if !$sat { " not" } else { "" },
