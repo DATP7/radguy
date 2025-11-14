@@ -35,8 +35,9 @@ use slotmap::DefaultKey;
 // }
 
 macro_rules! wctl_test {
-    ($($test_name:tt: $($process_name:literal, $formula_str:expr => $eq:literal),* $(,)? in $wccs:expr;)*) => {
+    ($($(#ignore($reason:literal))? $test_name:ident: $($process_name:literal, $formula_str:expr => $eq:literal),* $(,)? in $wccs:expr;)*) => {
         $(
+            $(#[ignore = $reason])?
             #[test]
             fn $test_name()
             {
@@ -84,11 +85,16 @@ wctl_test! {
     recursive: "S", "AF dump" => true in "S := <go>.dump:S;";
     recursive_neg: "S", "AF mow" => false in "S := <go>.dump:S;";
     compare: "S", "mow == 4" => true in "S := mow:0 + mow:0 + mow:0 + mow:0;";
-    //bit_protocol: "System", "EF[<= 35] delivered == 7" => true in include_str!("../systems/wccs/BitProtocol(B5M7).wccs");
-    //bit_protocol_small: "System", "EF[<= 4] delivered == 2" => true in include_str!("../systems/wccs/bit_small.wccs");
-    //bit_protocol_b5e7: "System", "EF[<= 4] delivered == 2" => true in include_str!("../systems/wccs/bit_tits.wccs");
     leader_election:
-        "Ring", "EF leader > 1" => false,
-        "Ring", "EF leader" => true
-        in include_str!("../systems/wccs/LeaderElection2.wccs");
+    "Ring", "EF leader > 1" => false,
+    "Ring", "EF leader" => true
+    in include_str!("../systems/wccs/LeaderElection2.wccs");
+
+    #ignore("too slow") bit_protocol: "System", "EF[<= 35] delivered == 7" => true in include_str!("../systems/wccs/BitProtocol(B5M7).wccs");
+    #ignore("too slow") client_server:
+        "System", "E True U[<=10] (A True U[<=1] failed)" => true,
+        "System", "E True U[<=8] delivered" => true,
+        "System", "E True U[<=5] failed" => true,
+        "System", "EF[<=10] (AF[<=1] failed)" => true,
+        in include_str!("../systems/wccs/ClientServer.wccs");
 }
