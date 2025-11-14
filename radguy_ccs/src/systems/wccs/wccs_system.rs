@@ -61,8 +61,8 @@ pub struct WCCSSystem<'a, ProcKey: Key> {
 }
 
 impl<'a, ProcKey: Key> WCCSSystem<'a, ProcKey> {
-    pub fn lookup_process(&self, process_name: &'a str) -> Option<&ProcKey> {
-        self.bindings.get(process_name)
+    pub fn lookup_process_key(&self, process_name: &'a str) -> Option<ProcKey> {
+        self.bindings.get(process_name).copied()
     }
     pub fn get_propositions(&self, process_key: ProcKey) -> Vec<&'a str> {
         let process = self.get_process(process_key);
@@ -80,7 +80,7 @@ impl<'a, ProcKey: Key> WCCSSystem<'a, ProcKey> {
             FlatProcess::PropositionRelabelling { process, labels } => self
                 .get_propositions(process)
                 .into_iter()
-                .map(|prop| dbg!(&labels).get(prop).copied().unwrap_or(prop))
+                .map(|prop| labels.get(prop).copied().unwrap_or(prop))
                 .collect(),
             FlatProcess::Sum(left, right) | FlatProcess::Compose(left, right) => self
                 .get_propositions(left)
@@ -107,7 +107,10 @@ impl<'a, ProcKey: Key> WCCSSystem<'a, ProcKey> {
 
         let transitions = match process {
             FlatProcess::Nil => HashMap::new(),
-            FlatProcess::Named(name) => self.get_transitions(self.lookup_process_key(name)),
+            FlatProcess::Named(name) => self.get_transitions(
+                self.lookup_process_key(name)
+                    .expect("Named process should not refer to unbinded process"),
+            ),
             FlatProcess::ActionPrefix { action, process } => {
                 HashMap::from([(action, HashSet::from([process]))])
             }
@@ -329,34 +332,32 @@ impl<'a, ProcKey: Key> WCCSSystem<'a, ProcKey> {
                         .iter()
                         .filter(|(WeightedAction { action, .. }, _)| *action == co_action)
                         .collect::<Vec<_>>();
-                    if !matching_right_transitions.is_empty() {
-                        for (
-                            WeightedAction {
-                                weight: right_weight,
-                                ..
-                            },
-                            right_successors,
-                        ) in matching_right_transitions
-                        {
-                            let current_sync_processes = right_successors
-                                .iter()
-                                .map(|right_successor| {
-                                    self.insert_process(FlatProcess::Compose(
-                                        left_successor,
-                                        *right_successor,
-                                    ))
-                                })
-                                .collect::<Vec<_>>();
+                    for (
+                        WeightedAction {
+                            weight: right_weight,
+                            ..
+                        },
+                        right_successors,
+                    ) in matching_right_transitions
+                    {
+                        let current_sync_processes = right_successors
+                            .iter()
+                            .map(|right_successor| {
+                                self.insert_process(FlatProcess::Compose(
+                                    left_successor,
+                                    *right_successor,
+                                ))
+                            })
+                            .collect::<Vec<_>>();
 
-                            if !current_sync_processes.is_empty() {
-                                successors
-                                    .entry(WeightedAction {
-                                        action: Action::Tau,
-                                        weight: max(left_weight, *right_weight),
-                                    })
-                                    .or_default()
-                                    .extend(current_sync_processes);
-                            }
+                        if !current_sync_processes.is_empty() {
+                            successors
+                                .entry(WeightedAction {
+                                    action: Action::Tau,
+                                    weight: max(left_weight, *right_weight),
+                                })
+                                .or_default()
+                                .extend(current_sync_processes);
                         }
                     }
                 }
@@ -381,13 +382,6 @@ impl<'a, ProcKey: Key> WCCSSystem<'a, ProcKey> {
         }
 
         successors
-    }
-
-    fn lookup_process_key(&self, name: &str) -> ProcKey {
-        *self
-            .bindings
-            .get(name)
-            .expect("all bindings should have been mapped")
     }
 }
 

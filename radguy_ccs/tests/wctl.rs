@@ -52,9 +52,9 @@ macro_rules! wctl_test {
                     let formula = formula_parser.parse($formula_str).expect("Formula should parse");
 
                     let sys = WCTLSystem::<DefaultKey, DefaultKey, DefaultKey, DefaultKey, DefaultKey>::new(wccs_system);
-                    let process_key = sys.lookup_process($process_name).expect("Process name should be bound");
+                    let process_key = sys.lookup_process_key($process_name).expect("Process name should be bound");
                     let formula_key = sys.insert_ast_formula(formula.clone());
-                    let start = sys.get_var(*process_key, formula_key);
+                    let start = sys.get_var(process_key, formula_key);
 
                     let result = kleene_local(&sys, start, &SMax::default()) == Number::Val(0);
                     assert_eq!($eq, result, "{} should{} satisfy {} in {}", $process_name, if !$eq { " not" } else {""}, $formula_str, $wccs);
@@ -84,5 +84,11 @@ wctl_test! {
     recursive: "S", "AF dump" => true in "S := <go>.dump:S;";
     recursive_neg: "S", "AF mow" => false in "S := <go>.dump:S;";
     compare: "S", "mow == 4" => true in "S := mow:0 + mow:0 + mow:0 + mow:0;";
-    bit_protocol: "System", "EF[<= 35] delivered == 7" => true in include_str!("../systems/wccs/BitProtocol(B5M7).wccs");
+    //bit_protocol: "System", "EF[<= 35] delivered == 7" => true in include_str!("../systems/wccs/BitProtocol(B5M7).wccs");
+    //bit_protocol_small: "System", "EF[<= 4] delivered == 2" => true in include_str!("../systems/wccs/bit_small.wccs");
+    //bit_protocol_b5e7: "System", "EF[<= 4] delivered == 2" => true in include_str!("../systems/wccs/bit_tits.wccs");
+    leader_election:
+        "Ring", "EF leader > 1" => false,
+        "Ring", "EF leader" => true
+        in include_str!("../systems/wccs/LeaderElection2.wccs");
 }

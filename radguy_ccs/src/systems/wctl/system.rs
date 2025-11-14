@@ -3,7 +3,7 @@ use std::{
     collections::{BTreeSet, HashMap, HashSet},
 };
 
-use radguy::{Arguments, Assignment, PairUniverse, System, bislotmap::BiSlotMap};
+use radguy::{Arguments, Assignment, PairUniverse, System, Universe, bislotmap::BiSlotMap};
 use slotmap::Key;
 
 use crate::systems::{
@@ -17,14 +17,13 @@ pub struct WCTLSystem<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key,
     numeric_system: RefCell<NumericSystem<VarKey, TermKey, (ProcKey, FormKey)>>,
     pub(crate) formulas: RefCell<BiSlotMap<FormKey, FlatFormula<'a, FormKey, ExprKey>>>,
     pub(crate) expresions: RefCell<BiSlotMap<ExprKey, FlatExpr<'a, ExprKey>>>,
-    visited: RefCell<HashSet<VarKey>>,
 }
 
 impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
     WCTLSystem<'a, ProcKey, FormKey, ExprKey, VarKey, TermKey>
 {
-    pub fn lookup_process(&self, process_name: &'a str) -> Option<&ProcKey> {
-        self.wccs_system.lookup_process(process_name)
+    pub fn lookup_process_key(&self, process_name: &'a str) -> Option<ProcKey> {
+        self.wccs_system.lookup_process_key(process_name)
     }
 
     pub fn new(wccs_system: WCCSSystem<'a, ProcKey>) -> Self {
@@ -33,7 +32,6 @@ impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
             numeric_system: RefCell::new(NumericSystem::default()),
             formulas: RefCell::new(BiSlotMap::default()),
             expresions: RefCell::new(BiSlotMap::default()),
-            visited: RefCell::new(HashSet::default()),
         }
     }
     fn insert_term(&self, term: NumericTerm<VarKey, TermKey>) -> TermKey {
@@ -47,11 +45,6 @@ impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
         if let Some(term_key) = self.numeric_system.borrow().definitions.get(key) {
             return *term_key;
         }
-
-        if self.visited.borrow().contains(&key) {
-            return self.insert_term(NumericTerm::Var(key));
-        }
-        self.visited.borrow_mut().insert(key);
 
         let (process_key, formula_key) = *self.numeric_system.borrow().names.get_value(key);
         let formula = self.formulas.borrow().get_value(formula_key).clone();
@@ -68,16 +61,16 @@ impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
                 let left_var_key = self.get_var(process_key, left);
                 let right_var_key = self.get_var(process_key, right);
 
-                let left_term = self.get_term(left_var_key);
-                let right_term = self.get_term(right_var_key);
+                let left_term = self.insert_term(NumericTerm::Var(left_var_key));
+                let right_term = self.insert_term(NumericTerm::Var(right_var_key));
                 self.insert_term(NumericTerm::Max(BTreeSet::from([left_term, right_term])))
             }
             FlatFormula::Or(left, right) => {
                 let left_var_key = self.get_var(process_key, left);
                 let right_var_key = self.get_var(process_key, right);
 
-                let left_term = self.get_term(left_var_key);
-                let right_term = self.get_term(right_var_key);
+                let left_term = self.insert_term(NumericTerm::Var(left_var_key));
+                let right_term = self.insert_term(NumericTerm::Var(right_var_key));
                 self.insert_term(NumericTerm::Min(BTreeSet::from([left_term, right_term])))
             }
             FlatFormula::UniversalUntil { left, right, bound } => {
@@ -103,7 +96,7 @@ impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
                         .filter(|(weight, _)| *weight <= bound)
                         .map(|(_, succ_proc)| {
                             let var_key = self.get_var(succ_proc, formula);
-                            self.get_term(var_key)
+                            self.insert_term(NumericTerm::Var(var_key))
                         });
                 self.insert_term(NumericTerm::Max(sub_terms.collect()))
             }
@@ -114,7 +107,7 @@ impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
                         .filter(|(weight, _)| *weight <= bound)
                         .map(|(_, succ_proc)| {
                             let var_key = self.get_var(succ_proc, formula);
-                            self.get_term(var_key)
+                            self.insert_term(NumericTerm::Var(var_key))
                         });
                 self.insert_term(NumericTerm::Min(sub_terms.collect()))
             }
@@ -123,14 +116,15 @@ impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
                 let mut hyper_edge: BTreeSet<TermKey> = transitions
                     .map(|(weight, proc)| {
                         let sub_var = self.get_var(proc, formula_key);
-                        let sub_term = self.get_term(sub_var);
+                        let sub_term = self.insert_term(NumericTerm::Var(sub_var));
                         let weight_term = self.insert_term(NumericTerm::Const(weight));
                         self.insert_term(NumericTerm::Add(weight_term, sub_term))
                     })
                     .collect();
 
-                let left_term = self.get_term(self.get_var(process_key, left));
-                let right_term = self.get_term(self.get_var(process_key, right));
+                let left_term = self.insert_term(NumericTerm::Var(self.get_var(process_key, left)));
+                let right_term =
+                    self.insert_term(NumericTerm::Var(self.get_var(process_key, right)));
 
                 hyper_edge.insert(left_term);
 
@@ -139,14 +133,15 @@ impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
                 self.insert_term(NumericTerm::Min(BTreeSet::from([right_term, hyper_edge])))
             }
             FlatFormula::SymbolicExistentialUntil { left, right } => {
-                let left_term = self.get_term(self.get_var(process_key, left));
-                let right_term = self.get_term(self.get_var(process_key, right));
+                let left_term = self.insert_term(NumericTerm::Var(self.get_var(process_key, left)));
+                let right_term =
+                    self.insert_term(NumericTerm::Var(self.get_var(process_key, right)));
 
                 let transitions = self.flatten_transitions(process_key);
                 let mut hyper_edges: BTreeSet<TermKey> = transitions
                     .map(|(weight, proc)| {
                         let sub_var = self.get_var(proc, formula_key);
-                        let sub_term = self.get_term(sub_var);
+                        let sub_term = self.insert_term(NumericTerm::Var(sub_var));
                         let weight_term = self.insert_term(NumericTerm::Const(weight));
                         let add_term = self.insert_term(NumericTerm::Add(weight_term, sub_term));
 
@@ -165,13 +160,15 @@ impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
                 let hyper_edge: BTreeSet<TermKey> = transitions
                     .map(|(weight, proc)| {
                         let sub_var = self.get_var(proc, formula_key);
-                        let sub_term = self.get_term(sub_var);
+                        let sub_term = self.insert_term(NumericTerm::Var(sub_var));
                         let weight_term = self.insert_term(NumericTerm::Const(weight));
                         self.insert_term(NumericTerm::Add(weight_term, sub_term))
                     })
                     .collect();
 
-                let acceptance_term = self.get_term(self.get_var(process_key, acceptance_formula));
+                let acceptance_term = self.insert_term(NumericTerm::Var(
+                    self.get_var(process_key, acceptance_formula),
+                ));
                 let hyper_edge = self.insert_term(NumericTerm::Max(hyper_edge));
 
                 self.insert_term(NumericTerm::Min(BTreeSet::from([
@@ -187,13 +184,15 @@ impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
                 let mut hyper_edges: BTreeSet<TermKey> = transitions
                     .map(|(weight, proc)| {
                         let sub_var = self.get_var(proc, formula_key);
-                        let sub_term = self.get_term(sub_var);
+                        let sub_term = self.insert_term(NumericTerm::Var(sub_var));
                         let weight_term = self.insert_term(NumericTerm::Const(weight));
                         self.insert_term(NumericTerm::Add(weight_term, sub_term))
                     })
                     .collect();
 
-                let acceptance_term = self.get_term(self.get_var(process_key, acceptance_formula));
+                let acceptance_term = self.insert_term(NumericTerm::Var(
+                    self.get_var(process_key, acceptance_formula),
+                ));
 
                 hyper_edges.insert(acceptance_term);
 
@@ -262,7 +261,7 @@ impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
             .names
             .get_or_insert_key((process_key, symbolic_formula_key));
 
-        let symbolic_term_key = self.get_term(var_key);
+        let symbolic_term_key = self.insert_term(NumericTerm::Var(var_key));
         self.insert_term(NumericTerm::Bound {
             bound,
             term: symbolic_term_key,
@@ -274,13 +273,6 @@ impl<ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key> System
     for WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
 {
     fn evaluate(&self, key: VarKey, assignment: &dyn Assignment<VarKey, Number>) -> Number {
-        if let Some(term_key) = self.numeric_system.borrow().definitions.get(key) {
-            return self
-                .numeric_system
-                .borrow()
-                .evaluate_term(*term_key, assignment);
-        }
-
         let term_key = self.get_term(key);
         self.numeric_system
             .borrow()
@@ -297,12 +289,16 @@ impl<ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
     for WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
 {
     fn arguments(&self, key: VarKey) -> HashSet<VarKey> {
-        if let Some(term_key) = self.numeric_system.borrow().definitions.get(key) {
-            return self.numeric_system.borrow().term_arguments(*term_key);
-        }
-
         let term_key = self.get_term(key);
         self.numeric_system.borrow().term_arguments(term_key)
+    }
+}
+
+impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key> Universe<HashSet<VarKey>>
+    for WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
+{
+    fn universe(&self) -> HashSet<VarKey> {
+        self.numeric_system.borrow().universe()
     }
 }
 
