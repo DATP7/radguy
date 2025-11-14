@@ -1,5 +1,6 @@
 use itertools::iproduct;
 use radguy::extension::TermSystem;
+use radguy::ordered::strategy::{InitialStrategy, StrategyHeap, StrategyItem};
 use radguy::{Arguments, PairUniverse, System, Universe};
 use radguy::{Assignment, Set, Union, bislotmap::BiSlotMap};
 use slotmap::{Key, SecondaryMap};
@@ -10,14 +11,21 @@ use std::hash::Hash;
 use crate::systems::numeric::number::Number;
 use crate::systems::numeric::numeric_term::NumericTerm;
 
+pub trait NumericSystem<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone>:
+    TermSystem<V, bool, T>
+{
+    fn get_term(&self, term_key: T) -> NumericTerm<V, T>;
+    fn evaluate_term(&self, term_key: T, assignment: &dyn Assignment<V, Number>) -> Number;
+}
+
 #[derive(Default, Debug)]
-pub struct NumericSystem<K: Key, T: Key, N: Hash + Eq + Clone> {
+pub struct NumericSystemImpl<K: Key, T: Key, N: Hash + Eq + Clone> {
     pub names: BiSlotMap<K, N>,
     pub definitions: SecondaryMap<K, T>,
     pub terms: BiSlotMap<T, NumericTerm<K, T>>,
 }
 
-impl<K: Key, T: Key, N: Hash + Eq + Clone> NumericSystem<K, T, N> {
+impl<K: Key, T: Key, N: Hash + Eq + Clone> NumericSystemImpl<K, T, N> {
     pub fn evaluate_term(&self, term_key: T, assignment: &dyn Assignment<K, Number>) -> Number {
         match self.terms.get_value(term_key) {
             NumericTerm::Const(num) => *num,
@@ -94,7 +102,7 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone> NumericSystem<K, T, N> {
     }
 }
 
-impl<K: Key, T: Key, N: Hash + Eq + Clone + Debug> NumericSystem<K, T, N> {
+impl<K: Key, T: Key, N: Hash + Eq + Clone + Debug> NumericSystemImpl<K, T, N> {
     pub fn print_assignment(&self, a: &dyn Assignment<K, Number>) {
         for (key, name) in self.names.iter() {
             println!("{name:?} = {:?}", a.get(&key));
@@ -112,14 +120,14 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone + Debug> NumericSystem<K, T, N> {
     }
 }
 
-impl<K: Key, T: Key, N: Hash + Eq + Clone> Universe<HashSet<K>> for NumericSystem<K, T, N> {
+impl<K: Key, T: Key, N: Hash + Eq + Clone> Universe<HashSet<K>> for NumericSystemImpl<K, T, N> {
     fn universe(&self) -> HashSet<K> {
         self.definitions.keys().collect()
     }
 }
 
 impl<K: Key, T: Key, N: Hash + Eq + Clone> PairUniverse<HashSet<(K, K)>>
-    for NumericSystem<K, T, N>
+    for NumericSystemImpl<K, T, N>
 {
     fn pair_universe(&self) -> HashSet<(K, K)> {
         iproduct!(self.names.keys(), self.names.keys()).collect()
@@ -127,7 +135,7 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone> PairUniverse<HashSet<(K, K)>>
 }
 
 impl<VarKey: Key, TermKey: Key, VarName: Hash + Eq + Clone> System<VarKey, Number>
-    for NumericSystem<VarKey, TermKey, VarName>
+    for NumericSystemImpl<VarKey, TermKey, VarName>
 {
     fn evaluate(&self, key: VarKey, assignment: &dyn Assignment<VarKey, Number>) -> Number {
         let term_key = self.definitions.get(key).expect("variable must be defined");
@@ -140,7 +148,7 @@ impl<VarKey: Key, TermKey: Key, VarName: Hash + Eq + Clone> System<VarKey, Numbe
 }
 
 impl<VarKey: Key, TermKey: Key, VarName: Hash + Eq + Clone> Arguments<VarKey, HashSet<VarKey>>
-    for NumericSystem<VarKey, TermKey, VarName>
+    for NumericSystemImpl<VarKey, TermKey, VarName>
 {
     fn arguments(&self, key: VarKey) -> HashSet<VarKey> {
         let term_key = self.definitions.get(key).expect("variable must be defined");
@@ -149,13 +157,24 @@ impl<VarKey: Key, TermKey: Key, VarName: Hash + Eq + Clone> Arguments<VarKey, Ha
 }
 
 impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
-    TermSystem<VarKey, Number, TermKey> for NumericSystem<VarKey, TermKey, VarName>
+    TermSystem<VarKey, Number, TermKey> for NumericSystemImpl<VarKey, TermKey, VarName>
 {
     fn definition(&self, variable: VarKey) -> TermKey {
         *self
             .definitions
             .get(variable)
             .expect("variable should have a definition")
+    }
+}
+
+impl<VarKey: Key + Hash + Clone, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
+    InitialStrategy<VarKey, Number, StrategyHeap<(VarKey, VarKey)>>
+    for NumericSystemImpl<VarKey, TermKey, VarName>
+{
+    fn get_initial_strategy(&self) -> StrategyHeap<(VarKey, VarKey)> {
+        iproduct!(self.names.keys(), self.names.keys())
+            .map(|(x, y)| StrategyItem::infinite((x, y)).reversed())
+            .collect()
     }
 }
 
@@ -229,7 +248,7 @@ macro_rules! numeric_def {
 macro_rules! numeric_system {
     ($($id:ident = $term:tt;)*) => {
         {
-            let mut system = $crate::systems::numeric::numeric_system::NumericSystem::<slotmap::DefaultKey, slotmap::DefaultKey, &str>::default();
+            let mut system = $crate::systems::numeric::numeric_system::NumericSystemImpl::<slotmap::DefaultKey, slotmap::DefaultKey, &str>::default();
             $(
                 numeric_def!($id = $term; system);
             )*

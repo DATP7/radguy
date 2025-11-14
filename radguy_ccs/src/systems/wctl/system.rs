@@ -3,18 +3,22 @@ use std::{
     collections::{BTreeSet, HashMap, HashSet},
 };
 
-use radguy::{Arguments, Assignment, PairUniverse, System, Universe, bislotmap::BiSlotMap};
+use radguy::{
+    Arguments, Assignment, PairUniverse, System, Universe,
+    bislotmap::BiSlotMap,
+    ordered::strategy::{InitialStrategy, Strategy},
+};
 use slotmap::Key;
 
 use crate::systems::{
-    numeric::{number::Number, numeric_system::NumericSystem, numeric_term::NumericTerm},
+    numeric::{number::Number, numeric_system::NumericSystemImpl, numeric_term::NumericTerm},
     wccs::{ast::WeightedAction, wccs_system::WCCSSystem},
     wctl::flat_formula::{FlatExpr, FlatFormula},
 };
 
 pub struct WCTLSystem<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key> {
     pub(crate) wccs_system: WCCSSystem<'a, ProcKey>,
-    numeric_system: RefCell<NumericSystem<VarKey, TermKey, (ProcKey, FormKey)>>,
+    numeric_system: RefCell<NumericSystemImpl<VarKey, TermKey, (ProcKey, FormKey)>>,
     pub(crate) formulas: RefCell<BiSlotMap<FormKey, FlatFormula<'a, FormKey, ExprKey>>>,
     pub(crate) expresions: RefCell<BiSlotMap<ExprKey, FlatExpr<'a, ExprKey>>>,
 }
@@ -29,7 +33,7 @@ impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
     pub fn new(wccs_system: WCCSSystem<'a, ProcKey>) -> Self {
         WCTLSystem {
             wccs_system,
-            numeric_system: RefCell::new(NumericSystem::default()),
+            numeric_system: RefCell::new(NumericSystemImpl::default()),
             formulas: RefCell::new(BiSlotMap::default()),
             expresions: RefCell::new(BiSlotMap::default()),
         }
@@ -308,5 +312,23 @@ impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key>
 {
     fn pair_universe(&self) -> HashSet<(VarKey, VarKey)> {
         self.numeric_system.borrow().pair_universe()
+    }
+}
+
+impl<
+    ProcKey: Key,
+    VarKey: Key,
+    TermKey: Key,
+    FormKey: Key,
+    ExprKey: Key,
+    OutStrategy: Strategy<(VarKey, VarKey)>,
+> InitialStrategy<VarKey, Number, OutStrategy>
+    for WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
+where
+    NumericSystemImpl<VarKey, TermKey, (ProcKey, ProcKey)>:
+        InitialStrategy<VarKey, Number, OutStrategy>,
+{
+    fn get_initial_strategy(&self) -> OutStrategy {
+        self.numeric_system.borrow().get_initial_strategy()
     }
 }

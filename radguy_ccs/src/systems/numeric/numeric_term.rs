@@ -4,7 +4,7 @@ use std::fmt::Debug;
 use std::fmt::Display;
 use std::hash::Hash;
 
-use crate::systems::numeric::{number::Number, numeric_system::NumericSystem};
+use crate::systems::numeric::{number::Number, numeric_system::NumericSystemImpl};
 
 #[derive(Hash, PartialEq, Eq, Clone, Debug)]
 pub enum NumericTerm<V: Key, T: Key> {
@@ -22,7 +22,7 @@ pub enum NumericTerm<V: Key, T: Key> {
 impl<V: Key, T: Key> NumericTerm<V, T> {
     pub fn to_string_debug<N: Hash + Clone + Eq + Debug>(
         &self,
-        sys: &NumericSystem<V, T, N>,
+        sys: &NumericSystemImpl<V, T, N>,
     ) -> String {
         match self {
             Self::Const(num) => format!("{num}"),
@@ -70,7 +70,7 @@ impl<V: Key, T: Key> NumericTerm<V, T> {
 
     pub fn to_string<N: Hash + Clone + Eq + Display>(
         &self,
-        sys: &NumericSystem<V, T, N>,
+        sys: &NumericSystemImpl<V, T, N>,
     ) -> String {
         match self {
             Self::Const(num) => format!("{num}"),
