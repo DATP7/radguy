@@ -1,3 +1,4 @@
+use std::hash::Hash;
 use std::{
     cell::RefCell,
     collections::{BTreeSet, HashMap, HashSet},
@@ -315,18 +316,18 @@ impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key>
     }
 }
 
-impl<
+impl<ProcKey, VarKey, TermKey, FormKey, ExprKey, OutStrategy>
+    InitialStrategy<VarKey, Number, OutStrategy>
+    for WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
+where
+    NumericSystemImpl<VarKey, TermKey, (ProcKey, FormKey)>:
+        InitialStrategy<VarKey, Number, OutStrategy>,
     ProcKey: Key,
-    VarKey: Key,
-    TermKey: Key,
+    VarKey: Key + Clone + Hash,
+    TermKey: Key + Hash,
     FormKey: Key,
     ExprKey: Key,
     OutStrategy: Strategy<(VarKey, VarKey)>,
-> InitialStrategy<VarKey, Number, OutStrategy>
-    for WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
-where
-    NumericSystemImpl<VarKey, TermKey, (ProcKey, ProcKey)>:
-        InitialStrategy<VarKey, Number, OutStrategy>,
 {
     fn get_initial_strategy(&self) -> OutStrategy {
         self.numeric_system.borrow().get_initial_strategy()
