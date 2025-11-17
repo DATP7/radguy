@@ -23,6 +23,24 @@ pub trait BoolSystem<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone>:
     fn evaluate_term(&self, term_key: T, assignment: &dyn Assignment<V, bool>) -> bool;
 }
 
+pub struct SmartBoolSystem<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone, K: Key> {
+    bool_system: BoolSystemImpl<B,T,N>,
+    discovered_pair_univsere: HashSet<K,K>,
+}
+
+impl<K: Key, T: Key, N: Hash + Eq + Clone> PairUniverse<HashSet<(K, K)>>
+    for SmartBoolSystem<K, T, N>
+{
+    fn pair_universe(&self) -> HashSet<(K, K)> {
+        let args = !todo!();
+        let discovered = !todo!();
+        let discoverd_product = iproduct!(discovered, args);
+        let args_product = iproduct!(args, discovered);
+        self.discovered_pair_univsere.union(discoverd_pairs).union(args_pairs)
+    }
+}
+
+
 #[derive(Default, Debug)]
 pub struct BoolSystemImpl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone> {
     pub names: BiSlotMap<V, N>,
