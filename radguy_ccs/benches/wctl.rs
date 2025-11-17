@@ -2,20 +2,10 @@ use criterion::BenchmarkId;
 use criterion::{Criterion, criterion_group, criterion_main};
 use radguy::{
     kleene_local,
-    oracle::{ArgumentsOracle, LocalMaxR, LocalOracle, SMax},
-    ordered::{
-        self,
-        oracle::{
-            CountOracle, InverseCountOracle, StrategicArgumentsOracle, StrategicLocalOracle,
-            ToConstant,
-        },
-        strategy::StrategyWeight,
-    },
+    oracle::SMax,
+    ordered::{self, oracle::ToConstant, strategy::StrategyWeight},
 };
-use radguy_ccs::systems::ccs::{
-    bisimulation_system::BisimulationSystem, grammar::ProgramParser,
-    transition_system::TransitionSystem, weak_transition_system::WeakTransitionSystem,
-};
+
 use radguy_ccs::systems::numeric::number::Number;
 use radguy_ccs::systems::wccs;
 use radguy_ccs::systems::wccs::wccs_system::WCCSSystem;
@@ -44,7 +34,7 @@ macro_rules! bisim_bench_oracles_ordered {
                         wccs_system.insert_ast_bindings(wccs_ast.clone());
                         (WCTLSystem::<DefaultKey, DefaultKey, DefaultKey, DefaultKey, DefaultKey>::new(wccs_system), (*o).clone())
                     },
-                    |(mut sys, o)| {
+                    |(sys, o)| {
                         let process_key = sys.lookup_process_key($process_name).expect("Process name should be bound");
                         let formula_key = sys.insert_ast_formula(formula.clone());
                         let target = sys.get_var(process_key, formula_key);
@@ -89,7 +79,7 @@ macro_rules! bisim_bench_oracles_unordered {
                         wccs_system.insert_ast_bindings(wccs_ast.clone());
                         (WCTLSystem::<DefaultKey, DefaultKey, DefaultKey, DefaultKey, DefaultKey>::new(wccs_system), (*o).clone())
                     },
-                    |(mut sys, o)| {
+                    |(sys, o)| {
                         let process_key = sys.lookup_process_key($process_name).expect("Process name should be bound");
                         let formula_key = sys.insert_ast_formula(formula.clone());
                         let target = sys.get_var(process_key, formula_key);
@@ -133,8 +123,8 @@ macro_rules! bisim_bench_suite {
             };
 
             bisim_bench_oracles_ordered! { $name: using c, bench $process_name, $formula_str => $sat in wccs, with
+                SMax::default().constant(StrategyWeight::Infinity),
                 // TODO: Orderd oracles dont work properly
-                // SMax::default().constant(StrategyWeight::Infinity),
                 // LocalMaxR::default().constant(StrategyWeight::Infinity),
                 // LocalMaxR::default().constant(StrategyWeight::Infinity).then(CountOracle),
                 // LocalMaxR::default().constant(StrategyWeight::Infinity).then(InverseCountOracle),

@@ -4,35 +4,8 @@ use radguy_ccs::systems::numeric::number::Number;
 use radguy_ccs::systems::wccs;
 use radguy_ccs::systems::wccs::wccs_system::WCCSSystem;
 use radguy_ccs::systems::wctl;
-use radguy_ccs::systems::wctl::system::WCTLSystem;
+use radguy_ccs::systems::wctl::wctl_system::WCTLSystem;
 use slotmap::DefaultKey;
-
-// macro_rules! wctl_test {
-//     ($($process_name:literal, $formula_name:literal => $eq:literal in $wccs:expr, $wctl:expr;)*) => {
-//         $(
-//             {
-//                 let wccs_parser = wccs::ProgramParser::new();
-//                 let wccs_ast = wccs_parser
-//                     .parse(&$wccs)
-//                     .expect("Failed to parse WCCS program content.");
-//                 let mut wccs_system = WCCSSystem::<DefaultKey>::default();
-//                 wccs_system.insert_ast_bindings(wccs_ast);
-
-//                 let wctl_parser = wctl::ProgramParser::new();
-//                 let wctl_bindings = wctl_parser.parse(&$wctl).expect("Failed to parse WCTL program content.");
-//                 let formula = wctl_bindings.get($formula_name).expect("Formula should be bound");
-
-//                 let sys = WCTLSystem::<DefaultKey, DefaultKey, DefaultKey, DefaultKey, DefaultKey>::new(wccs_system);
-//                 let process_key = sys.lookup_process($process_name).expect("Process name should be bound");
-//                 let formula_key = sys.insert_ast_formula(formula.clone());
-//                 let start = sys.get_var(*process_key, formula_key);
-
-//                 let result = kleene_local(&sys, start, &SMax::default()) == Number::Val(0);
-//                 assert_eq!($eq, result, "{} should{} satisfy {} in {} {}", $process_name, if !$eq { " not" } else {""}, $formula_name, $wccs, $wctl);
-//             }
-//         )*
-//     };
-// }
 
 macro_rules! wctl_test {
     ($($(#ignore($reason:literal))? $test_name:ident: $($process_name:literal, $formula_str:expr => $eq:literal),* $(,)? in $wccs:expr;)*) => {
