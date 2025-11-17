@@ -4,7 +4,7 @@ use crate::systems::{
     numeric::number::Number,
     wctl::{
         flat_formula::{FlatExpr, FlatFormula, FlatRelationalExpr},
-        system::WCTLSystem,
+        wctl_system::WCTLSystem,
     },
 };
 

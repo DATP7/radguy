@@ -12,7 +12,7 @@ use crate::systems::numeric::number::Number;
 use crate::systems::numeric::numeric_term::NumericTerm;
 
 pub trait NumericSystem<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone>:
-    TermSystem<V, bool, T>
+    TermSystem<V, Number, T>
 {
     fn get_term(&self, term_key: T) -> NumericTerm<V, T>;
     fn evaluate_term(&self, term_key: T, assignment: &dyn Assignment<V, Number>) -> Number;
@@ -25,8 +25,12 @@ pub struct NumericSystemImpl<K: Key, T: Key, N: Hash + Eq + Clone> {
     pub terms: BiSlotMap<T, NumericTerm<K, T>>,
 }
 
-impl<K: Key, T: Key, N: Hash + Eq + Clone> NumericSystemImpl<K, T, N> {
-    pub fn evaluate_term(&self, term_key: T, assignment: &dyn Assignment<K, Number>) -> Number {
+impl<K: Key, T: Key, N: Hash + Eq + Clone> NumericSystem<K, T, N> for NumericSystemImpl<K, T, N> {
+    fn get_term(&self, term_key: T) -> NumericTerm<K, T> {
+        self.terms.get_value(term_key).clone()
+    }
+
+    fn evaluate_term(&self, term_key: T, assignment: &dyn Assignment<K, Number>) -> Number {
         match self.terms.get_value(term_key) {
             NumericTerm::Const(num) => *num,
             NumericTerm::Var(k) => assignment.get(k),
@@ -73,7 +77,9 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone> NumericSystemImpl<K, T, N> {
             }
         }
     }
+}
 
+impl<K: Key, T: Key, N: Hash + Eq + Clone> NumericSystemImpl<K, T, N> {
     pub fn term_arguments<
         ArgSet: Set<K> + Union + Default + FromIterator<K> + IntoIterator<Item = K>,
     >(

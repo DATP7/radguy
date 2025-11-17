@@ -1,7 +1,7 @@
 use slotmap::Key;
 
 use crate::systems::wccs::wccs_system::MultiSet;
-use crate::systems::{numeric::number::Number, wctl::system::WCTLSystem};
+use crate::systems::{numeric::number::Number, wctl::wctl_system::WCTLSystem};
 
 #[derive(Hash, PartialEq, Eq, Clone)]
 pub enum FlatFormula<'a, FormKey: Key, ExprKey: Key> {

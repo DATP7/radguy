@@ -9,5 +9,5 @@ lalrpop_mod!(
 
 pub mod ast;
 pub mod flat_formula;
-pub mod system;
+pub mod wctl_system;
 pub use grammar::ProgramParser;

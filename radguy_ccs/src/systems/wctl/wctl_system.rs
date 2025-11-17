@@ -4,6 +4,7 @@ use std::{
     collections::{BTreeSet, HashMap, HashSet},
 };
 
+use radguy::extension::TermSystem;
 use radguy::{
     Arguments, Assignment, PairUniverse, System, Universe,
     bislotmap::BiSlotMap,
@@ -12,7 +13,11 @@ use radguy::{
 use slotmap::Key;
 
 use crate::systems::{
-    numeric::{number::Number, numeric_system::NumericSystemImpl, numeric_term::NumericTerm},
+    numeric::{
+        number::Number,
+        numeric_system::{NumericSystem, NumericSystemImpl},
+        numeric_term::NumericTerm,
+    },
     wccs::{ast::WeightedAction, wccs_system::WCCSSystem},
     wctl::flat_formula::{FlatExpr, FlatFormula},
 };
@@ -46,12 +51,12 @@ impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
             .get_or_insert_key(term)
     }
 
-    fn get_term(&self, key: VarKey) -> TermKey {
-        if let Some(term_key) = self.numeric_system.borrow().definitions.get(key) {
+    fn get_term_key(&self, var_key: VarKey) -> TermKey {
+        if let Some(term_key) = self.numeric_system.borrow().definitions.get(var_key) {
             return *term_key;
         }
 
-        let (process_key, formula_key) = *self.numeric_system.borrow().names.get_value(key);
+        let (process_key, formula_key) = *self.numeric_system.borrow().names.get_value(var_key);
         let formula = self.formulas.borrow().get_value(formula_key).clone();
 
         let term_key = match formula {
@@ -226,7 +231,7 @@ impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
         self.numeric_system
             .borrow_mut()
             .definitions
-            .insert(key, term_key);
+            .insert(var_key, term_key);
 
         term_key
     }
@@ -278,7 +283,7 @@ impl<ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key> System
     for WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
 {
     fn evaluate(&self, key: VarKey, assignment: &dyn Assignment<VarKey, Number>) -> Number {
-        let term_key = self.get_term(key);
+        let term_key = self.get_term_key(key);
         self.numeric_system
             .borrow()
             .evaluate_term(term_key, assignment)
@@ -294,7 +299,7 @@ impl<ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
     for WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
 {
     fn arguments(&self, key: VarKey) -> HashSet<VarKey> {
-        let term_key = self.get_term(key);
+        let term_key = self.get_term_key(key);
         self.numeric_system.borrow().term_arguments(term_key)
     }
 }
@@ -331,5 +336,33 @@ where
 {
     fn get_initial_strategy(&self) -> OutStrategy {
         self.numeric_system.borrow().get_initial_strategy()
+    }
+}
+
+impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key>
+    TermSystem<VarKey, Number, TermKey>
+    for WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
+{
+    fn definition(&self, variable: VarKey) -> TermKey {
+        self.get_term_key(variable)
+    }
+}
+
+impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key>
+    NumericSystem<VarKey, TermKey, (ProcKey, FormKey)>
+    for WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
+{
+    fn get_term(&self, term_key: TermKey) -> NumericTerm<VarKey, TermKey> {
+        self.numeric_system.borrow().get_term(term_key)
+    }
+
+    fn evaluate_term(
+        &self,
+        term_key: TermKey,
+        assignment: &dyn Assignment<VarKey, Number>,
+    ) -> Number {
+        self.numeric_system
+            .borrow()
+            .evaluate_term(term_key, assignment)
     }
 }
