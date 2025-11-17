@@ -377,16 +377,16 @@ impl<VarKey: Eq + Copy + Hash, PS: Strategy<(VarKey, VarKey)>> Display
     }
 }
 
-#[derive(Default, Clone, Debug)]
+/* #[derive(Default, Clone, Debug)]
 pub struct StrategicHeightOracle<VarKey: Eq + Copy + Hash + Key> {
     successors: RefCell<HashMap<VarKey, HashSet<VarKey>>>,
     ancestors: RefCell<HashMap<VarKey, HashSet<VarKey>>>,
     previous_visited: RefCell<HashSet<VarKey>>,
     strategy_cache: RefCell<StrategyHeap<(VarKey, VarKey)>>,
     variables_cache: HashSet<VarKey>,
-}
+} */
 
-impl<K: Eq + Copy + Hash + Debug + Key> StrategicHeightOracle<K> {
+/* impl<K: Eq + Copy + Hash + Debug + Key> StrategicHeightOracle<K> {
     fn get_updated_weights<S: Arguments<K, HashSet<K>>>(
         &self,
         visited: &HashSet<K>,
@@ -500,9 +500,134 @@ impl<K: Eq + Copy + Hash + Debug + Key> StrategicHeightOracle<K> {
 
         strategy.clone()
     }
+} */
+
+#[derive(Default, Clone, Debug)]
+pub struct StrategicHeightOracle<VarKey: Eq + Copy + Hash + Key> {
+    previous_visited: RefCell<HashSet<VarKey>>,
+    variables_cache: HashSet<VarKey>,
+}
+#[expect(clippy::similar_names)]
+impl<K: Eq + Copy + Hash + Debug + Key> StrategicHeightOracle<K> {
+    fn get_updated_weights<S: Arguments<K, HashSet<K>>>(
+        &self,
+        visited: &HashSet<K>,
+        system: &S,
+        relation: &StrategyHeap<(K, K)>,
+    ) -> StrategyHeap<(K, K)> {
+        let previous_visited =  self.previous_visited.borrow_mut();
+        
+        let mut new_variables = Vec::new();
+        if previous_visited.len() != visited.len() {
+            new_variables = visited.difference(&previous_visited).copied().collect();
+        };
+
+        let mut variables = HashSet::new();
+        if self.variables_cache.is_empty() {
+            variables.clone_from(visited);
+            for variable in visited {
+                for arg in system.arguments(*variable) {
+                    variables.insert(arg);
+                }
+            }
+        } else {
+            variables.clone_from(&self.variables_cache);
+            for variable in new_variables {
+                for arg in system.arguments(variable) {
+                    variables.insert(arg);
+                }
+            }
+        }
+        
+        let weightmap: HashMap<_, _> = relation
+            .iter()
+            .map(|Reverse(StrategyItem(weight, (x, y)))| ((x,y), weight))
+            .collect();
+
+        //PERF find algorithm that uses previous knowledge of graph to speed up finding all shortest paths.
+        let mut graph: SecondaryMap<K, _> = SecondaryMap::<K, SecondaryMap<K, Option<StrategyWeight>>>::new();
+        for i in variables {
+            let mut inner = SecondaryMap::new();
+            for j in variables {
+                if let Some(weight) = weightmap.get(&(&i, &j)) {
+                    inner.insert(j, Some(**weight));
+                } else {
+                    inner.insert(j, None);
+                }
+            }
+        }
+        for k in variables.clone() {
+            for i in variables.clone() {
+                for j in variables.clone() {
+                    let dist_ij = *graph
+                        .get(i)
+                        .expect("All variables should be mapped")
+                        .get(j)
+                        .expect("All variables should be mapped");
+                    let dist_ik = *graph
+                        .get(i)
+                        .expect("All variables should be mapped")
+                        .get(k)
+                        .expect("All variables should be mapped");
+                    let dist_kj = *graph
+                        .get(k)
+                        .expect("All variables should be mapped")
+                        .get(j)
+                        .expect("All variables should be mapped");
+                    if let Some(dist_ik) = dist_ik
+                        && let Some(dist_kj) = dist_kj
+                    {
+                        if let Some(dist_ij) = dist_ij {
+                            if dist_ij > dist_ik + dist_kj {
+                                graph
+                                    .get_mut(i)
+                                    .expect("All variables should be mapped")
+                                    .insert(j, Some(dist_ik + dist_kj));
+                            }
+                        } else {
+                            graph
+                                .get_mut(i)
+                                .expect("All variables should be mapped")
+                                .insert(j, Some(dist_ik + dist_kj));
+                        }
+                    }
+                }
+            }
+        }
+
+        
+        // Change to a retain
+
+        let mut new_strategy = StrategyHeap::new();
+        for i in variables.clone() {
+            for j in variables.clone() {
+                let val = graph
+                .get(i)
+                .unwrap_or_else(|| panic!("All variables should be mapped {i:?} outer"))
+                .get(j)
+                .unwrap_or_else(|| panic!("All variables should be mapped {j:?} inner"));
+            if !val.is_none() {
+                new_strategy.push(Reverse(StrategyItem(val.expect("Just checked that value is not none"), (j,i))));
+            }
+            }
+        }
+        /* strategy.extend(to_update.into_iter().map(|(x, y)| {
+            let val = graph
+                .get(y)
+                .unwrap_or_else(|| panic!("All variables should be mapped {y:?} outer"))
+                .get(x)
+                .unwrap_or_else(|| panic!("All variables should be mapped {x:?} inner"));
+            val.as_ref().map_or(
+                Reverse(StrategyItem(StrategyWeight::Infinity, (x, y))),
+                |number| Reverse(StrategyItem(StrategyWeight::Num(*number), (x, y))),
+            )
+        })); */
+
+        new_strategy
+    }
 }
 
-#[expect(clippy::similar_names)]
+/* #[expect(clippy::similar_names)]
 impl<K: Eq + Copy + Hash + Debug + Key> StrategicHeightOracle<K> {
     fn find_weights<S: Arguments<K, HashSet<K>>>(
         visited: &HashSet<K>,
@@ -592,7 +717,7 @@ impl<K: Eq + Copy + Hash + Debug + Key> StrategicHeightOracle<K> {
         }));
         strategy
     }
-}
+} */
 
 // TODO: Make this generic on set/strategy implementation
 impl<K: Eq + Copy + Hash + Debug + Key, V: PartialOrd, S: System<K, V> + Arguments<K, HashSet<K>>>
