@@ -391,6 +391,7 @@ impl<K: Eq + Copy + Hash + Debug + Key> StrategicHeightOracle<K> {
         &self,
         visited: &HashSet<K>,
         system: &S,
+        relation: &StrategyHeap<(K, K)>,
     ) -> StrategyHeap<(K, K)> {
         let mut successors = self.successors.borrow_mut();
         let mut ancestors = self.ancestors.borrow_mut();
@@ -493,7 +494,9 @@ impl<K: Eq + Copy + Hash + Debug + Key> StrategicHeightOracle<K> {
                 }
             }
         }
-        strategy.extend(Self::find_weights(visited, &variables, system, to_add));
+        strategy.extend(Self::find_weights(
+            visited, &variables, system, to_add, relation,
+        ));
 
         strategy.clone()
     }
@@ -506,8 +509,16 @@ impl<K: Eq + Copy + Hash + Debug + Key> StrategicHeightOracle<K> {
         variables: &HashSet<K>,
         system: &S,
         to_update: HashSet<(K, K)>,
+        relation: &StrategyHeap<(K, K)>,
     ) -> StrategyHeap<(K, K)> {
         let mut strategy = StrategyHeap::new();
+        let weightmap: HashMap<_, _> = relation
+            .iter()
+            .map(|Reverse(StrategyItem(weight, (x, y)))| match weight {
+                StrategyWeight::Infinity => ((x, y), None),
+                StrategyWeight::Num(number) => ((x, y), Some(*number)),
+            })
+            .collect();
 
         //PERF find algorithm that uses previous knowledge of graph to speed up finding all shortest paths.
         let mut graph = SecondaryMap::new();
@@ -517,7 +528,12 @@ impl<K: Eq + Copy + Hash + Debug + Key> StrategicHeightOracle<K> {
                 if i == j {
                     inner.insert(j, Some(0));
                 } else if visited.contains(&i) && system.arguments(i).contains(&j) {
-                    inner.insert(j, Some(1));
+                    if let Some(weight) = weightmap.get(&(&i, &j)) {
+                        inner.insert(j, *weight);
+                    } else {
+                        // Infinity or none?
+                        inner.insert(j, Some(1));
+                    }
                 } else {
                     inner.insert(j, None);
                 }
@@ -563,20 +579,16 @@ impl<K: Eq + Copy + Hash + Debug + Key> StrategicHeightOracle<K> {
             }
         }
 
-        strategy.extend(to_update.into_iter().map(|(y, x)| {
-            Reverse(StrategyItem(
-                StrategyWeight::Num(
-                    graph
-                        .get(x)
-                        .unwrap_or_else(|| panic!("All variables should be mapped {x:?} outer"))
-                        .get(y)
-                        .unwrap_or_else(|| panic!("All variables should be mapped {y:?} inner"))
-                        .unwrap_or_else(|| {
-                            panic!("All viable pairs should return a number ({x:?}, {y:?})")
-                        }),
-                ),
-                (x, y),
-            ))
+        strategy.extend(to_update.into_iter().map(|(x, y)| {
+            let val = graph
+                .get(y)
+                .unwrap_or_else(|| panic!("All variables should be mapped {y:?} outer"))
+                .get(x)
+                .unwrap_or_else(|| panic!("All variables should be mapped {x:?} inner"));
+            val.as_ref().map_or(
+                Reverse(StrategyItem(StrategyWeight::Infinity, (x, y))),
+                |number| Reverse(StrategyItem(StrategyWeight::Num(*number), (x, y))),
+            )
         }));
         strategy
     }
@@ -590,16 +602,16 @@ impl<K: Eq + Copy + Hash + Debug + Key, V: PartialOrd, S: System<K, V> + Argumen
         &self,
         visited: &HashSet<K>,
         _assignment: &impl Assignment<K, V>,
-        _strategy: &StrategyHeap<(K, K)>,
+        strategy: &StrategyHeap<(K, K)>,
         system: &S,
     ) -> StrategyHeap<(K, K)> {
-        self.get_updated_weights(visited, system)
+        self.get_updated_weights(visited, system, strategy)
     }
 }
 
 impl<VarKey: Eq + Copy + Hash + Key> Display for StrategicHeightOracle<VarKey> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Args_c")
+        write!(f, "height_c")
     }
 }
 
@@ -1030,11 +1042,23 @@ mod tests {
 
                         let mut visited = HashSet::new();
                         let mut visit_seq = Vec::new();
+                        let mut relation = StrategyHeap::new();
+                        let mut discovered = HashSet::new();
                         $(
                             visited.extend(HashSet::from([$($visited_var,)*]));
+                            for variable in visited.clone() {
+                                for arg in system.arguments(variable) {
+                                    discovered.insert(arg);
+                                }
+                            }
+                            for variable1 in discovered.clone() {
+                                for variable2 in discovered.clone() {
+                                    relation.push(Reverse(StrategyItem(StrategyWeight::Num(100), (variable1, variable2))));
+                                }
+                            }
                             visit_seq.push(stringify!($($visited_var),*));
                             let expected = StrategyHeap::from([$(StrategyItem(StrategyWeight::Num($w), ($l, $r)).reversed(),)*]);
-                            let got = oracle.get_updated_weights(&visited, &system);
+                            let got = oracle.get_updated_weights(&visited, &system, &relation);
 
                             let expected_domain: HashSet<_> = expected.clone().domain();
                             let got_domain: HashSet<_> = got.clone().domain();
@@ -1081,7 +1105,7 @@ mod tests {
                     x = {y};
                     y = {};
                 };
-                visit {x} => {(x, x) -> 0, (x, y) -> 1, (y, y) -> 0};
+                visit {x} => {(x, x) -> 0, (y, x) -> 1, (y, y) -> 0};
                 reset;
             };
             insert_into_chain: {
@@ -1094,49 +1118,49 @@ mod tests {
                 };
                 visit {a} => {
                     (a, a) -> 0,
-                    (a, b) -> 1,
-                    (a, e) -> 1,
+                    (b, a) -> 1,
+                    (e, a) -> 1,
                     (b, b) -> 0,
                     (e, e) -> 0,
                 };
                 visit {b} => {
                     (a, a) -> 0,
-                    (a, b) -> 1,
-                    (a, e) -> 1,
+                    (b, a) -> 1,
+                    (e, a) -> 1,
                     (b, b) -> 0,
                     (e, e) -> 0,
                     (c, c) -> 0,
-                    (a, c) -> 2,
-                    (b, c) -> 1,
+                    (c, a) -> 2,
+                    (c, b) -> 1,
                 };
                 visit {c} => {
                     (a, a) -> 0,
-                    (a, b) -> 1,
-                    (a, e) -> 1,
+                    (b, a) -> 1,
+                    (e, a) -> 1,
                     (b, b) -> 0,
                     (e, e) -> 0,
                     (c, c) -> 0,
-                    (a, c) -> 2,
-                    (b, c) -> 1,
+                    (c, a) -> 2,
+                    (c, b) -> 1,
                     (d, d) -> 0,
-                    (a, d) -> 3,
-                    (b, d) -> 2,
-                    (c, d) -> 1,
+                    (d, a) -> 3,
+                    (d, b) -> 2,
+                    (d, c) -> 1,
                 };
                 visit {e} => {
                     (a, a) -> 0,
-                    (a, b) -> 1,
-                    (a, e) -> 1,
+                    (b, a) -> 1,
+                    (e, a) -> 1,
                     (b, b) -> 0,
                     (e, e) -> 0,
                     (c, c) -> 0,
-                    (a, c) -> 2,
-                    (b, c) -> 1,
+                    (c, a) -> 2,
+                    (c, b) -> 1,
                     (d, d) -> 0,
-                    (a, d) -> 2,
-                    (b, d) -> 2,
-                    (c, d) -> 1,
-                    (e, d) -> 1,
+                    (d, a) -> 2,
+                    (d, b) -> 2,
+                    (d, c) -> 1,
+                    (d, e) -> 1,
                 };
                 reset;
             };
@@ -1145,8 +1169,8 @@ mod tests {
                     x = {y};
                     y = {x};
                 };
-                visit {x} => {(x, x) -> 0, (x, y) -> 1, (y, y) -> 0};
-                visit {y} => {(x, x) -> 0, (x, y) -> 1, (y, y) -> 0, (y, x) -> 1};
+                visit {x} => {(x, x) -> 0, (y, x) -> 1, (y, y) -> 0};
+                visit {y} => {(x, x) -> 0, (y, x) -> 1, (y, y) -> 0, (x, y) -> 1};
                 reset;
             };
             four_cycle: {
@@ -1158,46 +1182,46 @@ mod tests {
                 };
                 visit {x} => {
                     (x, x) -> 0,
-                    (x, y) -> 1,
+                    (y, x) -> 1,
                     (y, y) -> 0,
                 };
                 visit {y} => {
                     (x, x) -> 0,
-                    (x, y) -> 1,
+                    (y, x) -> 1,
                     (y, y) -> 0,
-                    (x, z) -> 2,
-                    (y, z) -> 1,
+                    (z, x) -> 2,
+                    (z, y) -> 1,
                     (z, z) -> 0,
                 };
                 visit {z} => {
                     (x, x) -> 0,
-                    (x, y) -> 1,
+                    (y, x) -> 1,
                     (y, y) -> 0,
-                    (x, z) -> 2,
-                    (y, z) -> 1,
+                    (z, x) -> 2,
+                    (z, y) -> 1,
                     (z, z) -> 0,
-                    (x, k) -> 3,
-                    (y, k) -> 2,
-                    (z, k) -> 1,
+                    (k, x) -> 3,
+                    (k, y) -> 2,
+                    (k, z) -> 1,
                     (k, k) -> 0,
                 };
                 visit {k} => {
                     (x, x) -> 0,
-                    (x, y) -> 1,
+                    (y, x) -> 1,
                     (y, y) -> 0,
-                    (x, z) -> 2,
-                    (y, z) -> 1,
-                    (z, z) -> 0,
-                    (x, k) -> 3,
-                    (y, k) -> 2,
-                    (z, k) -> 1,
-                    (k, k) -> 0,
-                    (y, x) -> 3,
                     (z, x) -> 2,
-                    (k, x) -> 1,
-                    (z, y) -> 3,
+                    (z, y) -> 1,
+                    (z, z) -> 0,
+                    (k, x) -> 3,
                     (k, y) -> 2,
-                    (k, z) -> 3,
+                    (k, z) -> 1,
+                    (k, k) -> 0,
+                    (x, y) -> 3,
+                    (x, z) -> 2,
+                    (x, k) -> 1,
+                    (y, z) -> 3,
+                    (y, k) -> 2,
+                    (z, k) -> 3,
                 };
                 reset;
             };
