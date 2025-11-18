@@ -5,13 +5,13 @@ use std::{
     hash::Hash,
 };
 
-use itertools::iproduct;
+use itertools::{Itertools, iproduct};
+use radguy::bislotmap::BiSlotMap;
 use radguy::{
     Arguments, Assignment, PairUniverse, System, Universe,
     extension::TermSystem,
     ordered::strategy::{InitialStrategy, Strategy, StrategyItem},
 };
-use radguy::{Union, bislotmap::BiSlotMap};
 use slotmap::{Key, SecondaryMap};
 
 pub mod extension;
@@ -43,9 +43,10 @@ impl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone> BoolSystemImpl<V, T, N>
                 set.insert(*k);
                 set
             }
-            BoolTerm::Or(lhs, rhs) | BoolTerm::And(lhs, rhs) => {
-                self.term_arguments(*lhs).union(self.term_arguments(*rhs))
-            }
+            BoolTerm::Or(elements) | BoolTerm::And(elements) => elements
+                .iter()
+                .flat_map(|term_key| self.term_arguments(*term_key))
+                .collect(),
         };
         let insert = self
             .term_arguments_cache
@@ -132,12 +133,12 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
             BoolTerm::True => true,
             BoolTerm::False => false,
             BoolTerm::Variable(k) => assignment.get(k),
-            BoolTerm::Or(lhs, rhs) => {
-                self.evaluate_term(*lhs, assignment) || self.evaluate_term(*rhs, assignment)
-            }
-            BoolTerm::And(lhs, rhs) => {
-                self.evaluate_term(*lhs, assignment) && self.evaluate_term(*rhs, assignment)
-            }
+            BoolTerm::Or(term_keys) => term_keys
+                .iter()
+                .any(|term_key| self.evaluate_term(*term_key, assignment)),
+            BoolTerm::And(term_keys) => term_keys
+                .iter()
+                .all(|term_key| self.evaluate_term(*term_key, assignment)),
         }
     }
 }
@@ -161,8 +162,8 @@ pub enum BoolTerm<V: Key, T: Key> {
     True,
     False,
     Variable(V),
-    Or(T, T),
-    And(T, T),
+    Or(Vec<T>),
+    And(Vec<T>),
 }
 
 impl<V: Key, T: Key> BoolTerm<V, T> {
@@ -174,15 +175,19 @@ impl<V: Key, T: Key> BoolTerm<V, T> {
             Self::True => "tt".to_owned(),
             Self::False => "ff".to_owned(),
             Self::Variable(k) => format!("{:?}", *sys.names.get_value(*k)),
-            Self::Or(lhs, rhs) => format!(
-                "({} || {})",
-                sys.terms.get_value(*lhs).to_string_debug(sys),
-                sys.terms.get_value(*rhs).to_string_debug(sys)
+            Self::Or(elements) => format!(
+                "or({})",
+                elements
+                    .iter()
+                    .map(|term_key| sys.terms.get_value(*term_key).to_string_debug(sys))
+                    .join(", "),
             ),
-            Self::And(lhs, rhs) => format!(
-                "({} && {})",
-                sys.terms.get_value(*lhs).to_string_debug(sys),
-                sys.terms.get_value(*rhs).to_string_debug(sys)
+            Self::And(elements) => format!(
+                "and({})",
+                elements
+                    .iter()
+                    .map(|term_key| sys.terms.get_value(*term_key).to_string_debug(sys))
+                    .join(", "),
             ),
         }
     }
@@ -195,15 +200,19 @@ impl<V: Key, T: Key> BoolTerm<V, T> {
             Self::True => "tt".to_owned(),
             Self::False => "ff".to_owned(),
             Self::Variable(k) => format!("{}", *sys.names.get_value(*k)),
-            Self::Or(lhs, rhs) => format!(
-                "({} || {})",
-                sys.terms.get_value(*lhs).to_string(sys),
-                sys.terms.get_value(*rhs).to_string(sys)
+            Self::Or(elements) => format!(
+                "or({})",
+                elements
+                    .iter()
+                    .map(|term_key| sys.terms.get_value(*term_key).to_string(sys))
+                    .join(", "),
             ),
-            Self::And(lhs, rhs) => format!(
-                "({} && {})",
-                sys.terms.get_value(*lhs).to_string(sys),
-                sys.terms.get_value(*rhs).to_string(sys)
+            Self::And(elements) => format!(
+                "and({})",
+                elements
+                    .iter()
+                    .map(|term_key| sys.terms.get_value(*term_key).to_string(sys))
+                    .join(", "),
             ),
         }
     }
@@ -224,12 +233,12 @@ macro_rules! bool_term {
     (($lhs:tt || $rhs:tt); $system:expr) => {{
         let lhs = $crate::bool_term!($lhs; $system);
         let rhs = $crate::bool_term!($rhs; $system);
-        $system.terms.get_or_insert_key($crate::systems::bool::BoolTerm::Or(lhs, rhs))
+        $system.terms.get_or_insert_key($crate::systems::bool::BoolTerm::Or(Vec::from([lhs, rhs])))
         }};
     (($lhs:tt && $rhs:tt); $system:expr) => {{
         let lhs = $crate::bool_term!($lhs; $system);
         let rhs = $crate::bool_term!($rhs; $system);
-        $system.terms.get_or_insert_key($crate::systems::bool::BoolTerm::And(lhs, rhs))
+        $system.terms.get_or_insert_key($crate::systems::bool::BoolTerm::And(Vec::from([lhs, rhs])))
     }};
 }
 
@@ -276,11 +285,11 @@ mod tests {
         for (key, term) in &sys.definitions {
             let var = *sys.names.get_value(key);
             match var {
-                "x" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "(z || y)"),
-                "z" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "(k && b)"),
+                "x" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "or(z, y)"),
+                "z" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "and(k, b)"),
                 "y" => assert_eq!(
                     sys.terms.get_value(*term).to_string(&sys),
-                    "((z || x) && (k && a))"
+                    "and(or(z, x), and(k, a))"
                 ),
                 "k" | "a" => {
                     assert_eq!(sys.terms.get_value(*term).to_string(&sys), "tt");
@@ -288,7 +297,7 @@ mod tests {
                 "b" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "a"),
                 "h" => assert_eq!(
                     sys.terms.get_value(*term).to_string(&sys),
-                    "(((z || x) && k) && a)"
+                    "and(and(or(z, x), k), a)"
                 ),
                 &_ => panic!("{var} not found"),
             }

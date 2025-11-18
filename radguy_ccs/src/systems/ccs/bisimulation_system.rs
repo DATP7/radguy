@@ -224,39 +224,20 @@ impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKe
             .insert(var_key, term_key);
     }
 
-    fn construct_conjunction(&self, mut elements: impl Iterator<Item = TermKey>) -> TermKey {
-        let Some(left_term_key) = elements.next() else {
-            return self
-                .bool_system
-                .borrow_mut()
-                .terms
-                .get_or_insert_key(BoolTerm::True);
-        };
-
-        let right_term_key = self.construct_conjunction(elements);
-
+    fn construct_conjunction(&self, elements: impl Iterator<Item = TermKey>) -> TermKey {
+        let elements = elements.collect();
         self.bool_system
             .borrow_mut()
             .terms
-            .get_or_insert_key(BoolTerm::And(left_term_key, right_term_key))
+            .get_or_insert_key(BoolTerm::And(elements))
     }
 
-    // TODO: this is repeditive
-    fn construct_disjunction(&self, mut elements: impl Iterator<Item = TermKey>) -> TermKey {
-        let Some(left_term_key) = elements.next() else {
-            return self
-                .bool_system
-                .borrow_mut()
-                .terms
-                .get_or_insert_key(BoolTerm::False);
-        };
-
-        let right_term_key = self.construct_disjunction(elements);
-
+    fn construct_disjunction(&self, elements: impl Iterator<Item = TermKey>) -> TermKey {
+        let elements = elements.collect();
         self.bool_system
             .borrow_mut()
             .terms
-            .get_or_insert_key(BoolTerm::Or(left_term_key, right_term_key))
+            .get_or_insert_key(BoolTerm::Or(elements))
     }
 
     fn ensure_variable_defined(&self, variable: VarKey) {
