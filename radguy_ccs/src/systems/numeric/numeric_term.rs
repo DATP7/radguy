@@ -12,8 +12,6 @@ pub enum NumericTerm<V: Key, T: Key> {
     Var(V),
     Add(T, T),
     Mult(T, T),
-    Sub(T, T),
-    Div(T, T),
     Min(BTreeSet<T>),
     Max(BTreeSet<T>),
     Bound { bound: Number, term: T },
@@ -34,16 +32,6 @@ impl<V: Key, T: Key> NumericTerm<V, T> {
             ),
             Self::Mult(lhs, rhs) => format!(
                 "({} * {})",
-                sys.terms.get_value(*lhs).to_string_debug(sys),
-                sys.terms.get_value(*rhs).to_string_debug(sys)
-            ),
-            Self::Sub(lhs, rhs) => format!(
-                "({} - {})",
-                sys.terms.get_value(*lhs).to_string_debug(sys),
-                sys.terms.get_value(*rhs).to_string_debug(sys)
-            ),
-            Self::Div(lhs, rhs) => format!(
-                "({} / {})",
                 sys.terms.get_value(*lhs).to_string_debug(sys),
                 sys.terms.get_value(*rhs).to_string_debug(sys)
             ),
@@ -82,16 +70,6 @@ impl<V: Key, T: Key> NumericTerm<V, T> {
             ),
             Self::Mult(lhs, rhs) => format!(
                 "({} * {})",
-                sys.terms.get_value(*lhs).to_string(sys),
-                sys.terms.get_value(*rhs).to_string(sys)
-            ),
-            Self::Sub(lhs, rhs) => format!(
-                "({} - {})",
-                sys.terms.get_value(*lhs).to_string(sys),
-                sys.terms.get_value(*rhs).to_string(sys)
-            ),
-            Self::Div(lhs, rhs) => format!(
-                "({} / {})",
                 sys.terms.get_value(*lhs).to_string(sys),
                 sys.terms.get_value(*rhs).to_string(sys)
             ),

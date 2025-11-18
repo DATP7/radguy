@@ -40,12 +40,6 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone> NumericSystem<K, T, N> for NumericSys
             NumericTerm::Mult(lhs, rhs) => {
                 self.evaluate_term(*lhs, assignment) * self.evaluate_term(*rhs, assignment)
             }
-            NumericTerm::Sub(lhs, rhs) => {
-                self.evaluate_term(*lhs, assignment) - self.evaluate_term(*rhs, assignment)
-            }
-            NumericTerm::Div(lhs, rhs) => {
-                self.evaluate_term(*lhs, assignment) / self.evaluate_term(*rhs, assignment)
-            }
             NumericTerm::Min(keys) => keys
                 .iter()
                 .map(|key| self.evaluate_term(*key, assignment))
@@ -93,10 +87,7 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone> NumericSystemImpl<K, T, N> {
                 set.insert(*k);
                 set
             }
-            NumericTerm::Add(lhs, rhs)
-            | NumericTerm::Mult(lhs, rhs)
-            | NumericTerm::Sub(lhs, rhs)
-            | NumericTerm::Div(lhs, rhs) => self
+            NumericTerm::Add(lhs, rhs) | NumericTerm::Mult(lhs, rhs) => self
                 .term_arguments::<ArgSet>(*lhs)
                 .union(self.term_arguments(*rhs)),
             NumericTerm::Max(keys) | NumericTerm::Min(keys) => keys
@@ -210,18 +201,6 @@ macro_rules! numeric_term {
         let lhs = numeric_term!($lhs; $system);
         let rhs = numeric_term!($rhs; $system);
         $system.terms.get_or_insert_key($crate::systems::numeric::numeric_term::NumericTerm::Mult(lhs, rhs))
-    }};
-    // sub
-    (($lhs:tt - $rhs:tt); $system:expr) => {{
-        let lhs = numeric_term!($lhs; $system);
-        let rhs = numeric_term!($rhs; $system);
-        $system.terms.get_or_insert_key($crate::systems::numeric::numeric_term::NumericTerm::Sub(lhs, rhs))
-    }};
-    // div
-    (($lhs:tt / $rhs:tt); $system:expr) => {{
-        let lhs = numeric_term!($lhs; $system);
-        let rhs = numeric_term!($rhs; $system);
-        $system.terms.get_or_insert_key($crate::systems::numeric::numeric_term::NumericTerm::Div(lhs, rhs))
     }};
     // min
     ((min($($elem:tt),*)); $system:expr) => {{
@@ -368,54 +347,6 @@ mod tests {
     }
 
     #[test]
-    fn numeric_system_sub() {
-        let sys = numeric_system! {
-            x = (y - k);
-            y = z;
-            z = 5;
-            k = t;
-            t = (v - 3);
-            v = (4 - 2);
-        };
-        for (key, term) in &sys.definitions {
-            let var = *sys.names.get_value(key);
-            match var {
-                "x" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "(y - k)"),
-                "y" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "z"),
-                "z" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "5"),
-                "k" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "t"),
-                "t" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "(v - 3)"),
-                "v" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "(4 - 2)"),
-                &_ => panic!("{var} not found"),
-            }
-        }
-    }
-
-    #[test]
-    fn numeric_system_div() {
-        let sys = numeric_system! {
-            x = (y / k);
-            y = z;
-            z = 5;
-            k = t;
-            t = (v / 3);
-            v = (4 / 2);
-        };
-        for (key, term) in &sys.definitions {
-            let var = *sys.names.get_value(key);
-            match var {
-                "x" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "(y / k)"),
-                "y" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "z"),
-                "z" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "5"),
-                "k" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "t"),
-                "t" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "(v / 3)"),
-                "v" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "(4 / 2)"),
-                &_ => panic!("{var} not found"),
-            }
-        }
-    }
-
-    #[test]
     fn numeric_system_min() {
         let sys = numeric_system! {
             x = (min(y, k));
@@ -550,66 +481,6 @@ mod tests {
         );
         assert_eq!(
             sys.evaluate(z, &HashMap::new()),
-            crate::systems::numeric::number::Number::Inf
-        );
-    }
-
-    #[test]
-    fn numeric_system_evaluate_sub() {
-        let mut sys = numeric_system! {
-            x = (4 - 2);
-            y = (4 - inf);
-            z = (inf - 2);
-            k = (inf - inf);
-        };
-        let x = sys.names.get_or_insert_key("x");
-        let y = sys.names.get_or_insert_key("y");
-        let z = sys.names.get_or_insert_key("z");
-        let k = sys.names.get_or_insert_key("k");
-        assert_eq!(
-            sys.evaluate(x, &HashMap::new()),
-            crate::systems::numeric::number::Number::Val(2)
-        );
-        assert_eq!(
-            sys.evaluate(y, &HashMap::new()),
-            crate::systems::numeric::number::Number::Inf
-        );
-        assert_eq!(
-            sys.evaluate(z, &HashMap::new()),
-            crate::systems::numeric::number::Number::Inf
-        );
-        assert_eq!(
-            sys.evaluate(k, &HashMap::new()),
-            crate::systems::numeric::number::Number::Inf
-        );
-    }
-
-    #[test]
-    fn numeric_system_evaluate_div() {
-        let mut sys = numeric_system! {
-            x = (4 / 2);
-            y = (inf / 2);
-            z = (2 / inf);
-            k = (inf / inf);
-        };
-        let x = sys.names.get_or_insert_key("x");
-        let y = sys.names.get_or_insert_key("y");
-        let z = sys.names.get_or_insert_key("z");
-        let k = sys.names.get_or_insert_key("k");
-        assert_eq!(
-            sys.evaluate(x, &HashMap::new()),
-            crate::systems::numeric::number::Number::Val(2)
-        );
-        assert_eq!(
-            sys.evaluate(y, &HashMap::new()),
-            crate::systems::numeric::number::Number::Inf
-        );
-        assert_eq!(
-            sys.evaluate(z, &HashMap::new()),
-            crate::systems::numeric::number::Number::Inf
-        );
-        assert_eq!(
-            sys.evaluate(k, &HashMap::new()),
             crate::systems::numeric::number::Number::Inf
         );
     }
