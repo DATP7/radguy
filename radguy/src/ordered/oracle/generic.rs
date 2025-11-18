@@ -2,6 +2,7 @@
 
 use std::{
     cell::RefCell,
+    cmp::min,
     collections::{HashMap, HashSet},
     fmt::{Debug, Display},
     hash::Hash,
@@ -12,7 +13,7 @@ use orx_priority_queue::PriorityQueueDecKey;
 use slotmap::{Key, SecondaryMap};
 
 use crate::{
-    Arguments, System,
+    Arguments, Assignment, System, Universe,
     ordered::{
         StrategicLocalOracle,
         strategy::{
@@ -377,364 +378,112 @@ impl<VarKey: Eq + Copy + Hash, PS: Strategy<(VarKey, VarKey)>> Display
     }
 }
 
-/* #[derive(Default, Clone, Debug)]
-pub struct StrategicHeightOracle<VarKey: Eq + Copy + Hash + Key> {
-    successors: RefCell<HashMap<VarKey, HashSet<VarKey>>>,
-    ancestors: RefCell<HashMap<VarKey, HashSet<VarKey>>>,
-    previous_visited: RefCell<HashSet<VarKey>>,
-    strategy_cache: RefCell<StrategyHeap<(VarKey, VarKey)>>,
-    variables_cache: HashSet<VarKey>,
-} */
-
-/* impl<K: Eq + Copy + Hash + Debug + Key> StrategicHeightOracle<K> {
-    fn get_updated_weights<S: Arguments<K, HashSet<K>>>(
-        &self,
-        visited: &HashSet<K>,
-        system: &S,
-        relation: &StrategyHeap<(K, K)>,
-    ) -> StrategyHeap<(K, K)> {
-        let mut successors = self.successors.borrow_mut();
-        let mut ancestors = self.ancestors.borrow_mut();
-        let previous_visited = self.previous_visited.borrow_mut();
-
-        if previous_visited.len() == visited.len() {
-            return self.strategy_cache.borrow().clone();
-        }
-        let new_variables: Vec<_> = visited.difference(&previous_visited).copied().collect();
-        let mut var_ancestors = HashSet::<K>::new();
-        let var_successors = HashSet::<K>::new();
-
-        let mut to_add = HashSet::new();
-        for &variable in &new_variables {
-            let args = system.arguments(variable);
-            var_ancestors.clone_from(
-                &ancestors
-                    .entry(variable)
-                    .or_insert_with(|| HashSet::from([variable]))
-                    .clone(),
-            );
-
-            let new_successors: Vec<_> = args
-                .iter()
-                .copied()
-                .flat_map(|a| {
-                    successors
-                        .entry(a)
-                        .or_insert_with(|| HashSet::from([a]))
-                        .clone()
-                })
-                .chain([variable])
-                .collect();
-
-            let var_successors = successors.entry(variable).or_default();
-
-            var_successors.extend(new_successors);
-
-            let var_successors = var_successors.clone();
-
-            // each new variable has its parent's ancestors as ancestors, and itself
-            for &succ in &var_successors {
-                ancestors
-                    .entry(succ)
-                    .or_default()
-                    .extend(var_ancestors.iter().copied().chain([succ]));
-            }
-
-            for &ancestor in &var_ancestors {
-                if ancestor == variable {
-                    continue;
-                }
-                // TODO: we don't actually need to update the weight of `ancestor` if extending its
-                // successors added nothing
-                successors
-                    .get_mut(&ancestor)
-                    .expect("ancestor must have successors")
-                    .extend(&var_successors);
-            }
-
-            // TODO: this is probably very inefficient
-            for &arg in successors
-                .get(&variable)
-                .expect("variable should have successors")
-            {
-                to_add.extend(
-                    ancestors
-                        .get(&arg)
-                        .expect("argument should have ancestors")
-                        .iter()
-                        .copied()
-                        .map(|anc| (arg, anc)),
-                );
-            }
-        }
-        let mut strategy = self.strategy_cache.borrow_mut();
-
-        strategy.retain(|Reverse(StrategyItem(_, (x, y)))| {
-            if var_ancestors.contains(x) && var_successors.contains(y) {
-                to_add.insert((*x, *y));
-                false
-            } else {
-                true
-            }
-        });
-
-        let mut variables = HashSet::new();
-        if self.variables_cache.is_empty() {
-            variables.clone_from(visited);
-            for variable in visited {
-                for arg in system.arguments(*variable) {
-                    variables.insert(arg);
-                }
-            }
-        } else {
-            variables.clone_from(&self.variables_cache);
-            for variable in new_variables {
-                for arg in system.arguments(variable) {
-                    variables.insert(arg);
-                }
-            }
-        }
-        strategy.extend(Self::find_weights(
-            visited, &variables, system, to_add, relation,
-        ));
-
-        strategy.clone()
-    }
-} */
-
 #[derive(Default, Clone, Debug)]
-pub struct StrategicHeightOracle<VarKey: Eq + Copy + Hash + Key> {
-    previous_visited: RefCell<HashSet<VarKey>>,
-    variables_cache: HashSet<VarKey>,
-}
+pub struct StrategicHeightOracle {}
 #[expect(clippy::similar_names)]
-impl<K: Eq + Copy + Hash + Debug + Key> StrategicHeightOracle<K> {
-    fn get_updated_weights<S: Arguments<K, HashSet<K>>>(
-        &self,
-        visited: &HashSet<K>,
+impl StrategicHeightOracle {
+    fn get_updated_weights<
+        K: Eq + Copy + Hash + Debug + Key,
+        S: Arguments<K, HashSet<K>> + Universe<HashSet<K>>,
+        PS: Strategy<(K, K)>
+            + Default
+            + Extend<StrategyItem<(K, K)>>
+            + FromIterator<StrategyItem<(K, K)>>,
+    >(
         system: &S,
-        relation: &StrategyHeap<(K, K)>,
-    ) -> StrategyHeap<(K, K)> {
-        let previous_visited =  self.previous_visited.borrow_mut();
-        
-        let mut new_variables = Vec::new();
-        if previous_visited.len() != visited.len() {
-            new_variables = visited.difference(&previous_visited).copied().collect();
-        };
+        relation: &PS,
+    ) -> PS
+    where
+        for<'a> &'a PS: IntoIterator<Item = StrategyItem<(K, K)>>,
+    {
+        let variables = system.universe();
 
-        let mut variables = HashSet::new();
-        if self.variables_cache.is_empty() {
-            variables.clone_from(visited);
-            for variable in visited {
-                for arg in system.arguments(*variable) {
-                    variables.insert(arg);
-                }
-            }
-        } else {
-            variables.clone_from(&self.variables_cache);
-            for variable in new_variables {
-                for arg in system.arguments(variable) {
-                    variables.insert(arg);
-                }
-            }
-        }
-        
         let weightmap: HashMap<_, _> = relation
-            .iter()
-            .map(|Reverse(StrategyItem(weight, (x, y)))| ((x,y), weight))
-            .collect();
-
-        //PERF find algorithm that uses previous knowledge of graph to speed up finding all shortest paths.
-        let mut graph: SecondaryMap<K, _> = SecondaryMap::<K, SecondaryMap<K, Option<StrategyWeight>>>::new();
-        for i in variables {
-            let mut inner = SecondaryMap::new();
-            for j in variables {
-                if let Some(weight) = weightmap.get(&(&i, &j)) {
-                    inner.insert(j, Some(**weight));
-                } else {
-                    inner.insert(j, None);
-                }
-            }
-        }
-        for k in variables.clone() {
-            for i in variables.clone() {
-                for j in variables.clone() {
-                    let dist_ij = *graph
-                        .get(i)
-                        .expect("All variables should be mapped")
-                        .get(j)
-                        .expect("All variables should be mapped");
-                    let dist_ik = *graph
-                        .get(i)
-                        .expect("All variables should be mapped")
-                        .get(k)
-                        .expect("All variables should be mapped");
-                    let dist_kj = *graph
-                        .get(k)
-                        .expect("All variables should be mapped")
-                        .get(j)
-                        .expect("All variables should be mapped");
-                    if let Some(dist_ik) = dist_ik
-                        && let Some(dist_kj) = dist_kj
-                    {
-                        if let Some(dist_ij) = dist_ij {
-                            if dist_ij > dist_ik + dist_kj {
-                                graph
-                                    .get_mut(i)
-                                    .expect("All variables should be mapped")
-                                    .insert(j, Some(dist_ik + dist_kj));
-                            }
-                        } else {
-                            graph
-                                .get_mut(i)
-                                .expect("All variables should be mapped")
-                                .insert(j, Some(dist_ik + dist_kj));
-                        }
-                    }
-                }
-            }
-        }
-
-        
-        // Change to a retain
-
-        let mut new_strategy = StrategyHeap::new();
-        for i in variables.clone() {
-            for j in variables.clone() {
-                let val = graph
-                .get(i)
-                .unwrap_or_else(|| panic!("All variables should be mapped {i:?} outer"))
-                .get(j)
-                .unwrap_or_else(|| panic!("All variables should be mapped {j:?} inner"));
-            if !val.is_none() {
-                new_strategy.push(Reverse(StrategyItem(val.expect("Just checked that value is not none"), (j,i))));
-            }
-            }
-        }
-        /* strategy.extend(to_update.into_iter().map(|(x, y)| {
-            let val = graph
-                .get(y)
-                .unwrap_or_else(|| panic!("All variables should be mapped {y:?} outer"))
-                .get(x)
-                .unwrap_or_else(|| panic!("All variables should be mapped {x:?} inner"));
-            val.as_ref().map_or(
-                Reverse(StrategyItem(StrategyWeight::Infinity, (x, y))),
-                |number| Reverse(StrategyItem(StrategyWeight::Num(*number), (x, y))),
-            )
-        })); */
-
-        new_strategy
-    }
-}
-
-/* #[expect(clippy::similar_names)]
-impl<K: Eq + Copy + Hash + Debug + Key> StrategicHeightOracle<K> {
-    fn find_weights<S: Arguments<K, HashSet<K>>>(
-        visited: &HashSet<K>,
-        variables: &HashSet<K>,
-        system: &S,
-        to_update: HashSet<(K, K)>,
-        relation: &StrategyHeap<(K, K)>,
-    ) -> StrategyHeap<(K, K)> {
-        let mut strategy = StrategyHeap::new();
-        let weightmap: HashMap<_, _> = relation
-            .iter()
-            .map(|Reverse(StrategyItem(weight, (x, y)))| match weight {
-                StrategyWeight::Infinity => ((x, y), None),
-                StrategyWeight::Num(number) => ((x, y), Some(*number)),
-            })
+            .into_iter()
+            .map(|StrategyItem(weight, (x, y))| ((x, y), weight))
             .collect();
 
         //PERF find algorithm that uses previous knowledge of graph to speed up finding all shortest paths.
         let mut graph = SecondaryMap::new();
-        for &i in variables {
+        for &i in &variables {
             let mut inner = SecondaryMap::new();
-            for &j in variables {
-                if i == j {
-                    inner.insert(j, Some(0));
-                } else if visited.contains(&i) && system.arguments(i).contains(&j) {
-                    if let Some(weight) = weightmap.get(&(&i, &j)) {
-                        inner.insert(j, *weight);
-                    } else {
-                        // Infinity or none?
-                        inner.insert(j, Some(1));
-                    }
-                } else {
-                    inner.insert(j, None);
+            for &j in &variables {
+                if let Some(weight) = weightmap.get(&(i, j))
+                    && (i == j || system.arguments(j).contains(&i))
+                {
+                    inner.insert(j, *weight);
                 }
             }
             graph.insert(i, inner);
         }
-        for &k in variables {
-            for &i in variables {
-                for &j in variables {
-                    let dist_ij = *graph
-                        .get(i)
-                        .expect("All variables should be mapped")
-                        .get(j)
-                        .expect("All variables should be mapped");
-                    let dist_ik = *graph
-                        .get(i)
-                        .expect("All variables should be mapped")
-                        .get(k)
-                        .expect("All variables should be mapped");
-                    let dist_kj = *graph
-                        .get(k)
-                        .expect("All variables should be mapped")
-                        .get(j)
-                        .expect("All variables should be mapped");
-                    if let Some(dist_ik) = dist_ik
-                        && let Some(dist_kj) = dist_kj
-                    {
-                        if let Some(dist_ij) = dist_ij {
-                            if dist_ij > dist_ik + dist_kj {
-                                graph
-                                    .get_mut(i)
-                                    .expect("All variables should be mapped")
-                                    .insert(j, Some(dist_ik + dist_kj));
-                            }
-                        } else {
-                            graph
-                                .get_mut(i)
-                                .expect("All variables should be mapped")
-                                .insert(j, Some(dist_ik + dist_kj));
+
+        //PERF Find a way to remove the outer for loop so we only need to run the 3 inner loops once instead of twice (if possible)
+        for _ in 1..=2 {
+            for &k in &variables {
+                let k_map = graph
+                    .get(k)
+                    .expect("All variables should be mapped")
+                    .clone();
+                for &i in &variables {
+                    let i_map = graph.get_mut(i).expect("All variables should be mapped");
+                    for &j in &variables {
+                        let dist_ij = i_map.get(j);
+                        let dist_ik = i_map.get(k);
+                        let dist_kj = k_map.get(j);
+                        let graph_weight = weightmap.get(&(i, j));
+                        if let Some(dist_ik) = dist_ik
+                            && let Some(dist_kj) = dist_kj
+                            && let Some(graph_weight) = graph_weight
+                        {
+                            let val = dist_ij.map_or_else(
+                                || min(*graph_weight, *dist_ik + *dist_kj),
+                                |dist_ij| min(*graph_weight, min(*dist_ij, *dist_ik + *dist_kj)),
+                            );
+                            i_map.insert(j, val);
                         }
                     }
                 }
             }
         }
 
-        strategy.extend(to_update.into_iter().map(|(x, y)| {
-            let val = graph
-                .get(y)
-                .unwrap_or_else(|| panic!("All variables should be mapped {y:?} outer"))
-                .get(x)
-                .unwrap_or_else(|| panic!("All variables should be mapped {x:?} inner"));
-            val.as_ref().map_or(
-                Reverse(StrategyItem(StrategyWeight::Infinity, (x, y))),
-                |number| Reverse(StrategyItem(StrategyWeight::Num(*number), (x, y))),
-            )
-        }));
-        strategy
-    }
-} */
+        let mut vec = Vec::new();
+        for &i in &variables {
+            for &j in &variables {
+                let val = graph.get(i).expect("All variables should be mapped").get(j);
+                if let Some(val) = val
+                    && weightmap.contains_key(&(i, j))
+                {
+                    vec.insert(0, StrategyItem(*val, (i, j)));
+                }
+            }
+        }
 
-// TODO: Make this generic on set/strategy implementation
-impl<K: Eq + Copy + Hash + Debug + Key, V: PartialOrd, S: System<K, V> + Arguments<K, HashSet<K>>>
-    StrategicLocalOracle<K, V, HashSet<K>, StrategyHeap<(K, K)>, S> for StrategicHeightOracle<K>
-{
-    fn get_strategy(
-        &self,
-        visited: &HashSet<K>,
-        _assignment: &impl Assignment<K, V>,
-        strategy: &StrategyHeap<(K, K)>,
-        system: &S,
-    ) -> StrategyHeap<(K, K)> {
-        self.get_updated_weights(visited, system, strategy)
+        PS::from_iter(vec)
     }
 }
 
-impl<VarKey: Eq + Copy + Hash + Key> Display for StrategicHeightOracle<VarKey> {
+// TODO: Make this generic on set/strategy implementation
+impl<
+    K: Eq + Copy + Hash + Debug + Key,
+    V: PartialOrd,
+    S: System<K, V> + Arguments<K, HashSet<K>> + Universe<HashSet<K>>,
+    PS: Strategy<(K, K)> + Default + Extend<StrategyItem<(K, K)>> + FromIterator<StrategyItem<(K, K)>>,
+> StrategicLocalOracle<K, V, HashSet<K>, PS, S> for StrategicHeightOracle
+where
+    for<'a> &'a PS: IntoIterator<Item = StrategyItem<(K, K)>>,
+{
+    fn get_strategy(
+        &self,
+        _visited: &HashSet<K>,
+        _assignment: &impl Assignment<K, V>,
+        strategy: &PS,
+        system: &S,
+    ) -> PS {
+        Self::get_updated_weights(system, strategy)
+    }
+}
+
+impl Display for StrategicHeightOracle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "height_c")
     }
@@ -742,47 +491,50 @@ impl<VarKey: Eq + Copy + Hash + Key> Display for StrategicHeightOracle<VarKey> {
 
 #[cfg(test)]
 mod tests {
-    mod arguments {
-        use std::collections::{HashMap, HashSet};
+    use crate::{
+        Arguments, Universe,
+        ordered::{
+            oracle::StrategicArgumentsOracle,
+            strategy::{BinaryHeapStrategy, Domain, StrategyItem, StrategyWeight},
+        },
+    };
+    use std::collections::{HashMap, HashSet};
+    use std::fmt::Debug;
 
-        use slotmap::{DefaultKey, SlotMap};
-
-        use crate::{
-            Arguments,
-            ordered::{
-                oracle::StrategicArgumentsOracle,
-                strategy::{BinaryHeapStrategy, Domain, StrategyItem, StrategyWeight},
-            },
-        };
-
-        #[derive(Default, Debug)]
-        struct MockSystem {
-            variables: SlotMap<DefaultKey, HashSet<DefaultKey>>,
+    use slotmap::{DefaultKey, SlotMap};
+    #[derive(Default, Debug)]
+    struct MockSystem {
+        variables: SlotMap<DefaultKey, HashSet<DefaultKey>>,
+    }
+    impl MockSystem {
+        fn add_variable(&mut self) -> DefaultKey {
+            self.variables.insert(HashSet::new())
         }
 
-        impl MockSystem {
-            fn add_variable(&mut self) -> DefaultKey {
-                self.variables.insert(HashSet::new())
-            }
-
-            fn set_arguments(&mut self, variable: DefaultKey, arguments: HashSet<DefaultKey>) {
-                *self
-                    .variables
-                    .get_mut(variable)
-                    .expect("variable should be defined") = arguments;
-            }
+        fn set_arguments(&mut self, variable: DefaultKey, arguments: HashSet<DefaultKey>) {
+            *self
+                .variables
+                .get_mut(variable)
+                .expect("variable should be defined") = arguments;
         }
+    }
 
-        impl Arguments<DefaultKey, HashSet<DefaultKey>> for MockSystem {
-            fn arguments(&self, key: DefaultKey) -> HashSet<DefaultKey> {
-                self.variables
-                    .get(key)
-                    .expect("variable must have arguments")
-                    .clone()
-            }
+    impl Arguments<DefaultKey, HashSet<DefaultKey>> for MockSystem {
+        fn arguments(&self, key: DefaultKey) -> HashSet<DefaultKey> {
+            self.variables
+                .get(key)
+                .expect("variable must have arguments")
+                .clone()
         }
+    }
 
-        macro_rules! system_def {
+    impl Universe<HashSet<DefaultKey>> for MockSystem {
+        fn universe(&self) -> HashSet<DefaultKey> {
+            self.variables.keys().collect()
+        }
+    }
+
+    macro_rules! system_def {
             ($($name:ident = {$($dep:ident),* $(,)?};)*) => {
                 {
                     let mut system = MockSystem::default();
@@ -796,6 +548,8 @@ mod tests {
                 }
             };
         }
+    mod arguments {
+        use super::*;
 
         macro_rules! test_arguments {
             ($(
@@ -1084,272 +838,235 @@ mod tests {
         }
     }
     mod height {
-        use std::cmp::Reverse;
-        use std::collections::{HashMap, HashSet};
+        use super::*;
+        use crate::ordered::oracle::StrategicHeightOracle;
 
-        use slotmap::{DefaultKey, SlotMap};
-
-        use crate::{
-            Arguments,
-            ordered::{
-                oracle::StrategicHeightOracle,
-                strategy::{Domain, StrategyHeap, StrategyItem, StrategyWeight},
-            },
-        };
-
-        #[derive(Default, Debug)]
-        struct MockSystem {
-            variables: SlotMap<DefaultKey, HashSet<DefaultKey>>,
-        }
-
-        impl MockSystem {
-            fn add_variable(&mut self) -> DefaultKey {
-                self.variables.insert(HashSet::new())
-            }
-
-            fn set_arguments(&mut self, variable: DefaultKey, arguments: HashSet<DefaultKey>) {
-                *self
-                    .variables
-                    .get_mut(variable)
-                    .expect("variable should be defined") = arguments;
-            }
-        }
-
-        impl Arguments<DefaultKey, HashSet<DefaultKey>> for MockSystem {
-            fn arguments(&self, key: DefaultKey) -> HashSet<DefaultKey> {
-                self.variables
-                    .get(key)
-                    .expect("variable must have arguments")
-                    .clone()
-            }
-        }
-
-        macro_rules! system_def {
-            ($($name:ident = {$($dep:ident),* $(,)?};)*) => {
-                {
-                    let mut system = MockSystem::default();
-                    $(
-                        let $name = system.add_variable();
-                    )*
-                    $(
-                        system.set_arguments($name, HashSet::from([$($dep,)*]));
-                    )*
-                    (system, [$($name,)*])
-                }
+        macro_rules! create_strategyitem {
+            (($left:ident, $right:ident) -> inf) => {
+                StrategyItem(StrategyWeight::Infinity, ($left, $right))
+            };
+            (($left:ident, $right:ident) -> $weight:literal) => {
+                StrategyItem(StrategyWeight::Num($weight), ($left, $right))
             };
         }
+
         macro_rules! test_height {
             ($(
                 $test_name:ident: {
                     with {$(
                         $var_name:ident = {$($dep:ident),* $(,)?};
-                    )*};
-                    $(
-                        $(
-                        visit {$($visited_var:ident),* $(,)?} => {$(($l:ident, $r:ident) -> $w:literal),* $(,)?};
-                        )+
-                        reset;
-                    )*
+                    )*} in {
+                        $(($left:ident, $right:ident) -> $weight:tt),* $(,)?
+                    } expects {
+                        $(($l:ident, $r:ident) -> $w:tt),* $(,)?
+                    }
                 };
             )*) => {
                 $(
                     #[test]
+                    #[allow(unused_variables)]
                     fn $test_name() {
-                        let (system, [$($var_name,)*]) = system_def! {$(
-                            $var_name = {$($dep,)*};
-                        )*};
-                        $(
-                        let oracle = StrategicHeightOracle::default();
-                        assert!(
-                            oracle.strategy_cache.borrow().is_empty(),
-                            "strategy should start empty"
-                        );
+                        for _ in 1..100 {
+                            let (system, [$($var_name,)*]) = system_def! {$(
+                                $var_name = {$($dep,)*};
+                            )*};
+                            let relation = BinaryHeapStrategy::from_iter([$(create_strategyitem!{($left, $right) -> $weight},)*]);
 
-                        let mut visited = HashSet::new();
-                        let mut visit_seq = Vec::new();
-                        let mut relation = StrategyHeap::new();
-                        let mut discovered = HashSet::new();
-                        $(
-                            visited.extend(HashSet::from([$($visited_var,)*]));
-                            for variable in visited.clone() {
-                                for arg in system.arguments(variable) {
-                                    discovered.insert(arg);
-                                }
-                            }
-                            for variable1 in discovered.clone() {
-                                for variable2 in discovered.clone() {
-                                    relation.push(Reverse(StrategyItem(StrategyWeight::Num(100), (variable1, variable2))));
-                                }
-                            }
-                            visit_seq.push(stringify!($($visited_var),*));
-                            let expected = StrategyHeap::from([$(StrategyItem(StrategyWeight::Num($w), ($l, $r)).reversed(),)*]);
-                            let got = oracle.get_updated_weights(&visited, &system, &relation);
+                            let expected = BinaryHeapStrategy::from_iter([$(create_strategyitem!{($l, $r) -> $w},)*]);
+                            let got = StrategicHeightOracle::get_updated_weights(&system, &relation);
 
                             let expected_domain: HashSet<_> = expected.clone().domain();
                             let got_domain: HashSet<_> = got.clone().domain();
 
                             for v in &got_domain {
-                                assert!(expected_domain.contains(&v), "got domain contains {v:?} but shouldn't. sequence: {visit_seq:?}");
+                                assert!(expected_domain.contains(v), "got domain contains {v:?} but shouldn't.");
                             }
                             for v in &expected_domain {
-                                assert!(got_domain.contains(&v), "got domain does not contain {v:?}. sequence: {visit_seq:#?}");
+                                assert!(got_domain.contains(v), "got domain does not contain {v:?}");
                             }
                             assert_eq!(expected_domain, got.clone().domain(),
-                                "wrong domain when visiting {{{}}}. sequence: {visit_seq:#?} state: {oracle:#?}", stringify!($($visited_var),*)
+                                "wrong domain"
                             );
                             let got_map = got
                                     .into_iter()
-                                    .map(|Reverse(StrategyItem(w, (x, y)))| ((x, y), w))
+                                    .map(|StrategyItem(w, (x, y))| ((x, y), w))
                                     .collect::<HashMap<_, _>>();
-                            for Reverse(StrategyItem(w, v)) in expected.iter() {
-                                let w_got = got_map.get(v).expect(&*format!("{v:?} does not exist in got"));
-                                assert_eq!(w, w_got, "wrong weight for {v:?}, seq: {visit_seq:?}");
+                            for StrategyItem(w, v) in expected.iter() {
+                                let w_got = got_map.get(&v).expect(&*format!("{v:?} does not exist in got"));
+                                assert_eq!(w, *w_got, "wrong weight for {v:?}");
                             }
 
                             assert_eq!(
-                                expected.into_iter().map(|Reverse(StrategyItem(w, (x, y)))| ((x, y), w)).collect::<HashMap<_, _>>(),
+                                expected.into_iter().map(|StrategyItem(w, (x, y))| ((x, y), w)).collect::<HashMap<_, _>>(),
                                 got_map,
-                                "wrong strategy when visiting {{{}}}. sequence: {visit_seq:#?} state: {oracle:#?}", stringify!($($visited_var),*)
+                                "wrong strategy"
                             );
-                        )+
-                        )*
+                        }
                     }
                 )*
             };
         }
+
         test_height! {
             single_variable: {
                 with {
                     x = {};
-                };
-                visit {x} => {(x, x) -> 0};
-                reset;
+                } in {
+                    (x, x) -> 0,
+                } expects {
+                    (x, x) -> 0,
+                }
             };
-            chain: {
+            chain_2: {
                 with {
                     x = {y};
                     y = {};
-                };
-                visit {x} => {(x, x) -> 0, (y, x) -> 1, (y, y) -> 0};
-                reset;
+                } in {
+                    (x, x) -> 0, (y, y) -> 0, (y, x) -> 1,
+                } expects {
+                    (x, x) -> 0, (y, y) -> 0, (y, x) -> 1,
+                }
             };
-            insert_into_chain: {
-                with {
-                    a = {b, e};
-                    b = {c};
-                    c = {d};
-                    d = {};
-                    e = {d};
-                };
-                visit {a} => {
-                    (a, a) -> 0,
-                    (b, a) -> 1,
-                    (e, a) -> 1,
-                    (b, b) -> 0,
-                    (e, e) -> 0,
-                };
-                visit {b} => {
-                    (a, a) -> 0,
-                    (b, a) -> 1,
-                    (e, a) -> 1,
-                    (b, b) -> 0,
-                    (e, e) -> 0,
-                    (c, c) -> 0,
-                    (c, a) -> 2,
-                    (c, b) -> 1,
-                };
-                visit {c} => {
-                    (a, a) -> 0,
-                    (b, a) -> 1,
-                    (e, a) -> 1,
-                    (b, b) -> 0,
-                    (e, e) -> 0,
-                    (c, c) -> 0,
-                    (c, a) -> 2,
-                    (c, b) -> 1,
-                    (d, d) -> 0,
-                    (d, a) -> 3,
-                    (d, b) -> 2,
-                    (d, c) -> 1,
-                };
-                visit {e} => {
-                    (a, a) -> 0,
-                    (b, a) -> 1,
-                    (e, a) -> 1,
-                    (b, b) -> 0,
-                    (e, e) -> 0,
-                    (c, c) -> 0,
-                    (c, a) -> 2,
-                    (c, b) -> 1,
-                    (d, d) -> 0,
-                    (d, a) -> 2,
-                    (d, b) -> 2,
-                    (d, c) -> 1,
-                    (d, e) -> 1,
-                };
-                reset;
-            };
-            two_cycle: {
+            chain_3: {
                 with {
                     x = {y};
-                    y = {x};
-                };
-                visit {x} => {(x, x) -> 0, (y, x) -> 1, (y, y) -> 0};
-                visit {y} => {(x, x) -> 0, (y, x) -> 1, (y, y) -> 0, (x, y) -> 1};
-                reset;
+                    y = {z};
+                    z = {};
+                } in {
+                    (x, x) -> 0, (y, y) -> 0, (z, z) -> 0, (y, x) -> 1, (z, x) -> 5, (z, y) -> 1,
+                } expects {
+                    (x, x) -> 0, (y, y) -> 0, (z, z) -> 0, (y, x) -> 1, (z, x) -> 2, (z, y) -> 1,
+                }
             };
-            four_cycle: {
+            chain_4: {
                 with {
                     x = {y};
                     y = {z};
                     z = {k};
-                    k = {x};
-                };
-                visit {x} => {
-                    (x, x) -> 0,
-                    (y, x) -> 1,
-                    (y, y) -> 0,
-                };
-                visit {y} => {
-                    (x, x) -> 0,
-                    (y, x) -> 1,
-                    (y, y) -> 0,
-                    (z, x) -> 2,
-                    (z, y) -> 1,
-                    (z, z) -> 0,
-                };
-                visit {z} => {
-                    (x, x) -> 0,
-                    (y, x) -> 1,
-                    (y, y) -> 0,
-                    (z, x) -> 2,
-                    (z, y) -> 1,
-                    (z, z) -> 0,
-                    (k, x) -> 3,
-                    (k, y) -> 2,
-                    (k, z) -> 1,
-                    (k, k) -> 0,
-                };
-                visit {k} => {
-                    (x, x) -> 0,
-                    (y, x) -> 1,
-                    (y, y) -> 0,
-                    (z, x) -> 2,
-                    (z, y) -> 1,
-                    (z, z) -> 0,
-                    (k, x) -> 3,
-                    (k, y) -> 2,
-                    (k, z) -> 1,
-                    (k, k) -> 0,
-                    (x, y) -> 3,
-                    (x, z) -> 2,
-                    (x, k) -> 1,
-                    (y, z) -> 3,
-                    (y, k) -> 2,
-                    (z, k) -> 3,
-                };
-                reset;
+                    k = {};
+                } in {
+                    (x, x) -> 0, (y, y) -> 0, (z, z) -> 0, (k, k) -> 0, (y, x) -> 5, (z, x) -> 2, (k, x) -> 10, (z, y) -> 5, (k, y) -> 5, (k, z) -> 1,
+                } expects {
+                    (x, x) -> 0, (y, y) -> 0, (z, z) -> 0, (k, k) -> 0, (y, x) -> 5, (z, x) -> 2, (k, x) -> 3, (z, y) -> 5, (k, y) -> 5, (k, z) -> 1,
+                }
             };
+            chain_5: {
+                with {
+                    x = {y};
+                    y = {z};
+                    z = {k};
+                    k = {i};
+                    i = {};
+                } in {
+                    (x, x) -> 0, (y, y) -> 0, (z, z) -> 0, (k, k) -> 0, (i, i) -> 0, (y, x) -> 5, (z, x) -> 2, (k, x) -> 10, (i, x) -> 20, (z, y) -> 5, (k, y) -> 5, (i, y) -> 10, (k, z) -> 1, (i, z) -> 10, (i, k) -> 1,
+                } expects {
+                    (x, x) -> 0, (y, y) -> 0, (z, z) -> 0, (k, k) -> 0, (i, i) -> 0, (y, x) -> 5, (z, x) -> 2, (k, x) -> 3, (i, x) -> 4, (z, y) -> 5, (k, y) -> 5, (i, y) -> 6, (k, z) -> 1, (i, z) -> 2, (i, k) -> 1,
+                }
+            };
+            bad_edge: {
+                with {
+                    x = {z, y};
+                    y = {};
+                    z = {};
+                } in {
+                    (x, x) -> 0, (y, y) -> 0, (z, z) -> 0, (z, x) -> 1, (y, x) -> 1, (y, z) -> 2,
+                } expects {
+                    (x, x) -> 0, (y, y) -> 0, (z, z) -> 0, (z, x) -> 1, (y, x) -> 1,
+                }
+            };
+            bad_edge_circular: {
+                with {
+                    x = {y};
+                    y = {};
+                } in {
+                    (x, x) -> 0, (y, y) -> 0, (y, x) -> 1, (x, y) -> 1,
+                } expects {
+                    (x, x) -> 0, (y, y) -> 0, (y, x) -> 1,
+                }
+            };
+            edge_removed_in_relation: {
+                with {
+                    x = {y, z};
+                    y = {};
+                    z = {};
+                } in {
+                    (x, x) ->0 , (y, y) -> 0, (y, x) ->1,
+                } expects {
+                    (x, x) ->0 , (y, y) -> 0, (y, x) ->1,
+                }
+            };
+            circular: {
+                with {
+                    x = {y};
+                    y = {x};
+                } in {
+                    (x, x) -> 0, (y, y) -> 0, (y, x) -> 1, (x, y) -> 1,
+                } expects {
+                    (x, x) -> 0, (y, y) -> 0, (y, x) -> 1, (x, y) -> 1,
+                }
+            };
+            circular_2: {
+                with {
+                    x = {y};
+                    y = {x};
+                } in {
+                    (x, x) -> 5, (y, y) -> 5, (y, x) -> 1, (x, y) -> 1,
+                } expects {
+                    (x, x) -> 2, (y, y) -> 2, (y, x) -> 1, (x, y) -> 1,
+                }
+            };
+            infinite: {
+                with {
+                    x = {y};
+                    y = {};
+                } in {
+                    (x, x) -> 0, (y, y) -> 0, (y, x) -> inf,
+                } expects {
+                    (x, x) -> 0, (y, y) -> 0, (y, x) -> inf,
+                }
+            };
+            infinite_2: {
+                with {
+                    x = {y};
+                    y = {z};
+                    z = {};
+                } in {
+                    (x, x) -> 0, (y, y) -> 0, (z, z) -> 0, (y, x) -> 1, (z, x) -> inf, (z, y) -> 1,
+                } expects {
+                    (x, x) -> 0, (y, y) -> 0, (z, z) -> 0, (y, x) -> 1, (z, x) -> 2, (z, y) -> 1,
+                }
+            };
+            circular_infinite: {
+                with {
+                    x = {y};
+                    y = {x};
+                } in {
+                    (x, x) -> inf, (y, y) -> inf, (y, x) -> 1, (x, y) -> 1,
+                } expects {
+                    (x, x) -> 2, (y, y) -> 2, (y, x) -> 1, (x, y) -> 1,
+                }
+            };
+            circular_infinite_2: {
+                with {
+                    x = {y};
+                    y = {x};
+                } in {
+                    (x, x) -> 0, (y, y) -> 0, (y, x) -> inf, (x, y) -> inf,
+                } expects {
+                    (x, x) -> 0, (y, y) -> 0, (y, x) -> inf, (x, y) -> inf,
+                }
+            };
+            /*
+            template: {
+                with {
+
+                } in {
+
+                } expects {
+
+                }
+            };
+            */
         }
     }
 }

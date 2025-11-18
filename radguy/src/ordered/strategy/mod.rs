@@ -50,14 +50,12 @@ impl Display for StrategyWeight {
 }
 
 impl Add for StrategyWeight {
-    type Output = StrategyWeight;
+    type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
-            (StrategyWeight::Infinity, StrategyWeight::Infinity) => StrategyWeight::Infinity,
-            (StrategyWeight::Infinity, StrategyWeight::Num(_)) => StrategyWeight::Infinity,
-            (StrategyWeight::Num(_), StrategyWeight::Infinity) => StrategyWeight::Infinity,
-            (StrategyWeight::Num(r), StrategyWeight::Num(l)) => StrategyWeight::Num(l + r),
+            (Self::Num(r), Self::Num(l)) => Self::Num(l + r),
+            _ => Self::Infinity,
         }
     }
 }

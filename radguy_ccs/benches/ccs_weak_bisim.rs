@@ -118,6 +118,7 @@ macro_rules! bisim_bench_problem_ordered {
             StrategicArgumentsOracle::default().then(InverseCountOracle::default()),
             StrategicArgumentsOracle::default().and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(CountOracle::default()),
             StrategicArgumentsOracle::default().and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(InverseCountOracle::default()),
+            StrategicArgumentsOracle::default().then(StrategicHeightOracle::default()),
         };
     };
 }
@@ -150,40 +151,6 @@ macro_rules! bisim_bench_suite {
         $(
         fn $name(c: &mut Criterion) {
             bisim_bench_problem!($name: using c, $left, $right => $eq in $ccs);
-            let ccs = $ccs;
-            bisim_bench_oracles_unordered! { $name: using c, bench $left, $right => $eq in ccs, with
-                SMax::default(),
-                LocalMaxR::default(),
-                ArgumentsOracle::default(),
-                ArgumentsOracle::default().then(SMax::default()),
-                ArgumentsOracle::default().then(LocalMaxR::default()),
-                ArgumentsOracle::default().and(SMax::default()),
-                ArgumentsOracle::default().and(LocalMaxR::default()),
-                // TODO: Reenable when bool extension works again
-                // BoolExtension::oracle(),
-                // SMax::default().then(BoolExtension::oracle()),
-                // LocalMaxR::default().then(BoolExtension::oracle()),
-            };
-
-            bisim_bench_oracles_ordered! { $name: using c, bench $left, $right => $eq in ccs, with
-                SMax::default().constant(StrategyWeight::Infinity),
-                LocalMaxR::default().constant(StrategyWeight::Infinity),
-                LocalMaxR::default().constant(StrategyWeight::Infinity).then(CountOracle),
-                LocalMaxR::default().constant(StrategyWeight::Infinity).then(InverseCountOracle),
-                // BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(InverseCountOracle, std::cmp::min),
-                // BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(CountOracle, std::cmp::min),
-                StrategicArgumentsOracle::default(),
-                StrategicArgumentsOracle::default().and_by(CountOracle, std::cmp::min),
-                StrategicArgumentsOracle::default().and_by(InverseCountOracle, std::cmp::min),
-                CountOracle.then(StrategicArgumentsOracle::default()),
-                InverseCountOracle.then(StrategicArgumentsOracle::default()),
-                StrategicArgumentsOracle::default().then(CountOracle),
-                StrategicArgumentsOracle::default().then(InverseCountOracle),
-                StrategicArgumentsOracle::default().and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(CountOracle),
-                StrategicArgumentsOracle::default().and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(InverseCountOracle), */
-                StrategicHeightOracle::default(),
-                StrategicHeightOracle::default().and_by(CountOracle, std::cmp::min),
-            };
         }
         )*
         criterion_group!(
