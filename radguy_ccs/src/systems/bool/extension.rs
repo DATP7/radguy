@@ -73,46 +73,38 @@ fn collect_terms<
                 current.insert((x, term_key));
             }
         }
-        BoolTerm::Or(lhs, rhs) => {
-            collect_terms(x, lhs, assignment, possible, system, current);
-            collect_terms(x, rhs, assignment, possible, system, current);
-            if (current.contains(&(x, lhs)) || current.contains(&(x, rhs)))
-                && !system.evaluate_term(lhs, assignment)
-                && !system.evaluate_term(rhs, assignment)
+        BoolTerm::Or(term_keys) => {
+            // All terms are false and there exist a false term that x can influence
+            if term_keys
+                .iter()
+                .all(|&term_key| !system.evaluate_term(term_key, assignment))
+                && term_keys.iter().any(|&term_key| {
+                    collect_terms(x, term_key, assignment, possible, system, current);
+                    current.contains(&(x, term_key))
+                })
             {
                 current.insert((x, term_key));
             }
         }
-        BoolTerm::And(lhs, rhs) => {
-            collect_terms(x, lhs, assignment, possible, system, current);
-            collect_terms(x, rhs, assignment, possible, system, current);
+        BoolTerm::And(term_keys) => {
+            // Filter out true terms
+            let term_keys = term_keys
+                .iter()
+                .copied()
+                .filter(|&term_key| !system.evaluate_term(term_key, assignment))
+                .collect::<Vec<_>>();
 
-            // Case 1
-            if [(lhs, rhs), (rhs, lhs)].into_iter().any(|(i, j)| {
-                current.contains(&(x, i))
-                    && !system.evaluate_term(i, assignment)
-                    && system.evaluate_term(j, assignment)
+            // x can influence at least one false term and all false terms are dependent on some var (can change)
+            if term_keys.iter().any(|&term_key| {
+                collect_terms(x, term_key, assignment, possible, system, current);
+                current.contains(&(x, term_key))
+            }) && term_keys.iter().all(|&term_key| {
+                system.universe().iter().any(|&z| {
+                    collect_terms(z, term_key, assignment, possible, system, current);
+                    current.contains(&(z, term_key))
+                })
             }) {
                 current.insert((x, term_key));
-                return;
-            }
-
-            // Case 2
-            if system.evaluate_term(lhs, assignment) || system.evaluate_term(rhs, assignment) {
-                return;
-            }
-            for (i, j) in [(lhs, rhs), (rhs, lhs)] {
-                if !current.contains(&(x, i)) {
-                    continue;
-                }
-                let universe: HashSet<VarKey> = system.universe();
-                for z in universe {
-                    collect_terms(z, j, assignment, possible, system, current);
-                    if current.contains(&(z, j)) {
-                        current.insert((x, term_key));
-                        return;
-                    }
-                }
             }
         }
     }
