@@ -403,7 +403,6 @@ impl StrategicHeightOracle {
             .map(|StrategyItem(weight, (x, y))| ((x, y), weight))
             .collect();
 
-        //PERF find algorithm that uses previous knowledge of graph to speed up finding all shortest paths.
         let mut graph = SecondaryMap::new();
         for &i in &variables {
             let mut inner = SecondaryMap::new();
@@ -462,7 +461,6 @@ impl StrategicHeightOracle {
     }
 }
 
-// TODO: Make this generic on set/strategy implementation
 impl<
     K: Eq + Copy + Hash + Debug + Key,
     V: PartialOrd,
