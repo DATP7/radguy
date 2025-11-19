@@ -6,7 +6,7 @@ use std::{
 
 use radguy::extension::TermSystem;
 use radguy::{
-    Arguments, Assignment, PairUniverse, System, Universe,
+    Arguments, PairUniverse, System, Universe,
     bislotmap::BiSlotMap,
     ordered::strategy::{InitialStrategy, Strategy},
 };
@@ -14,26 +14,27 @@ use slotmap::Key;
 
 use crate::systems::{
     numeric::{
-        number::Number,
+        Number, NumericTerm,
         numeric_system::{NumericSystem, NumericSystemImpl},
-        numeric_term::NumericTerm,
     },
     wccs::{ast::WeightedAction, wccs_system::WCCSSystem},
     wctl::flat_formula::{FlatExpr, FlatFormula},
 };
 
+#[derive(Debug, Clone)]
 pub struct WCTLSystem<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key> {
     pub(crate) wccs_system: WCCSSystem<'a, ProcKey>,
     numeric_system: RefCell<NumericSystemImpl<VarKey, TermKey, (ProcKey, FormKey)>>,
     pub(crate) formulas: RefCell<BiSlotMap<FormKey, FlatFormula<'a, FormKey, ExprKey>>>,
     pub(crate) expresions: RefCell<BiSlotMap<ExprKey, FlatExpr<'a, ExprKey>>>,
+    locked: bool,
 }
 
 impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
     WCTLSystem<'a, ProcKey, FormKey, ExprKey, VarKey, TermKey>
 {
-    pub fn lookup_process_key(&self, process_name: &'a str) -> Option<ProcKey> {
-        self.wccs_system.lookup_process_key(process_name)
+    pub fn get_process_definition(&self, process_name: &'a str) -> Option<ProcKey> {
+        self.wccs_system.get_definition(process_name)
     }
 
     pub fn new(wccs_system: WCCSSystem<'a, ProcKey>) -> Self {
@@ -42,6 +43,7 @@ impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
             numeric_system: RefCell::new(NumericSystemImpl::default()),
             formulas: RefCell::new(BiSlotMap::default()),
             expresions: RefCell::new(BiSlotMap::default()),
+            locked: false,
         }
     }
     fn insert_term(&self, term: NumericTerm<VarKey, TermKey>) -> TermKey {
@@ -51,7 +53,7 @@ impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
             .get_or_insert_key(term)
     }
 
-    fn get_term_key(&self, var_key: VarKey) -> TermKey {
+    fn get_definition(&self, var_key: VarKey) -> TermKey {
         if let Some(term_key) = self.numeric_system.borrow().definitions.get(var_key) {
             return *term_key;
         }
@@ -236,6 +238,7 @@ impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
         term_key
     }
 
+    /// Formats the transitions from WCCS so actions are discardet and the map is flatternd to pairs of (w, p)
     fn flatten_transitions(&self, process_key: ProcKey) -> impl Iterator<Item = (Number, ProcKey)> {
         let transitions = self.wccs_system.get_transitions(process_key);
         transitions
@@ -279,18 +282,37 @@ impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
     }
 }
 
+macro_rules! assert_access_allowed {
+    ($self:expr, $key:expr) => {
+        debug_assert!(
+            !$self.locked || $self.numeric_system.borrow().definitions.contains_key($key),
+            "Variable {:?} was visited for the first time while the system was locked",
+            $self.numeric_system.borrow().names.get_value($key)
+        )
+    };
+}
+
 impl<ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key> System<VarKey, Number>
     for WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
 {
-    fn evaluate(&self, key: VarKey, assignment: &dyn Assignment<VarKey, Number>) -> Number {
-        let term_key = self.get_term_key(key);
+    fn evaluate(&self, key: VarKey, assignment: &HashMap<VarKey, Number>) -> Number {
+        assert_access_allowed!(self, key);
+        let term_key = self.get_definition(key);
         self.numeric_system
             .borrow()
             .evaluate_term(term_key, assignment)
     }
 
-    fn bottom_assignment(&self) -> impl Assignment<VarKey, Number> {
+    fn bottom_assignment(&self) -> HashMap<VarKey, Number> {
         HashMap::new()
+    }
+
+    fn lock(&mut self) {
+        self.locked = true;
+    }
+
+    fn unlock(&mut self) {
+        self.locked = false;
     }
 }
 
@@ -299,7 +321,8 @@ impl<ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
     for WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
 {
     fn arguments(&self, key: VarKey) -> HashSet<VarKey> {
-        let term_key = self.get_term_key(key);
+        assert_access_allowed!(self, key);
+        let term_key = self.get_definition(key);
         self.numeric_system.borrow().term_arguments(term_key)
     }
 }
@@ -344,7 +367,8 @@ impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key>
     for WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
 {
     fn definition(&self, variable: VarKey) -> TermKey {
-        self.get_term_key(variable)
+        assert_access_allowed!(self, variable);
+        self.get_definition(variable)
     }
 }
 
@@ -356,11 +380,7 @@ impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key>
         self.numeric_system.borrow().get_term(term_key)
     }
 
-    fn evaluate_term(
-        &self,
-        term_key: TermKey,
-        assignment: &dyn Assignment<VarKey, Number>,
-    ) -> Number {
+    fn evaluate_term(&self, term_key: TermKey, assignment: &HashMap<VarKey, Number>) -> Number {
         self.numeric_system
             .borrow()
             .evaluate_term(term_key, assignment)

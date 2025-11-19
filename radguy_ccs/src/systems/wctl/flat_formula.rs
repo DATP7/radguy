@@ -1,9 +1,9 @@
 use slotmap::Key;
 
 use crate::systems::wccs::wccs_system::MultiSet;
-use crate::systems::{numeric::number::Number, wctl::wctl_system::WCTLSystem};
+use crate::systems::{numeric::Number, wctl::wctl_system::WCTLSystem};
 
-#[derive(Hash, PartialEq, Eq, Clone)]
+#[derive(Hash, PartialEq, Eq, Clone, Debug)]
 pub enum FlatFormula<'a, FormKey: Key, ExprKey: Key> {
     Const(bool),
     And(FormKey, FormKey),
@@ -52,7 +52,7 @@ pub enum FlatFormula<'a, FormKey: Key, ExprKey: Key> {
     Proposition(&'a str),
 }
 
-#[derive(Hash, PartialEq, Eq, Clone)]
+#[derive(Hash, PartialEq, Eq, Clone, Debug)]
 pub enum FlatRelationalExpr<ExprKey: Key> {
     LessThan(ExprKey, ExprKey),
     LessThanEq(ExprKey, ExprKey),
@@ -62,7 +62,7 @@ pub enum FlatRelationalExpr<ExprKey: Key> {
     NotEq(ExprKey, ExprKey),
 }
 
-#[derive(Hash, PartialEq, Eq, Clone)]
+#[derive(Hash, PartialEq, Eq, Clone, Debug)]
 pub enum FlatExpr<'a, ExprKey: Key> {
     Multiply(ExprKey, ExprKey),
     Add(ExprKey, ExprKey),

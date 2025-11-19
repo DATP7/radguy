@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use crate::systems::wccs::ast::{Binding, Process, WeightedAction, Action, Relabeling};
 use lalrpop_util::ParseError;
-use crate::systems::numeric::number::Number;
+use crate::systems::numeric::Number;
 
 grammar;
 
@@ -74,31 +74,6 @@ RelabeledProcess: Process<'input> = {
 
     RestrictedProcess,
 }
-
-// ActionRelabeledProcess: Process<'input> = {
-//     <process:ActionRelabeledProcess> "[" <labels:Comma<ActionRelabelling>> "]" =>? if labels.iter().any(|(from, to)| *from == "tau" || *to == "tau") {
-//         Err(ParseError::User {
-//         error: "cannot relabel tau"
-//         })
-//     } else {
-//         Ok(Process::ActionRelabelling {
-//         process: Box::new(process),
-//         labels: BTreeMap::from_iter(labels),
-//         })
-//     },
-
-//     PropositionRelabeledProcess,
-// }
-
-// PropositionRelabeledProcess: Process<'input> = {
-//     <process:PropositionRelabeledProcess> "[" <labels:Comma<PropositionRelabelling>> "]" => 
-//         Process::PropositionRelabelling {
-//             process: Box::new(process),
-//             labels: BTreeMap::from_iter(labels),
-//         },
-
-//     RestrictedProcess,
-// }
 
 RestrictedProcess: Process<'input> = {
   <process:RestrictedProcess> "\\" <restriction:LabelSet> => Process::Restriction {

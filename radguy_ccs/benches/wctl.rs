@@ -1,20 +1,26 @@
+use crate::ordered::strategy::BinaryHeapStrategy;
 use criterion::BenchmarkId;
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::Criterion;
+use criterion::criterion_group;
+use criterion::criterion_main;
+use orx_priority_queue::DaryHeapWithMap;
+use radguy::ordered::strategy::HashMapStrategy;
+use radguy::ordered::strategy::OrxStrategy;
 use radguy::{
     kleene_local,
     oracle::SMax,
     ordered::{self, oracle::ToConstant, strategy::StrategyWeight},
 };
 
-use radguy_ccs::systems::numeric::number::Number;
+use radguy_ccs::systems::numeric::Number;
 use radguy_ccs::systems::wccs;
 use radguy_ccs::systems::wccs::wccs_system::WCCSSystem;
 use radguy_ccs::systems::wctl;
 use radguy_ccs::systems::wctl::wctl_system::WCTLSystem;
 use slotmap::DefaultKey;
 
-macro_rules! bisim_bench_oracles_ordered {
-    ($name:ident: using $c:expr, bench $process_name:expr, $formula_str:expr => $sat:literal in $wccs:expr, with $($oracle:expr,)*) => {{
+macro_rules! wctl_bench_oracles_ordered {
+    ($name:ident: using $c:expr, strategy $s:ty; $sname:literal; bench $process_name:expr, $formula_str:expr => $sat:literal in $wccs:expr, with $($oracle:expr,)*) => {{
         let wccs_parser = wccs::ProgramParser::new();
         let wccs_ast = wccs_parser
             .parse(&$wccs)
@@ -23,22 +29,26 @@ macro_rules! bisim_bench_oracles_ordered {
         let formula_parser = wctl::grammar::FormulaParser::new();
         let formula = formula_parser.parse($formula_str).expect("Formula should parse");
 
+        let mut wccs_system = WCCSSystem::<DefaultKey>::default();
+        wccs_system.insert_ast_bindings(wccs_ast.clone());
+        let sys = WCTLSystem::<DefaultKey, DefaultKey, DefaultKey, DefaultKey, DefaultKey>::new(wccs_system);
+
+        let formula_key = sys.insert_ast_formula(formula.clone());
+
+
         let mut group = $c.benchmark_group(stringify!($name));
         $(
         {
             let oracle = $oracle;
-            group.bench_with_input(BenchmarkId::new("ordered", &oracle), &oracle, |b, o| {
+            group.bench_with_input(BenchmarkId::new("ordered", format!("{}/{}", $sname, &oracle)), &oracle, |b, o| {
                 b.iter_batched(
                     || {
-                        let mut wccs_system = WCCSSystem::<DefaultKey>::default();
-                        wccs_system.insert_ast_bindings(wccs_ast.clone());
-                        (WCTLSystem::<DefaultKey, DefaultKey, DefaultKey, DefaultKey, DefaultKey>::new(wccs_system), (*o).clone())
+                        (sys.clone(), (*o).clone())
                     },
                     |(sys, o)| {
-                        let process_key = sys.lookup_process_key($process_name).expect("Process name should be bound");
-                        let formula_key = sys.insert_ast_formula(formula.clone());
+                        let process_key = sys.get_process_definition($process_name).expect("Process name should be bound");
                         let target = sys.get_var(process_key, formula_key);
-                        let result = ordered::kleene_local(&sys, target, &o) == Number::Val(0);
+                        let result = ordered::kleene_local::<_, _, $s, $s, _>(&sys, target, &o) == Number::Val(0);
                         assert_eq!(
                             $sat,
                             result,
@@ -58,7 +68,7 @@ macro_rules! bisim_bench_oracles_ordered {
     }};
 }
 
-macro_rules! bisim_bench_oracles_unordered {
+macro_rules! wctl_bench_oracles_unordered {
     ($name:ident: using $c:expr, bench $process_name:expr, $formula_str:expr => $sat:literal in $wccs:expr, with $($oracle:expr,)*) => {{
         let wccs_parser = wccs::ProgramParser::new();
         let wccs_ast = wccs_parser
@@ -68,32 +78,35 @@ macro_rules! bisim_bench_oracles_unordered {
         let formula_parser = wctl::grammar::FormulaParser::new();
         let formula = formula_parser.parse($formula_str).expect("Formula should parse");
 
+        let mut wccs_system = WCCSSystem::<DefaultKey>::default();
+        wccs_system.insert_ast_bindings(wccs_ast.clone());
+        let sys = WCTLSystem::<DefaultKey, DefaultKey, DefaultKey, DefaultKey, DefaultKey>::new(wccs_system);
+
+        let formula_key = sys.insert_ast_formula(formula.clone());
+
         let mut group = $c.benchmark_group(stringify!($name));
         $(
-        {
-            let oracle = $oracle;
-            group.bench_with_input(BenchmarkId::new("unordered", &oracle), &oracle, |b, o| {
-                b.iter_batched(
-                    || {
-                        let mut wccs_system = WCCSSystem::<DefaultKey>::default();
-                        wccs_system.insert_ast_bindings(wccs_ast.clone());
-                        (WCTLSystem::<DefaultKey, DefaultKey, DefaultKey, DefaultKey, DefaultKey>::new(wccs_system), (*o).clone())
-                    },
-                    |(sys, o)| {
-                        let process_key = sys.lookup_process_key($process_name).expect("Process name should be bound");
-                        let formula_key = sys.insert_ast_formula(formula.clone());
-                        let target = sys.get_var(process_key, formula_key);
-                        let result = kleene_local(&sys, target, &o) == Number::Val(0);
-                        assert_eq!(
-                            $sat,
-                            result,
-                            "{} should{} satisfy {} in {} with oracle {}",
-                            $process_name,
-                            $formula_str,
-                            if !$sat { " not" } else { "" },
-                            $wccs,
-                            o
-                        )
+            {
+                let oracle = $oracle;
+                group.bench_with_input(BenchmarkId::new("unordered", &oracle), &oracle, |b, o| {
+                    b.iter_batched(
+                        || {
+                            (sys.clone(), (*o).clone())
+                        },
+                        |(mut sys, o)| {
+                            let process_key = sys.get_process_definition($process_name).expect("Process name should be bound");
+                            let target = sys.get_var(process_key, formula_key);
+                            let result = kleene_local(&mut sys, target, &o) == Number::Val(0);
+                            assert_eq!(
+                                $sat,
+                                result,
+                                "{} should{} satisfy {} in {} with oracle {}",
+                                $process_name,
+                                $formula_str,
+                                if !$sat { " not" } else { "" },
+                                $wccs,
+                                o
+                            )
                     },
                     criterion::BatchSize::SmallInput,
                 );
@@ -103,43 +116,59 @@ macro_rules! bisim_bench_oracles_unordered {
     }};
 }
 
-macro_rules! bisim_bench_suite {
+macro_rules! wctl_bench_problem_ordered {
+    ($name:ident: using $c:expr, strategy $s:ty; $sname:literal; bench $process_name:expr, $formula_str:expr => $sat:literal in $wccs:expr) => {
+        let wccs = $wccs;
+
+        wctl_bench_oracles_ordered! {
+            $name: using $c, strategy $s; $sname; bench $process_name, $formula_str => $sat in wccs, with
+            SMax::default().constant(StrategyWeight::Infinity),
+            // LocalMaxR::default().constant(StrategyWeight::Infinity),
+            // LocalMaxR::default().constant(StrategyWeight::Infinity).then(CountOracle::default()),
+            // LocalMaxR::default().constant(StrategyWeight::Infinity).then(InverseCountOracle::default()),
+            // // BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(InverseCountOracle, std::cmp::min),
+            // // BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(CountOracle, std::cmp::min),
+            // StrategicArgumentsOracle::default(),
+            // StrategicArgumentsOracle::default().and_by(CountOracle::default(), std::cmp::min),
+            // StrategicArgumentsOracle::default().and_by(InverseCountOracle::default(), std::cmp::min),
+            // CountOracle::default().then(StrategicArgumentsOracle::default()),
+            // InverseCountOracle::default().then(StrategicArgumentsOracle::default()),
+            // StrategicArgumentsOracle::default().then(CountOracle::default()),
+            // StrategicArgumentsOracle::default().then(InverseCountOracle::default()),
+            // StrategicArgumentsOracle::default().and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(CountOracle::default()),
+            // StrategicArgumentsOracle::default().and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(InverseCountOracle::default()),
+        };
+    };
+}
+
+macro_rules! wctl_bench_suite_problem {
+    ($name:ident: using $c:expr, $process_name:expr, $formula_str:expr => $sat:literal in $wccs:expr) => {
+        let wccs = $wccs;
+        wctl_bench_oracles_unordered!($name: using $c, bench $process_name, $formula_str => $sat in wccs, with
+            SMax::default(),
+            // TODO: LocalMaxR and Arguments should be fixed
+            // LocalMaxR::default(),
+            // ArgumentsOracle::default(),
+            // ArgumentsOracle::default().then(SMax::default()),
+            // ArgumentsOracle::default().then(LocalMaxR::default()),
+            // ArgumentsOracle::default().and(SMax::default()),
+            // ArgumentsOracle::default().and(LocalMaxR::default()),
+            // BoolExtension::oracle(),
+            // SMax::default().then(BoolExtension::oracle()),
+            // LocalMaxR::default().then(BoolExtension::oracle()),
+        );
+
+        wctl_bench_problem_ordered!($name: using $c, strategy BinaryHeapStrategy<_>; "std_binary"; bench $process_name, $formula_str => $sat in wccs);
+        wctl_bench_problem_ordered!($name: using $c, strategy HashMapStrategy<_>; "hashmap"; bench $process_name, $formula_str => $sat in wccs);
+        wctl_bench_problem_ordered!($name: using $c, strategy OrxStrategy<_, DaryHeapWithMap<_, _, 4>>; "orx_quad"; bench $process_name, $formula_str => $sat in wccs);
+    };
+}
+
+macro_rules! wctl_bench_suite {
     ($($name:ident: $process_name:expr, $formula_str:expr => $sat:literal in $wccs:expr;)*) => {
         $(
         fn $name(c: &mut Criterion) {
-        let wccs = $wccs;
-            bisim_bench_oracles_unordered! { $name: using c, bench $process_name, $formula_str => $sat in wccs, with
-                SMax::default(),
-                // TODO: LocalMaxR and Arguments should be fixed
-                //LocalMaxR::default(),
-                //ArgumentsOracle::default(),
-                //ArgumentsOracle::default().then(SMax::default()),
-                //ArgumentsOracle::default().then(LocalMaxR::default()),
-                //ArgumentsOracle::default().and(SMax::default()),
-                //ArgumentsOracle::default().and(LocalMaxR::default()),
-                // BoolExtension::oracle(),
-                // SMax::default().then(BoolExtension::oracle()),
-                // LocalMaxR::default().then(BoolExtension::oracle()),
-            };
-
-            bisim_bench_oracles_ordered! { $name: using c, bench $process_name, $formula_str => $sat in wccs, with
-                SMax::default().constant(StrategyWeight::Infinity),
-                // TODO: Orderd oracles dont work properly
-                // LocalMaxR::default().constant(StrategyWeight::Infinity),
-                // LocalMaxR::default().constant(StrategyWeight::Infinity).then(CountOracle),
-                // LocalMaxR::default().constant(StrategyWeight::Infinity).then(InverseCountOracle),
-                // BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(InverseCountOracle, std::cmp::min),
-                // BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(CountOracle, std::cmp::min),
-                // StrategicArgumentsOracle::default(),
-                // StrategicArgumentsOracle::default().and_by(CountOracle, std::cmp::min),
-                // StrategicArgumentsOracle::default().and_by(InverseCountOracle, std::cmp::min),
-                // CountOracle.then(StrategicArgumentsOracle::default()),
-                // InverseCountOracle.then(StrategicArgumentsOracle::default()),
-                // StrategicArgumentsOracle::default().then(CountOracle),
-                // StrategicArgumentsOracle::default().then(InverseCountOracle),
-                // StrategicArgumentsOracle::default().and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(CountOracle),
-                // StrategicArgumentsOracle::default().and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(InverseCountOracle),
-            };
+            wctl_bench_suite_problem!($name: using c, $process_name, $formula_str => $sat in $wccs);
         }
         )*
         criterion_group!(
@@ -150,7 +179,7 @@ macro_rules! bisim_bench_suite {
     };
 }
 
-bisim_bench_suite! {
+wctl_bench_suite! {
     mower_example:
         "S0", "A mow U[<=6] dump" => true
         in r"

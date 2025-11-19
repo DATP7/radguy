@@ -1,8 +1,9 @@
 use itertools::iproduct;
+use radguy::Assignment;
 use radguy::extension::TermSystem;
-use radguy::ordered::strategy::{InitialStrategy, StrategyHeap, StrategyItem};
+use radguy::ordered::strategy::{InitialStrategy, Strategy, StrategyItem};
 use radguy::{Arguments, PairUniverse, System, Universe};
-use radguy::{Assignment, Set, Union, bislotmap::BiSlotMap};
+use radguy::{Set, Union, bislotmap::BiSlotMap};
 use slotmap::{Key, SecondaryMap};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
@@ -15,10 +16,10 @@ pub trait NumericSystem<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone>:
     TermSystem<V, Number, T>
 {
     fn get_term(&self, term_key: T) -> NumericTerm<V, T>;
-    fn evaluate_term(&self, term_key: T, assignment: &dyn Assignment<V, Number>) -> Number;
+    fn evaluate_term(&self, term_key: T, assignment: &HashMap<V, Number>) -> Number;
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct NumericSystemImpl<K: Key, T: Key, N: Hash + Eq + Clone> {
     pub names: BiSlotMap<K, N>,
     pub definitions: SecondaryMap<K, T>,
@@ -30,10 +31,10 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone> NumericSystem<K, T, N> for NumericSys
         self.terms.get_value(term_key).clone()
     }
 
-    fn evaluate_term(&self, term_key: T, assignment: &dyn Assignment<K, Number>) -> Number {
+    fn evaluate_term(&self, term_key: T, assignment: &HashMap<K, Number>) -> Number {
         match self.terms.get_value(term_key) {
             NumericTerm::Const(num) => *num,
-            NumericTerm::Var(k) => assignment.get(k),
+            NumericTerm::Var(k) => assignment.get_assignment(k),
             NumericTerm::Add(lhs, rhs) => {
                 self.evaluate_term(*lhs, assignment) + self.evaluate_term(*rhs, assignment)
             }
@@ -100,7 +101,7 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone> NumericSystemImpl<K, T, N> {
 }
 
 impl<K: Key, T: Key, N: Hash + Eq + Clone + Debug> NumericSystemImpl<K, T, N> {
-    pub fn print_assignment(&self, a: &dyn Assignment<K, Number>) {
+    pub fn print_assignment(&self, a: &HashMap<K, Number>) {
         for (key, name) in self.names.iter() {
             println!("{name:?} = {:?}", a.get(&key));
         }
@@ -134,13 +135,21 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone> PairUniverse<HashSet<(K, K)>>
 impl<VarKey: Key, TermKey: Key, VarName: Hash + Eq + Clone> System<VarKey, Number>
     for NumericSystemImpl<VarKey, TermKey, VarName>
 {
-    fn evaluate(&self, key: VarKey, assignment: &dyn Assignment<VarKey, Number>) -> Number {
+    fn evaluate(&self, key: VarKey, assignment: &HashMap<VarKey, Number>) -> Number {
         let term_key = self.definitions.get(key).expect("variable must be defined");
         self.evaluate_term(*term_key, assignment)
     }
 
-    fn bottom_assignment(&self) -> impl Assignment<VarKey, Number> {
+    fn bottom_assignment(&self) -> HashMap<VarKey, Number> {
         HashMap::new()
+    }
+
+    fn lock(&mut self) {
+        todo!()
+    }
+
+    fn unlock(&mut self) {
+        todo!()
     }
 }
 
@@ -164,13 +173,16 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
     }
 }
 
-impl<VarKey: Key + Hash + Clone, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
-    InitialStrategy<VarKey, Number, StrategyHeap<(VarKey, VarKey)>>
-    for NumericSystemImpl<VarKey, TermKey, VarName>
+impl<
+    VarKey: Key + Hash + Clone,
+    TermKey: Key + Hash,
+    VarName: Hash + Eq + Clone,
+    PS: Strategy<(VarKey, VarKey)> + FromIterator<StrategyItem<(VarKey, VarKey)>>,
+> InitialStrategy<VarKey, Number, PS> for NumericSystemImpl<VarKey, TermKey, VarName>
 {
-    fn get_initial_strategy(&self) -> StrategyHeap<(VarKey, VarKey)> {
+    fn get_initial_strategy(&self) -> PS {
         iproduct!(self.names.keys(), self.names.keys())
-            .map(|(x, y)| StrategyItem::infinite((x, y)).reversed())
+            .map(|(x, y)| StrategyItem::infinite((x, y)))
             .collect()
     }
 }

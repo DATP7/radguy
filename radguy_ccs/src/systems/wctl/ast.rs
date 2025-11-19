@@ -1,7 +1,7 @@
 use slotmap::Key;
 
 use crate::systems::{
-    numeric::number::Number,
+    numeric::Number,
     wctl::{
         flat_formula::{FlatExpr, FlatFormula, FlatRelationalExpr},
         wctl_system::WCTLSystem,

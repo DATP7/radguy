@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Display;
 
-use crate::systems::numeric::number::Number;
+use crate::systems::numeric::Number;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Process<'a> {

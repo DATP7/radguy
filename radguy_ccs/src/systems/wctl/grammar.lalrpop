@@ -1,5 +1,5 @@
 use crate::systems::wctl::ast::{Formula, RelationalExpr, Expr};
-use crate::systems::numeric::number::Number;
+use crate::systems::numeric::Number;
 use std::collections::HashMap;
 
 grammar;

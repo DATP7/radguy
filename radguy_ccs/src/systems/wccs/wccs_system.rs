@@ -53,7 +53,7 @@ impl<T: Eq + Copy> MultiSet<T> for Vec<T> {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct WCCSSystem<'a, ProcKey: Key> {
     process_map: RefCell<BiSlotMap<ProcKey, FlatProcess<'a, ProcKey>>>,
     bindings: HashMap<&'a str, ProcKey>,
@@ -61,7 +61,7 @@ pub struct WCCSSystem<'a, ProcKey: Key> {
 }
 
 impl<'a, ProcKey: Key> WCCSSystem<'a, ProcKey> {
-    pub fn lookup_process_key(&self, process_name: &'a str) -> Option<ProcKey> {
+    pub fn get_definition(&self, process_name: &'a str) -> Option<ProcKey> {
         self.bindings.get(process_name).copied()
     }
     pub fn get_propositions(&self, process_key: ProcKey) -> Vec<&'a str> {
@@ -108,7 +108,7 @@ impl<'a, ProcKey: Key> WCCSSystem<'a, ProcKey> {
         let transitions = match process {
             FlatProcess::Nil => HashMap::new(),
             FlatProcess::Named(name) => self.get_transitions(
-                self.lookup_process_key(name)
+                self.get_definition(name)
                     .expect("Named process should not refer to unbinded process"),
             ),
             FlatProcess::ActionPrefix { action, process } => {

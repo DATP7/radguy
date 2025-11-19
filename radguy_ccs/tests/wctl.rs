@@ -1,6 +1,6 @@
 use radguy::kleene_local;
 use radguy::oracle::SMax;
-use radguy_ccs::systems::numeric::number::Number;
+use radguy_ccs::systems::numeric::Number;
 use radguy_ccs::systems::wccs;
 use radguy_ccs::systems::wccs::wccs_system::WCCSSystem;
 use radguy_ccs::systems::wctl;
@@ -25,12 +25,12 @@ macro_rules! wctl_test {
                     let formula_parser = wctl::grammar::FormulaParser::new();
                     let formula = formula_parser.parse($formula_str).expect("Formula should parse");
 
-                    let sys = WCTLSystem::<DefaultKey, DefaultKey, DefaultKey, DefaultKey, DefaultKey>::new(wccs_system);
-                    let process_key = sys.lookup_process_key($process_name).expect("Process name should be bound");
+                    let mut sys = WCTLSystem::<DefaultKey, DefaultKey, DefaultKey, DefaultKey, DefaultKey>::new(wccs_system);
+                    let process_key = sys.get_process_definition($process_name).expect("Process name should be bound");
                     let formula_key = sys.insert_ast_formula(formula.clone());
                     let start = sys.get_var(process_key, formula_key);
 
-                    let result = kleene_local(&sys, start, &SMax::default()) == Number::Val(0);
+                    let result = kleene_local(&mut sys, start, &SMax::default()) == Number::Val(0);
                     assert_eq!($eq, result, "{} should{} satisfy {} in {}", $process_name, if !$eq { " not" } else {""}, $formula_str, $wccs);
                 )*
             }
