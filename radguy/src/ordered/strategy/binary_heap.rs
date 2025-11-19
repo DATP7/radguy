@@ -73,7 +73,7 @@ impl<T: Copy> Strategy<T> for BinaryHeapStrategy<T> {
     }
 }
 
-impl<T: Eq + Copy + Hash> Intersect<T, HashSet<T>> for BinaryHeapStrategy<T> {
+impl<T: Eq + Copy + Hash> Intersect<HashSet<T>> for BinaryHeapStrategy<T> {
     fn intersect(mut self, other: &HashSet<T>) -> Self {
         self.0
             .retain(|Reverse(StrategyItem(_, v))| other.contains(v));

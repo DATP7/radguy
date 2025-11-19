@@ -79,7 +79,7 @@ impl<T> PartialEq for StrategyItem<T> {
 
 impl<T> Eq for StrategyItem<T> {}
 
-pub trait Strategy<T: Copy> {
+pub trait Strategy<T> {
     /// Extract the element in the strategy with the lowest weight
     ///
     /// Returns `None` of there are no more elements in the strategy
@@ -99,7 +99,6 @@ pub trait InitialStrategy<
 
 pub trait SliceLeft<T: Eq, U: Copy, S: Strategy<U>>: Strategy<(T, U)>
 where
-    (T, U): Copy,
     Self: Sized,
 {
     /// Get a strategy where all values are of the form `(left, x)`
@@ -108,19 +107,18 @@ where
 
 pub trait SliceRight<T: Copy, U: Eq, S: Strategy<T>>: Strategy<(T, U)>
 where
-    (T, U): Copy,
     Self: Sized,
 {
     /// Get a strategy where all values are of the form `(x, right)`
     fn slice_right(self, right: U) -> S;
 }
 
-pub trait Intersect<T: Eq + Copy, Other = Self> {
+pub trait Intersect<Other = Self> {
     #[must_use]
     fn intersect(self, other: &Other) -> Self;
 }
 
-pub trait IntersectBy<T: Eq + Copy, Other: Strategy<T> = Self> {
+pub trait IntersectBy<T: Eq, Other: Strategy<T> = Self> {
     #[must_use]
     /// Intersect the domains of two strategies, using `f` to compute the new weight elements
     fn intersect_by(
@@ -130,17 +128,18 @@ pub trait IntersectBy<T: Eq + Copy, Other: Strategy<T> = Self> {
     ) -> Self;
 }
 
-pub trait Domain<T: Copy, S>: Strategy<T> {
+pub trait Domain<T, S>: Strategy<T> {
     /// Get the set of elements that have a value in the strategy
     fn domain(self) -> S;
 }
 
-pub trait Singleton<T: Copy> {
+pub trait Singleton<T> {
     /// Return a new strategy where `x -> infinity`
     fn singleton(x: T) -> Self;
 }
 
 pub trait Length {
+    /// Get the number of items in the domain of the strategy
     fn length(&self) -> usize;
 }
 
