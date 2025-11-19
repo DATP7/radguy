@@ -8,7 +8,7 @@ use std::{
 use itertools::{Itertools, iproduct};
 use radguy::bislotmap::BiSlotMap;
 use radguy::{
-    Arguments, Assignment, PairUniverse, System, Universe,
+    Arguments, Assignment, Cartesian, Intersect, PairUniverse, System, Universe,
     extension::TermSystem,
     ordered::strategy::{InitialStrategy, Strategy, StrategyItem},
 };
@@ -23,12 +23,23 @@ pub trait BoolSystem<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone>:
     fn evaluate_term(&self, term_key: T, assignment: &dyn Assignment<V, bool>) -> bool;
 }
 
+macro_rules! assert_access_allowed {
+    ($self:expr, $key:expr) => {
+        debug_assert!(
+            !$self.locked || $self.definitions.contains_key($key),
+            "Variable {:?} was visited for the first time while the system was locked",
+            $self.names.get_value($key)
+        )
+    };
+}
+
 #[derive(Default, Debug)]
 pub struct BoolSystemImpl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone> {
     pub names: BiSlotMap<V, N>,
     pub definitions: SecondaryMap<V, T>,
     pub terms: BiSlotMap<T, BoolTerm<V, T>>,
     term_arguments_cache: RefCell<HashMap<T, HashSet<V>>>,
+    locked: bool,
 }
 
 impl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone> BoolSystemImpl<V, T, N> {
@@ -60,7 +71,7 @@ impl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone> BoolSystemImpl<V, T, N>
 impl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone + Debug> BoolSystemImpl<V, T, N> {
     pub fn print_assignment(&self, a: &dyn Assignment<V, bool>) {
         for (key, name) in self.names.iter() {
-            println!("{name:?} = {:?}", a.get(&key));
+            println!("{name:?} = {:?}", a.get_assignment(&key));
         }
     }
 
@@ -77,7 +88,7 @@ impl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone + Debug> BoolSystemImpl<
 
 impl<K: Key, T: Key, N: Hash + Eq + Clone> Universe<HashSet<K>> for BoolSystemImpl<K, T, N> {
     fn universe(&self) -> HashSet<K> {
-        self.definitions.keys().collect()
+        self.names.keys().collect()
     }
 }
 
@@ -85,26 +96,39 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone> PairUniverse<HashSet<(K, K)>>
     for BoolSystemImpl<K, T, N>
 {
     fn pair_universe(&self) -> HashSet<(K, K)> {
-        iproduct!(self.names.keys(), self.names.keys()).collect()
+        iproduct!(self.names.keys(), self.names.keys(),).collect()
     }
 }
-impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone> System<VarKey, bool>
-    for BoolSystemImpl<VarKey, TermKey, VarName>
+impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone + Debug>
+    System<VarKey, bool> for BoolSystemImpl<VarKey, TermKey, VarName>
 {
-    fn evaluate(&self, key: VarKey, assignment: &dyn Assignment<VarKey, bool>) -> bool {
-        let term_key = self.definitions.get(key).expect("variable must be defined");
+    fn evaluate(&self, key: VarKey, assignment: &HashMap<VarKey, bool>) -> bool {
+        assert_access_allowed!(self, key);
+        let term_key = self
+            .definitions
+            .get(key)
+            .unwrap_or_else(|| panic!("variable {:?} must be defined", self.names.get_value(key)));
         self.evaluate_term(*term_key, assignment)
     }
 
-    fn bottom_assignment(&self) -> impl Assignment<VarKey, bool> {
+    fn bottom_assignment(&self) -> HashMap<VarKey, bool> {
         HashMap::new()
+    }
+
+    fn lock(&mut self) {
+        self.locked = true;
+    }
+
+    fn unlock(&mut self) {
+        self.locked = false;
     }
 }
 
-impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
+impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone + Debug>
     TermSystem<VarKey, bool, TermKey> for BoolSystemImpl<VarKey, TermKey, VarName>
 {
     fn definition(&self, variable: VarKey) -> TermKey {
+        assert_access_allowed!(self, variable);
         *self
             .definitions
             .get(variable)
@@ -112,16 +136,17 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
     }
 }
 
-impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
+impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone + Debug>
     Arguments<VarKey, HashSet<VarKey>> for BoolSystemImpl<VarKey, TermKey, VarName>
 {
     fn arguments(&self, key: VarKey) -> HashSet<VarKey> {
+        assert_access_allowed!(self, key);
         let term_key = self.definitions.get(key).expect("variable must be defined");
         self.term_arguments(*term_key)
     }
 }
 
-impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
+impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone + Debug>
     BoolSystem<VarKey, TermKey, VarName> for BoolSystemImpl<VarKey, TermKey, VarName>
 {
     fn get_term(&self, term_key: TermKey) -> BoolTerm<VarKey, TermKey> {
@@ -132,7 +157,7 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
         match self.terms.get_value(term_key) {
             BoolTerm::True => true,
             BoolTerm::False => false,
-            BoolTerm::Variable(k) => assignment.get(k),
+            BoolTerm::Variable(k) => assignment.get_assignment(k),
             BoolTerm::Or(term_keys) => term_keys
                 .iter()
                 .any(|term_key| self.evaluate_term(*term_key, assignment)),
@@ -146,7 +171,7 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
 impl<
     VarKey: Key + Hash + Clone,
     TermKey: Key + Hash,
-    VarName: Hash + Eq + Clone,
+    VarName: Hash + Eq + Clone + Debug,
     PS: Strategy<(VarKey, VarKey)> + FromIterator<StrategyItem<(VarKey, VarKey)>>,
 > InitialStrategy<VarKey, bool, PS> for BoolSystemImpl<VarKey, TermKey, VarName>
 {
@@ -154,6 +179,138 @@ impl<
         iproduct!(self.names.keys(), self.names.keys())
             .map(|(x, y)| StrategyItem::infinite((x, y)))
             .collect()
+    }
+}
+
+/// Lazy bool system which ensures variables are not expanded when locked.
+/// Intended for testing local oracles.
+/// Not for production use.
+#[derive(Default, Debug)]
+pub struct LazyBoolSystem<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone> {
+    pub inner: RefCell<BoolSystemImpl<V, T, N>>,
+    visited: RefCell<HashSet<V>>,
+    discovered: RefCell<HashSet<V>>,
+}
+
+impl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone> From<BoolSystemImpl<V, T, N>>
+    for LazyBoolSystem<V, T, N>
+{
+    fn from(global_system: BoolSystemImpl<V, T, N>) -> Self {
+        Self {
+            inner: RefCell::new(global_system),
+            visited: RefCell::new(HashSet::new()),
+            discovered: RefCell::new(HashSet::new()),
+        }
+    }
+}
+
+macro_rules! ensure_lazy_access {
+    ($self:expr, $key:ident) => {
+        debug_assert!(!$self.inner.borrow().locked || $self.visited.borrow().contains(&$key));
+        if (!$self.inner.borrow().locked) {
+            $self.visited.borrow_mut().insert($key);
+            let args = $self.inner.borrow().arguments($key);
+            $self.discovered.borrow_mut().extend(args.into_iter());
+        }
+    };
+}
+
+impl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone + Debug> LazyBoolSystem<V, T, N> {
+    pub fn init_target(&mut self, target: N) -> V {
+        self.visited.replace(HashSet::new());
+        self.discovered.replace(HashSet::new());
+        let key = self.inner.borrow_mut().names.get_or_insert_key(target);
+        self.discovered.borrow_mut().insert(key);
+        key
+    }
+
+    pub fn print_assignment(&self, a: &dyn Assignment<V, bool>) {
+        self.inner.borrow().print_assignment(a);
+    }
+
+    pub fn print_definitions(&self) {
+        self.inner.borrow().print_definitions();
+    }
+}
+
+impl<K: Key, T: Key, N: Hash + Eq + Clone> Universe<HashSet<K>> for LazyBoolSystem<K, T, N> {
+    fn universe(&self) -> HashSet<K> {
+        self.inner
+            .borrow()
+            .universe()
+            .intersect(&self.discovered.borrow())
+    }
+}
+
+impl<K: Key, T: Key, N: Hash + Eq + Clone> PairUniverse<HashSet<(K, K)>>
+    for LazyBoolSystem<K, T, N>
+{
+    fn pair_universe(&self) -> HashSet<(K, K)> {
+        self.discovered
+            .borrow()
+            .cartesian(&self.discovered.borrow())
+    }
+}
+impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone + Debug>
+    System<VarKey, bool> for LazyBoolSystem<VarKey, TermKey, VarName>
+{
+    fn evaluate(&self, key: VarKey, assignment: &HashMap<VarKey, bool>) -> bool {
+        ensure_lazy_access!(self, key);
+        self.inner.borrow().evaluate(key, assignment)
+    }
+
+    fn bottom_assignment(&self) -> HashMap<VarKey, bool> {
+        HashMap::new()
+    }
+
+    fn lock(&mut self) {
+        self.inner.borrow_mut().lock();
+    }
+
+    fn unlock(&mut self) {
+        self.inner.borrow_mut().unlock();
+    }
+}
+
+impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone + Debug>
+    TermSystem<VarKey, bool, TermKey> for LazyBoolSystem<VarKey, TermKey, VarName>
+{
+    fn definition(&self, variable: VarKey) -> TermKey {
+        ensure_lazy_access!(self, variable);
+        self.inner.borrow().definition(variable)
+    }
+}
+
+impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone + Debug>
+    Arguments<VarKey, HashSet<VarKey>> for LazyBoolSystem<VarKey, TermKey, VarName>
+{
+    fn arguments(&self, key: VarKey) -> HashSet<VarKey> {
+        ensure_lazy_access!(self, key);
+        self.inner.borrow().arguments(key)
+    }
+}
+
+impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone + Debug>
+    BoolSystem<VarKey, TermKey, VarName> for LazyBoolSystem<VarKey, TermKey, VarName>
+{
+    fn get_term(&self, term_key: TermKey) -> BoolTerm<VarKey, TermKey> {
+        self.inner.borrow().get_term(term_key)
+    }
+
+    fn evaluate_term(&self, term_key: TermKey, assignment: &dyn Assignment<VarKey, bool>) -> bool {
+        self.inner.borrow().evaluate_term(term_key, assignment)
+    }
+}
+
+impl<
+    VarKey: Key + Hash + Clone,
+    TermKey: Key + Hash,
+    VarName: Hash + Eq + Clone + Debug,
+    PS: Strategy<(VarKey, VarKey)> + FromIterator<StrategyItem<(VarKey, VarKey)>>,
+> InitialStrategy<VarKey, bool, PS> for LazyBoolSystem<VarKey, TermKey, VarName>
+{
+    fn get_initial_strategy(&self) -> PS {
+        self.inner.borrow().get_initial_strategy()
     }
 }
 
@@ -257,6 +414,19 @@ macro_rules! bool_system {
     ($($id:ident = $def:tt;)*) => {
         {
             let mut system = $crate::systems::bool::BoolSystemImpl::<slotmap::DefaultKey, slotmap::DefaultKey, &str>::default();
+            $(
+                $crate::bool_def!($id = $def; system);
+            )*
+            system
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! lazy_bool_system {
+    ($($id:ident = $def:tt;)*) => {
+        {
+            let mut system = $crate::systems::bool::LazyBoolSystem::<slotmap::DefaultKey, slotmap::DefaultKey, &str>::default();
             $(
                 $crate::bool_def!($id = $def; system);
             )*

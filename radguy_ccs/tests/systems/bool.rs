@@ -17,18 +17,18 @@ macro_rules! system_spec {
         $($val:literal => $varname:ident = $def:tt;)*
     };)*) => {
         $(
-        pub fn $name() -> SystemSpec {
-            let system = bool_system! {
-                $($varname = $def;)*
-            };
-            let variables = vec![$(stringify!($varname),)*];
-            let goal = vec![$($val,)*];
-            SystemSpec {
-                system,
-                variables,
-                goal,
+            pub fn $name() -> SystemSpec {
+                let system = bool_system! {
+                    $($varname = $def;)*
+                };
+                let variables = vec![$(stringify!($varname),)*];
+                let goal = vec![$($val,)*];
+                SystemSpec {
+                    system,
+                    variables,
+                    goal,
+                }
             }
-        }
         )*
     };
 }
@@ -114,5 +114,10 @@ system_spec! {
         false => z = ff;
         true => k = tt;
         true => j = tt;
+    };
+    chain: {
+        true => x = y;
+        true => y = z;
+        true => z = tt;
     };
 }

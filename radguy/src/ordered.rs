@@ -1,40 +1,40 @@
 use crate::{
-    Arguments, Assignment, Cartesian, IsSubset, Set, System, Union,
+    Arguments, Assignment, Bottom, System, Union,
     ordered::{
         oracle::StrategicLocalOracle,
         strategy::{InitialStrategy, Intersect, Singleton, SliceRight, Strategy},
     },
 };
-use std::fmt::Debug;
+use std::{collections::HashSet, fmt::Debug, hash::Hash};
 
 pub mod oracle;
 pub mod strategy;
+
 pub fn kleene_local<
-    VarKey: Copy + Eq + Debug,
-    VarValue: PartialOrd,
-    VarStrategy: Strategy<VarKey> + Intersect<VarKey, VarSet> + Singleton<VarKey> + Debug,
+    VarKey: Copy + Eq + Debug + Hash,
+    VarValue: PartialOrd + Bottom + Copy,
+    VarStrategy: Strategy<VarKey> + Intersect<VarKey, HashSet<VarKey>> + Singleton<VarKey> + Debug,
     PairStrat: Strategy<(VarKey, VarKey)> + SliceRight<VarKey, VarKey, VarStrategy>,
-    VarSet: Set<VarKey> + Union + IsSubset + Cartesian<Output = PairSet> + FromIterator<VarKey> + Debug,
-    PairSet,
     S: System<VarKey, VarValue>
         + InitialStrategy<VarKey, VarValue, PairStrat>
-        + Arguments<VarKey, VarSet>,
+        + Arguments<VarKey, HashSet<VarKey>>,
 >(
     system: &S,
     target: VarKey,
-    oracle: &impl StrategicLocalOracle<VarKey, VarValue, VarSet, PairStrat, S>,
+    oracle: &impl StrategicLocalOracle<VarKey, VarValue, PairStrat, S>,
 ) -> VarValue {
     let initial_strategy = system.get_initial_strategy();
     let mut assignment = system.bottom_assignment();
-    let mut discovered: VarSet = std::iter::once(target).collect();
-    let mut visited: VarSet = std::iter::empty().collect();
+    let mut discovered = HashSet::from([target]);
+    let mut visited = HashSet::default();
     let mut todo = VarStrategy::singleton(target);
 
     while let Some(x) = todo.extract_min() {
         let evaluated = system.evaluate(x, &assignment);
         visited.insert(x);
-        if assignment.get(&x) != evaluated || !system.arguments(x).is_subset(&discovered) {
-            assignment.update(x, evaluated);
+        if assignment.get_assignment(&x) != evaluated || !system.arguments(x).is_subset(&discovered)
+        {
+            assignment.update_assignment(x, evaluated);
             discovered = discovered.union(system.arguments(x));
             todo = oracle
                 .get_strategy(&visited, &assignment, &initial_strategy, system)
@@ -43,5 +43,5 @@ pub fn kleene_local<
         }
     }
 
-    assignment.get(&target)
+    assignment.get_assignment(&target)
 }
