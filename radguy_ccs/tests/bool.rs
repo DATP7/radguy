@@ -72,22 +72,50 @@ macro_rules! test_oracles_unordered {
 
 macro_rules! test_oracle_system_strategy {
     ($name:ident: test $oracle:expr, with $strategy:ty, on: $spec:ident) => {
-        #[test]
-        fn $name() {
-            let $crate::systems::bool::SystemSpec {
-                mut system,
-                variables,
-                goal,
-            } = $crate::systems::bool::$spec();
-            for (var, goal) in variables.into_iter().zip(goal.into_iter()) {
-                let start = system.names.get_or_insert_key(var);
-                assert_eq!(
-                    ::radguy::ordered::kleene_local::<_, _, $strategy, $strategy, _>(
-                        &system, start, &$oracle
-                    ),
+        mod $name {
+            use super::*;
+
+            #[test]
+            fn eager() {
+                let $crate::systems::bool::SystemSpec {
+                    mut system,
+                    variables,
                     goal,
-                    "{var} did not have the expected value"
-                );
+                } = $crate::systems::bool::$spec();
+                for (var, goal) in variables.into_iter().zip(goal.into_iter()) {
+                    let start = system.names.get_or_insert_key(var);
+                    assert_eq!(
+                        ::radguy::ordered::kleene_local::<_, _, $strategy, $strategy, _>(
+                            &mut system,
+                            start,
+                            &$oracle
+                        ),
+                        goal,
+                        "{var} did not have the expected value"
+                    );
+                }
+            }
+
+            #[test]
+            fn lazy() {
+                let $crate::systems::bool::SystemSpec {
+                    system,
+                    variables,
+                    goal,
+                } = $crate::systems::bool::$spec();
+                let mut system: radguy_ccs::systems::bool::LazyBoolSystem<_, _, _> = system.into();
+                for (var, goal) in variables.into_iter().zip(goal.into_iter()) {
+                    let start = system.init_target(var);
+                    assert_eq!(
+                        ::radguy::ordered::kleene_local::<_, _, $strategy, $strategy, _>(
+                            &mut system,
+                            start,
+                            &$oracle
+                        ),
+                        goal,
+                        "{var} did not have the expected value"
+                    );
+                }
             }
         }
     };
@@ -182,7 +210,7 @@ mod unordered {
 mod ordered {
     use radguy::{
         extension::LocalExtension,
-        oracle::SMax,
+        oracle::{IdentityOracle, SMax, TrivialOracle},
         ordered::{
             oracle::{
                 CountOracle, InverseCountOracle, StrategicArgumentsOracle, StrategicLocalOracle,
@@ -194,12 +222,16 @@ mod ordered {
     use radguy_ccs::systems::bool::extension::BoolExtension;
 
     test_oracles_ordered! {
+        IdentityOracle.constant(StrategyWeight::Infinity), identity_oracle_inf;
+        TrivialOracle.constant(StrategyWeight::Infinity), trivial_oracle_inf;
         SMax::default().constant(StrategyWeight::Num(0)), smax_const_0;
         SMax::default().constant(StrategyWeight::Infinity), smax_const_infinity;
         SMax::default().constant(StrategyWeight::Num(0)).then(CountOracle::default()), smax_then_count;
         SMax::default().constant(StrategyWeight::Num(10)).and_by(CountOracle::default(), std::cmp::min), smax_10_and_min_count;
         BoolExtension::oracle().constant(StrategyWeight::Num(0)), bool_extension_0;
         BoolExtension::oracle().constant(StrategyWeight::Num(0)).and_by(CountOracle::default(), std::cmp::min), bool_extension_0_and_min_count;
+        BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(CountOracle::default(), std::cmp::min), bool_extension_inf_and_min_count;
+        BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(InverseCountOracle::default(), std::cmp::min), bool_extension_inf_and_min_count_inverse;
         CountOracle::default(), count;
         InverseCountOracle::default(), count_inverse;
         StrategicArgumentsOracle::default(), arguments_s;

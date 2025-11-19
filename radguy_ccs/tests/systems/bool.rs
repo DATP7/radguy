@@ -37,7 +37,7 @@ system_spec! {
     large: {
         true  => x = (((y || z) && k) || j);
         true  => y = ((x || j) || (z && k));
-        true  => z = (((a || b) || (c && d)) || ((e || f) && (g && h))) ;
+        true  => z = ((a || b || (c && d)) || ((e || f) && g && h)) ;
         true  => k = tt;
         false => j = (j || j);
         false => a = j;
