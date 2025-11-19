@@ -10,7 +10,7 @@ use radguy::{
             CountOracle, InverseCountOracle, StrategicArgumentsOracle, StrategicLocalOracle,
             ToConstant,
         },
-        strategy::{BinaryHeapStrategy, HashMapStrategy, OrxStrategy, StrategyWeight},
+        strategy::{BinaryHeapStrategy, HashMapStrategy, LazyHeap, OrxStrategy, StrategyWeight},
     },
 };
 use radguy_ccs::systems::bool::extension::BoolExtension;
@@ -140,6 +140,8 @@ macro_rules! bisim_bench_problem {
         bisim_bench_problem_ordered!($name: using $c, strategy BinaryHeapStrategy<_>; "std_binary"; $left, $right => $eq in $ccs);
         bisim_bench_problem_ordered!($name: using $c, strategy HashMapStrategy<_>; "hashmap"; $left, $right => $eq in $ccs);
         bisim_bench_problem_ordered!($name: using $c, strategy OrxStrategy<_, DaryHeapWithMap<_, _, 4>>; "orx_quad"; $left, $right => $eq in $ccs);
+        bisim_bench_problem_ordered!($name: using $c, strategy LazyHeap<_, BinaryHeapStrategy<_>>; "std_binary_lazy"; $left, $right => $eq in $ccs);
+        bisim_bench_problem_ordered!($name: using $c, strategy LazyHeap<_, OrxStrategy<_, DaryHeapWithMap<_, _, 4>>>; "orx_quad_lazy"; $left, $right => $eq in $ccs);
     };
 }
 

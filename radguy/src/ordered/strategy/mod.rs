@@ -8,10 +8,12 @@ use crate::System;
 
 mod binary_heap;
 mod hashmap;
+mod lazy;
 mod orx;
 
 pub use binary_heap::BinaryHeapStrategy;
 pub use hashmap::HashMapStrategy;
+pub use lazy::LazyHeap;
 pub use orx::OrxStrategy;
 
 #[derive(PartialEq, Eq, Clone, Copy, Hash, Debug)]
@@ -97,6 +99,26 @@ pub trait InitialStrategy<
     fn get_initial_strategy(&self) -> OutStrategy;
 }
 
+// We have `LeftSliced` and `RightSliced` so we can easily have the same implementation of
+// `SliceLeft` and `SliceRight` but with different input/output types.
+// For example, consider `OrxStrategy<(T, U), PH>`, where `PH: PriorityQueue<(T, U)>`.
+// We want to be able to treat `PH` as just a `PriorityQueue<(T, U)>`, but if we just have
+// ```rust
+// impl<T,
+//      U,
+//      TH: PriorityQueue<T>,
+//      PH: PriorityQueue<(T, U)>
+// > SliceRight<T, U> for OrxStrategy<(T, U), PH> {
+//  type Output = TH;
+//  fn slice_right(self, right: U) -> Self::Output;
+// }
+// ```
+//
+// Here, `TH` and `PH` are not related by any constraints, so slicing a binary heap could yield a
+// quatenary heap. This isn't a problem in theory, but it means that we need to specify our desired
+// output type whenever we slice a heap, which isn't ideal. Furthermore, in practice, we usually
+// just want to use the same underlying heap type everywhere, so fixing the output for each heap
+// isn't a problem.
 pub trait LeftSliced<T, U>: Strategy<(T, U)> {
     type SlicedLeft: Strategy<U>;
 }
