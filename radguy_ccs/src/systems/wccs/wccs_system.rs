@@ -482,7 +482,8 @@ mod test {
         tau_in_restrict: "(<a>.0 | <a!>.0) \\ {a}" => ["<tau>" => "(0 | 0) \\ {a}"];
         restrict_left_of_tau: "((<a>.0) \\ {a}) | <a!>.0" => ["<a!>" => "((<a>.0) \\ {a}) | 0"];
         restrict_right_of_tau: "<a>.0  | ((<a!>.0) \\ {a})" => ["<a>" => "0  | ((<a!>.0) \\ {a})"];
-        relabel_retained: "(<a>.<b>.0)[c -> b]" => ["<a>" => "(<b>.0)[c -> b]"];
+        relabel_action_retained: "(<a>.<b>.0)[c -> b]" => ["<a>" => "(<b>.0)[c -> b]"];
+        relabel_proposition_retained: "(<a>.<b>.0)[c => b]" => ["<a>" => "(<b>.0)[c => b]"];
         simple_relabel: "(<a>.<b>.0)[a -> c]" => ["<c>" => "(<b>.0)[a -> c]"];
         tau_in_relabel: "(<a>.0 | <a!>.0)[a -> b]" => ["<b>" => "(0 | <a!>.0)[a -> b]", "<b!>" => "(<a>.0 | 0)[a -> b]", "<tau>" => "(0 | 0)[a -> b]"];
         relabel_to_left_of_tau: "((<b>.0)[b -> a]) | <a!>.0" => ["<a>" => "(0)[b -> a] | <a!>.0", "<a!>" => "((<b>.0)[b -> a]) | 0", "<tau>" => "(0)[b -> a] | 0"];
