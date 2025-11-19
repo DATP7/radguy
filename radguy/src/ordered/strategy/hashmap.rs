@@ -5,8 +5,8 @@ use std::{
 };
 
 use crate::ordered::strategy::{
-    Domain, Intersect, IntersectBy, Length, Retain, Singleton, SliceLeft, SliceRight, Strategy,
-    StrategyItem, StrategyWeight,
+    Domain, Intersect, IntersectBy, LeftSliced, Length, Retain, RightSliced, Singleton, SliceLeft,
+    SliceRight, Strategy, StrategyItem, StrategyWeight,
 };
 
 #[derive(Default, Clone, Debug)]
@@ -90,6 +90,20 @@ impl<T: Eq + Copy + Hash> IntersectBy<T, Self> for HashMapStrategy<T> {
         });
         self
     }
+}
+
+impl<T, U: Copy + Eq + Hash> LeftSliced<T, U> for HashMapStrategy<(T, U)>
+where
+    (T, U): Copy + Eq + Hash,
+{
+    type SlicedLeft = HashMapStrategy<U>;
+}
+
+impl<T: Copy + Eq + Hash, U> RightSliced<T, U> for HashMapStrategy<(T, U)>
+where
+    (T, U): Copy + Eq + Hash,
+{
+    type SlicedRight = HashMapStrategy<T>;
 }
 
 impl<T: Eq + Hash, U: Copy + Eq + Hash> SliceLeft<T, U, HashMapStrategy<U>>

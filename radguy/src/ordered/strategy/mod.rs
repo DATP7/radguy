@@ -97,7 +97,15 @@ pub trait InitialStrategy<
     fn get_initial_strategy(&self) -> OutStrategy;
 }
 
-pub trait SliceLeft<T: Eq, U: Copy, S: Strategy<U>>: Strategy<(T, U)>
+pub trait LeftSliced<T, U>: Strategy<(T, U)> {
+    type SlicedLeft: Strategy<U>;
+}
+
+pub trait RightSliced<T, U>: Strategy<(T, U)> {
+    type SlicedRight: Strategy<T>;
+}
+
+pub trait SliceLeft<T: Eq, U, S>: Strategy<(T, U)> + LeftSliced<T, U, SlicedLeft = S>
 where
     Self: Sized,
 {
@@ -105,7 +113,7 @@ where
     fn slice_left(self, left: T) -> S;
 }
 
-pub trait SliceRight<T: Copy, U: Eq, S: Strategy<T>>: Strategy<(T, U)>
+pub trait SliceRight<T, U: Eq, S>: Strategy<(T, U)> + RightSliced<T, U, SlicedRight = S>
 where
     Self: Sized,
 {

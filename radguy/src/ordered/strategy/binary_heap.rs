@@ -6,8 +6,8 @@ use std::{
 };
 
 use crate::ordered::strategy::{
-    Domain, Intersect, IntersectBy, Length, Retain, Singleton, SliceLeft, SliceRight, Strategy,
-    StrategyItem, StrategyWeight,
+    Domain, Intersect, IntersectBy, LeftSliced, Length, Retain, RightSliced, Singleton, SliceLeft,
+    SliceRight, Strategy, StrategyItem, StrategyWeight,
 };
 
 #[derive(Default, Clone, Debug)]
@@ -103,6 +103,20 @@ impl<T: Eq + Copy + Hash> IntersectBy<T, Self> for BinaryHeapStrategy<T> {
             .collect();
         Self(heap)
     }
+}
+
+impl<T, U: Copy> LeftSliced<T, U> for BinaryHeapStrategy<(T, U)>
+where
+    (T, U): Copy,
+{
+    type SlicedLeft = BinaryHeapStrategy<U>;
+}
+
+impl<T: Copy, U> RightSliced<T, U> for BinaryHeapStrategy<(T, U)>
+where
+    (T, U): Copy,
+{
+    type SlicedRight = BinaryHeapStrategy<T>;
 }
 
 impl<T: Eq, U: Copy> SliceLeft<T, U, BinaryHeapStrategy<U>> for BinaryHeapStrategy<(T, U)>

@@ -7,11 +7,11 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use orx_priority_queue::{DaryHeapWithMap, NodeKeyRef, PriorityQueue, PriorityQueueDecKey};
+use orx_priority_queue::{DaryHeapWithMap, NodeKeyRef, PriorityQueueDecKey};
 
 use crate::ordered::strategy::{
-    Domain, Intersect, IntersectBy, Length, Singleton, SliceLeft, SliceRight, Strategy,
-    StrategyItem, StrategyWeight,
+    Domain, Intersect, IntersectBy, LeftSliced, Length, RightSliced, Singleton, SliceLeft,
+    SliceRight, Strategy, StrategyItem, StrategyWeight,
 };
 
 #[derive(Clone, Debug)]
@@ -95,15 +95,31 @@ impl<T: Eq + Copy + Hash, H: PriorityQueueDecKey<T, StrategyWeight>> IntersectBy
     }
 }
 
-impl<T: Eq + Hash, U: Copy + Eq + Hash, const D: usize>
-    SliceLeft<T, U, OrxStrategy<U, DaryHeapWithMap<U, StrategyWeight, D>>>
+impl<T: Copy + Eq + Hash, U: Copy + Eq + Hash, const D: usize> LeftSliced<T, U>
     for OrxStrategy<(T, U), DaryHeapWithMap<(T, U), StrategyWeight, D>>
+{
+    type SlicedLeft = OrxStrategy<U, DaryHeapWithMap<U, StrategyWeight, D>>;
+}
+
+impl<T: Copy + Eq + Hash, U: Copy + Eq + Hash, const D: usize> RightSliced<T, U>
+    for OrxStrategy<(T, U), DaryHeapWithMap<(T, U), StrategyWeight, D>>
+{
+    type SlicedRight = OrxStrategy<T, DaryHeapWithMap<T, StrategyWeight, D>>;
+}
+
+impl<
+    T: Copy + Eq + Hash,
+    U: Copy + Eq + Hash,
+    UH: PriorityQueueDecKey<U, StrategyWeight> + Default,
+    PH: PriorityQueueDecKey<(T, U), StrategyWeight>,
+> SliceLeft<T, U, OrxStrategy<U, UH>> for OrxStrategy<(T, U), PH>
 where
     (T, U): Copy,
+    Self: LeftSliced<T, U, SlicedLeft = OrxStrategy<U, UH>>,
 {
-    fn slice_left(self, left: T) -> OrxStrategy<U, DaryHeapWithMap<U, StrategyWeight, D>> {
+    fn slice_left(self, left: T) -> OrxStrategy<U, UH> {
         // PERF: i would like to do this in-place, actually consuming the strategy
-        let mut new = DaryHeapWithMap::new();
+        let mut new = UH::default();
         for x in self.0.iter() {
             let (t, u) = x.node();
             if *t == left {
@@ -114,15 +130,19 @@ where
     }
 }
 
-impl<T: Copy + Eq + Hash, U: Eq + Hash, const D: usize>
-    SliceRight<T, U, OrxStrategy<T, DaryHeapWithMap<T, StrategyWeight, D>>>
-    for OrxStrategy<(T, U), DaryHeapWithMap<(T, U), StrategyWeight, D>>
+impl<
+    T: Copy + Eq + Hash,
+    U: Copy + Eq + Hash,
+    TH: PriorityQueueDecKey<T, StrategyWeight> + Default,
+    PH: PriorityQueueDecKey<(T, U), StrategyWeight>,
+> SliceRight<T, U, OrxStrategy<T, TH>> for OrxStrategy<(T, U), PH>
 where
     (T, U): Copy,
+    Self: RightSliced<T, U, SlicedRight = OrxStrategy<T, TH>>,
 {
-    fn slice_right(self, right: U) -> OrxStrategy<T, DaryHeapWithMap<T, StrategyWeight, D>> {
+    fn slice_right(self, right: U) -> OrxStrategy<T, TH> {
         // PERF: i would like to do this in-place, actually consuming the strategy
-        let mut new = DaryHeapWithMap::new();
+        let mut new = TH::default();
         for x in self.0.iter() {
             let (t, u) = x.node();
             if *u == right {
