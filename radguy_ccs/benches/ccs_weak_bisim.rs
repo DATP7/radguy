@@ -35,7 +35,7 @@ macro_rules! bisim_bench_oracles_ordered {
                     },
                     |(mut sys, o)| {
                         let target = sys.specify_comparison($left, $right);
-                        let result = !ordered::kleene_local::<_, _, $s, $s, _, _, _>(&sys, target, &o);
+                        let result = !ordered::kleene_local::<_, _, $s, $s, _>(&sys, target, &o);
                         assert_eq!(
                             $eq,
                             result,
@@ -76,7 +76,7 @@ macro_rules! bisim_bench_oracles_unordered {
                     },
                     |(mut sys, o)| {
                         let target = sys.specify_comparison($left, $right);
-                        let result = !kleene_local(&sys, target, &o);
+                        let result = !kleene_local(&mut sys, target, &o);
                         assert_eq!(
                             $eq,
                             result,

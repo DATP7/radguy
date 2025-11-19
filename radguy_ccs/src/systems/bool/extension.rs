@@ -1,6 +1,11 @@
 use radguy::{Assignment, Universe, extension::LocalExtension};
 use slotmap::Key;
-use std::{collections::HashSet, fmt::Display, hash::Hash, marker::PhantomData};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+    hash::Hash,
+    marker::PhantomData,
+};
 
 use crate::systems::bool::{BoolSystem, BoolTerm};
 
@@ -19,7 +24,6 @@ impl<
         VarKey,
         bool,
         TermKey,
-        HashSet<VarKey>,
         HashSet<(VarKey, VarKey)>,
         HashSet<(VarKey, TermKey)>,
         System,
@@ -27,13 +31,17 @@ impl<
 {
     fn depends(
         &self,
-        _visited: &HashSet<VarKey>,
-        assignment: &dyn Assignment<VarKey, bool>,
+        visited: &HashSet<VarKey>,
+        assignment: &HashMap<VarKey, bool>,
         possible: &HashSet<(VarKey, VarKey)>,
         system: &System,
     ) -> HashSet<(VarKey, TermKey)> {
         let mut deps = HashSet::new();
-        for (x, y) in possible.iter().copied() {
+        for (x, y) in possible
+            .iter()
+            .filter(|(_, y)| visited.contains(y))
+            .copied()
+        {
             collect_terms(
                 x,
                 system.definition(y),
@@ -55,7 +63,7 @@ fn collect_terms<
 >(
     x: VarKey,
     term_key: TermKey,
-    assignment: &dyn Assignment<VarKey, bool>,
+    assignment: &HashMap<VarKey, bool>,
     possible: &HashSet<(VarKey, VarKey)>,
     system: &S,
     current: &mut HashSet<(VarKey, TermKey)>,
@@ -69,7 +77,7 @@ fn collect_terms<
     match term {
         BoolTerm::True | BoolTerm::False => (),
         BoolTerm::Variable(y) => {
-            if possible.contains(&(x, y)) && !assignment.get(&y) {
+            if possible.contains(&(x, y)) && !assignment.get_assignment(&y) {
                 current.insert((x, term_key));
             }
         }

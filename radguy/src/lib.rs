@@ -65,17 +65,19 @@ pub trait PairUniverse<S> {
 }
 
 pub trait System<VarKey: Copy, VarValue: PartialOrd> {
-    fn evaluate(&self, key: VarKey, assignment: &dyn Assignment<VarKey, VarValue>) -> VarValue;
-    fn bottom_assignment(&self) -> impl Assignment<VarKey, VarValue>;
+    fn evaluate(&self, key: VarKey, assignment: &HashMap<VarKey, VarValue>) -> VarValue;
+    fn bottom_assignment(&self) -> HashMap<VarKey, VarValue>;
+    fn lock(&mut self);
+    fn unlock(&mut self);
+}
+
+pub trait Assignment<K, V> {
+    fn get_assignment(&self, key: &K) -> V;
+    fn update_assignment(&mut self, key: K, value: V);
 }
 
 pub trait Arguments<VarKey, VarSet> {
     fn arguments(&self, key: VarKey) -> VarSet;
-}
-
-pub trait Assignment<K, V> {
-    fn get(&self, key: &K) -> V;
-    fn update(&mut self, key: K, value: V);
 }
 
 impl<T: Eq + Hash, S: ::std::hash::BuildHasher + Default> Set<T> for HashSet<T, S> {
@@ -132,63 +134,90 @@ impl<T: Eq + Hash + Copy, S: ::std::hash::BuildHasher> Diagonal for HashSet<T, S
 impl<K: Hash + Eq, V: Bottom + Clone, S: std::hash::BuildHasher> Assignment<K, V>
     for HashMap<K, V, S>
 {
-    fn get(&self, key: &K) -> V {
+    fn get_assignment(&self, key: &K) -> V {
         self.get(key).cloned().unwrap_or_else(V::bottom)
     }
 
-    fn update(&mut self, key: K, value: V) {
+    fn update_assignment(&mut self, key: K, value: V) {
         self.insert(key, value);
     }
 }
 
+#[expect(clippy::similar_names)]
 pub fn kleene_local<
     K: Copy + Hash + Eq + Debug,
-    V: Eq + PartialOrd,
-    PS,
-    VS: Set<K> + Union + IsSubset + FromIterator<K>,
-    S: System<K, V> + PairUniverse<PS> + Arguments<K, VS>,
+    V: Eq + PartialOrd + Bottom + Clone,
+    PS: Debug + Union,
+    S: System<K, V> + PairUniverse<PS> + Arguments<K, HashSet<K>>,
 >(
-    system: &S,
+    system: &mut S,
     target: K,
-    oracle: &impl LocalOracle<K, V, VS, PS, S>,
+    oracle: &impl LocalOracle<K, V, PS, S>,
 ) -> V
 where
     for<'a> &'a PS: IntoIterator<Item = &'a (K, K)>,
+    HashSet<K>: Cartesian<Output = PS>,
 {
     let mut assignment = system.bottom_assignment();
-    let mut visited = std::iter::once(target).collect();
-    let mut rel = system.pair_universe();
-    let mut todo = local_dependencies(target, &visited, &assignment, oracle, system, &mut rel);
+    let mut visited = HashSet::default();
+    let mut discovered = HashSet::from([target]);
+    let mut rel = discovered.cartesian(&discovered);
+    let mut todo = vec![target];
     let mut iter = todo.iter();
     while let Some(&x) = iter.next() {
+        visited.insert(x);
         let evaluated = system.evaluate(x, &assignment);
-        if assignment.get(&x) != evaluated || !system.arguments(x).is_subset(&visited) {
-            assignment.update(x, evaluated);
-            visited = visited.union(system.arguments(x));
-            todo = local_dependencies(target, &visited, &assignment, oracle, system, &mut rel);
+        let args = system.arguments(x);
+        if assignment.get_assignment(&x) != evaluated || !args.is_subset(&discovered) {
+            assignment.update_assignment(x, evaluated);
+            // At this point `rel` is D x D with some elements pruned by oracles
+            // We expand it with args to create (D u A) x (D u A), still with those elements
+            // pruned, by unioning with the elements of the square below.
+            // +-------------+-------+
+            // | A x D       | A x A |
+            // +-------------+-------+
+            // | D x D (rel) | D x A |
+            // +-------------+-------+
+            let axa = args.cartesian(&args);
+            let axd = args.cartesian(&discovered);
+            let dxa = discovered.cartesian(&args);
+            rel = rel.union(axa).union(axd).union(dxa);
+            discovered = discovered.union(args);
+            todo = local_dependencies(
+                target,
+                &visited,
+                &discovered,
+                &assignment,
+                oracle,
+                system,
+                &mut rel,
+            );
             iter = todo.iter();
         }
     }
 
-    assignment.get(&target)
+    assignment.get_assignment(&target)
 }
 
-fn local_dependencies<K: Hash + Copy + Eq, V: PartialOrd, VS: Set<K>, PS, S: System<K, V>>(
+fn local_dependencies<K: Hash + Copy + Eq, V: PartialOrd, PS, S: System<K, V>>(
     variable: K,
-    visited: &VS,
-    assignment: &impl Assignment<K, V>,
-    oracle: &impl LocalOracle<K, V, VS, PS, S>,
-    system: &S,
+    visited: &HashSet<K>,
+    discovered: &HashSet<K>,
+    assignment: &HashMap<K, V>,
+    oracle: &impl LocalOracle<K, V, PS, S>,
+    system: &mut S,
     rel: &mut PS,
 ) -> Vec<K>
 where
     for<'a> &'a PS: IntoIterator<Item = &'a (K, K)>,
 {
+    system.lock();
     *rel = oracle.approximate_flow(visited, assignment, rel, system);
+    system.unlock();
     rel.into_iter()
         .copied()
         .filter_map(|(x, y)| if y == variable { Some(x) } else { None })
-        .filter(|x| visited.contains(x))
+        .filter(|x| discovered.contains(x))
         .collect()
 }
 

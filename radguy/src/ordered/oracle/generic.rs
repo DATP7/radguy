@@ -11,7 +11,7 @@ use std::{
 use orx_priority_queue::PriorityQueueDecKey;
 
 use crate::{
-    Arguments, Assignment, System,
+    Arguments, System,
     ordered::{
         StrategicLocalOracle,
         strategy::{
@@ -29,14 +29,14 @@ impl<
     VS: Strategy<K> + Length,
     PS: Strategy<(K, K)> + SliceRight<K, K, VS> + FromIterator<StrategyItem<(K, K)>> + Clone,
     S: System<K, V>,
-> StrategicLocalOracle<K, V, HashSet<K>, PS, S> for CountOracle<VS>
+> StrategicLocalOracle<K, V, PS, S> for CountOracle<VS>
 where
     for<'a> &'a PS: IntoIterator<Item = StrategyItem<(K, K)>>,
 {
     fn get_strategy(
         &self,
         _visited: &HashSet<K>,
-        _assignment: &impl Assignment<K, V>,
+        _assignment: &HashMap<K, V>,
         strategy: &PS,
         _system: &S,
     ) -> PS {
@@ -72,14 +72,14 @@ impl<
     VS: Strategy<K> + Length,
     PS: Strategy<(K, K)> + SliceRight<K, K, VS> + FromIterator<StrategyItem<(K, K)>> + Clone,
     S: System<K, V>,
-> StrategicLocalOracle<K, V, HashSet<K>, PS, S> for InverseCountOracle<VS>
+> StrategicLocalOracle<K, V, PS, S> for InverseCountOracle<VS>
 where
     for<'a> &'a PS: IntoIterator<Item = StrategyItem<(K, K)>>,
 {
     fn get_strategy(
         &self,
         _visited: &HashSet<K>,
-        _assignment: &impl Assignment<K, V>,
+        _assignment: &HashMap<K, V>,
         strategy: &PS,
         _system: &S,
     ) -> PS {
@@ -157,6 +157,8 @@ impl<
 
             var_successors.extend(new_successors);
 
+            // Clone and shadow since we look at the entry again later and don't want to reference
+            // the same object
             let var_successors = var_successors.clone();
 
             // each new variable has its parent's ancestors as ancestors, and itself
@@ -333,12 +335,12 @@ impl<
     V: PartialOrd,
     PS: Strategy<(K, K)> + Retain<(K, K)> + Extend<StrategyItem<(K, K)>> + Clone,
     S: System<K, V> + Arguments<K, HashSet<K>>,
-> StrategicLocalOracle<K, V, HashSet<K>, PS, S> for StrategicArgumentsOracle<K, PS>
+> StrategicLocalOracle<K, V, PS, S> for StrategicArgumentsOracle<K, PS>
 {
     fn get_strategy(
         &self,
         visited: &HashSet<K>,
-        _assignment: &impl Assignment<K, V>,
+        _assignment: &HashMap<K, V>,
         _strategy: &PS,
         system: &S,
     ) -> PS {
@@ -352,13 +354,13 @@ impl<
     V: PartialOrd,
     H: PriorityQueueDecKey<(K, K), StrategyWeight> + Clone,
     S: System<K, V> + Arguments<K, HashSet<K>>,
-> StrategicLocalOracle<K, V, HashSet<K>, OrxStrategy<(K, K), H>, S>
+> StrategicLocalOracle<K, V, OrxStrategy<(K, K), H>, S>
     for StrategicArgumentsOracle<K, OrxStrategy<(K, K), H>>
 {
     fn get_strategy(
         &self,
         visited: &HashSet<K>,
-        _assignment: &impl Assignment<K, V>,
+        _assignment: &HashMap<K, V>,
         _strategy: &OrxStrategy<(K, K), H>,
         system: &S,
     ) -> OrxStrategy<(K, K), H> {

@@ -3,18 +3,35 @@ mod systems;
 macro_rules! test_oracle_system_unordered {
     (test $oracle:expr, on: $($spec:ident),* $(,)?) => {
         $(
-        #[test]
-        fn $spec() {
-            let $crate::systems::bool::SystemSpec {
-                mut system,
-                variables,
-                goal,
-            } = $crate::systems::bool::$spec();
-            for (var, goal) in variables.into_iter().zip(goal.into_iter()) {
-                let start = system.names.get_or_insert_key(var);
-                assert_eq!(::radguy::kleene_local(&system, start, &$oracle), goal, "{var} did not have the expected value");
+            mod $spec {
+                use super::*;
+                #[test]
+                fn eager() {
+                    let $crate::systems::bool::SystemSpec {
+                        mut system,
+                        variables,
+                        goal,
+                    } = $crate::systems::bool::$spec();
+                    for (var, goal) in variables.into_iter().zip(goal.into_iter()) {
+                        let start = system.names.get_or_insert_key(var);
+                        assert_eq!(::radguy::kleene_local(&mut system, start, &$oracle), goal, "{var} did not have the expected value");
+                    }
+                }
+
+                #[test]
+                fn lazy() {
+                    let $crate::systems::bool::SystemSpec {
+                        system,
+                        variables,
+                        goal,
+                    } = $crate::systems::bool::$spec();
+                    let mut system: radguy_ccs::systems::bool::LazyBoolSystem<_,_,_> = system.into();
+                    for (var, goal) in variables.into_iter().zip(goal.into_iter()) {
+                        let start = system.init_target(var);
+                        assert_eq!(::radguy::kleene_local(&mut system, start, &$oracle), goal, "{var} did not have the expected value");
+                    }
+                }
             }
-        }
         )*
     };
 }
@@ -40,6 +57,7 @@ macro_rules! test_oracle_unordered {
                 or_11,
                 parens_true,
                 parens_false,
+                chain,
             }
         }
     };
@@ -64,7 +82,7 @@ macro_rules! test_oracle_system_strategy {
             for (var, goal) in variables.into_iter().zip(goal.into_iter()) {
                 let start = system.names.get_or_insert_key(var);
                 assert_eq!(
-                    ::radguy::ordered::kleene_local::<_, _, $strategy, $strategy, _, _, _>(
+                    ::radguy::ordered::kleene_local::<_, _, $strategy, $strategy, _>(
                         &system, start, &$oracle
                     ),
                     goal,
@@ -118,6 +136,7 @@ macro_rules! test_oracle_ordered {
                 or_11,
                 parens_true,
                 parens_false,
+                chain,
             }
         }
     };
@@ -133,13 +152,14 @@ macro_rules! test_oracles_ordered {
 mod unordered {
     use radguy::{
         extension::ExtensionOracle,
-        oracle::{ArgumentsOracle, LocalMaxR, LocalOracle, SMax, TrivialOracle},
+        oracle::{ArgumentsOracle, IdentityOracle, LocalMaxR, LocalOracle, SMax, TrivialOracle},
     };
     use radguy_ccs::systems::bool::extension::BoolExtension;
 
     test_oracles_unordered! {
         SMax::default(), smax;
         TrivialOracle, trivialoracle;
+        IdentityOracle, identityoracle;
         LocalMaxR::default(), localmaxr;
         TrivialOracle.and(SMax::default()), trivialoracle_and_smax;
         LocalMaxR::default().and(SMax::default()), localmaxr_and_smax;
