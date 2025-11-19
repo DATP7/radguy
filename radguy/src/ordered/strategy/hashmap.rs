@@ -69,7 +69,7 @@ impl<T: Copy + Eq + Hash> Strategy<T> for HashMapStrategy<T> {
     }
 }
 
-impl<T: Eq + Copy + Hash> Intersect<T, HashSet<T>> for HashMapStrategy<T> {
+impl<T: Eq + Copy + Hash> Intersect<HashSet<T>> for HashMapStrategy<T> {
     fn intersect(mut self, other: &HashSet<T>) -> Self {
         self.0.retain(|v, _| other.contains(v));
         self

@@ -13,7 +13,7 @@ pub mod strategy;
 pub fn kleene_local<
     VarKey: Copy + Eq + Debug + Hash,
     VarValue: PartialOrd + Bottom + Copy,
-    VarStrategy: Strategy<VarKey> + Intersect<VarKey, HashSet<VarKey>> + Singleton<VarKey> + Debug,
+    VarStrategy: Strategy<VarKey> + Intersect<HashSet<VarKey>> + Singleton<VarKey> + Debug,
     PairStrat: Strategy<(VarKey, VarKey)> + SliceRight<VarKey, VarKey, VarStrategy>,
     S: System<VarKey, VarValue>
         + InitialStrategy<VarKey, VarValue, PairStrat>
