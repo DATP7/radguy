@@ -82,7 +82,7 @@ pub trait LocalExtension<
         ExtensionOracle::from(Self::default())
     }
 }
-#[allow(clippy::type_complexity)]
+#[expect(clippy::type_complexity)]
 pub struct ExtensionOracle<
     K: Hash + Eq + Copy,
     V: PartialOrd,

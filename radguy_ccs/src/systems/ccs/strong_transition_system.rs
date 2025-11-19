@@ -307,7 +307,6 @@ mod tests {
         ($($name:ident: $proc:expr => [$($action:expr => $target:expr),*] $(in $ccs:expr)?;)*) => {
             $(
             #[test]
-            #[allow(unused_variables)]
             fn $name() {
                 #[allow(unused_mut)]
                 let mut lts = StrongTransitionSystem::<DefaultKey>::default();
