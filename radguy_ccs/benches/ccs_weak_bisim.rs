@@ -1,6 +1,7 @@
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use orx_priority_queue::DaryHeapWithMap;
 use radguy::{
+    extension::LocalExtension,
     kleene_local,
     oracle::{ArgumentsOracle, LocalMaxR, LocalOracle, SMax},
     ordered::{
@@ -12,6 +13,7 @@ use radguy::{
         strategy::{BinaryHeapStrategy, HashMapStrategy, OrxStrategy, StrategyWeight},
     },
 };
+use radguy_ccs::systems::bool::extension::BoolExtension;
 use radguy_ccs::systems::ccs::{
     bisimulation_system::BisimulationSystem, grammar::ProgramParser,
     transition_system::TransitionSystem, weak_transition_system::WeakTransitionSystem,
@@ -35,7 +37,7 @@ macro_rules! bisim_bench_oracles_ordered {
                     },
                     |(mut sys, o)| {
                         let target = sys.specify_comparison($left, $right);
-                        let result = !ordered::kleene_local::<_, _, $s, $s, _>(&sys, target, &o);
+                        let result = !ordered::kleene_local::<_, _, $s, $s, _>(&mut sys, target, &o);
                         assert_eq!(
                             $eq,
                             result,
@@ -104,8 +106,9 @@ macro_rules! bisim_bench_problem_ordered {
             LocalMaxR::default().constant(StrategyWeight::Infinity),
             LocalMaxR::default().constant(StrategyWeight::Infinity).then(CountOracle::default()),
             LocalMaxR::default().constant(StrategyWeight::Infinity).then(InverseCountOracle::default()),
-            // BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(InverseCountOracle, std::cmp::min),
-            // BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(CountOracle, std::cmp::min),
+            BoolExtension::oracle().constant(StrategyWeight::Infinity),
+            BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(InverseCountOracle::default(), std::cmp::min),
+            BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(CountOracle::default(), std::cmp::min),
             StrategicArgumentsOracle::default(),
             StrategicArgumentsOracle::default().and_by(CountOracle::default(), std::cmp::min),
             StrategicArgumentsOracle::default().and_by(InverseCountOracle::default(), std::cmp::min),
@@ -130,10 +133,9 @@ macro_rules! bisim_bench_problem {
             ArgumentsOracle::default().then(LocalMaxR::default()),
             ArgumentsOracle::default().and(SMax::default()),
             ArgumentsOracle::default().and(LocalMaxR::default()),
-            // TODO: Reenable when bool extension works again
-            // BoolExtension::oracle(),
-            // SMax::default().then(BoolExtension::oracle()),
-            // LocalMaxR::default().then(BoolExtension::oracle()),
+            BoolExtension::oracle(),
+            SMax::default().then(BoolExtension::oracle()),
+            LocalMaxR::default().then(BoolExtension::oracle()),
         };
         bisim_bench_problem_ordered!($name: using $c, strategy BinaryHeapStrategy<_>; "std_binary"; $left, $right => $eq in $ccs);
         bisim_bench_problem_ordered!($name: using $c, strategy HashMapStrategy<_>; "hashmap"; $left, $right => $eq in $ccs);

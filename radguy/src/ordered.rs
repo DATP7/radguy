@@ -19,11 +19,10 @@ pub fn kleene_local<
         + InitialStrategy<VarKey, VarValue, PairStrat>
         + Arguments<VarKey, HashSet<VarKey>>,
 >(
-    system: &S,
+    system: &mut S,
     target: VarKey,
     oracle: &impl StrategicLocalOracle<VarKey, VarValue, PairStrat, S>,
 ) -> VarValue {
-    let initial_strategy = system.get_initial_strategy();
     let mut assignment = system.bottom_assignment();
     let mut discovered = HashSet::from([target]);
     let mut visited = HashSet::default();
@@ -36,10 +35,17 @@ pub fn kleene_local<
         {
             assignment.update_assignment(x, evaluated);
             discovered = discovered.union(system.arguments(x));
+            system.lock();
             todo = oracle
-                .get_strategy(&visited, &assignment, &initial_strategy, system)
+                .get_strategy(
+                    &visited,
+                    &assignment,
+                    &system.get_initial_strategy(),
+                    system,
+                )
                 .slice_right(target)
                 .intersect(&discovered);
+            system.unlock();
         }
     }
 

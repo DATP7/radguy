@@ -49,8 +49,8 @@ impl<T: Copy, H: PriorityQueueDecKey<T, StrategyWeight>> Strategy<T> for OrxStra
     }
 }
 
-impl<T: Eq + Copy + Hash + Debug, H: PriorityQueueDecKey<T, StrategyWeight> + Debug>
-    Intersect<T, HashSet<T>> for OrxStrategy<T, H>
+impl<T: Eq + Copy + Hash, H: PriorityQueueDecKey<T, StrategyWeight>> Intersect<T, HashSet<T>>
+    for OrxStrategy<T, H>
 {
     fn intersect(mut self, other: &HashSet<T>) -> Self {
         let to_remove: Vec<T> = self
@@ -65,7 +65,7 @@ impl<T: Eq + Copy + Hash + Debug, H: PriorityQueueDecKey<T, StrategyWeight> + De
             })
             .collect();
         for v in to_remove {
-            self.0.remove(dbg!(&v));
+            self.0.remove(&v);
         }
         self
     }

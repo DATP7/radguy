@@ -310,7 +310,12 @@ impl<
 > InitialStrategy<VarKey, bool, PS> for LazyBoolSystem<VarKey, TermKey, VarName>
 {
     fn get_initial_strategy(&self) -> PS {
-        self.inner.borrow().get_initial_strategy()
+        self.discovered
+            .borrow()
+            .cartesian(&self.discovered.borrow())
+            .into_iter()
+            .map(|(x, y)| StrategyItem::infinite((x, y)))
+            .collect()
     }
 }
 
@@ -362,6 +367,7 @@ impl<V: Key, T: Key> BoolTerm<V, T> {
                 elements
                     .iter()
                     .map(|term_key| sys.terms.get_value(*term_key).to_string(sys))
+                    .sorted()
                     .join(", "),
             ),
             Self::And(elements) => format!(
@@ -369,6 +375,7 @@ impl<V: Key, T: Key> BoolTerm<V, T> {
                 elements
                     .iter()
                     .map(|term_key| sys.terms.get_value(*term_key).to_string(sys))
+                    .sorted()
                     .join(", "),
             ),
         }
@@ -387,15 +394,15 @@ macro_rules! bool_term {
             let var_key = $system.names.get_or_insert_key(stringify!($id));
             $system.terms.get_or_insert_key($crate::systems::bool::BoolTerm::Variable(var_key))
     }};
-    (($lhs:tt || $rhs:tt); $system:expr) => {{
-        let lhs = $crate::bool_term!($lhs; $system);
-        let rhs = $crate::bool_term!($rhs; $system);
-        $system.terms.get_or_insert_key($crate::systems::bool::BoolTerm::Or(Vec::from([lhs, rhs])))
+    (($lhs:tt $(|| $rest:tt)+); $system:expr) => {{
+        let mut terms = Vec::from([$($crate::bool_term!($rest; $system),)+]);
+        terms.push($crate::bool_term!($lhs; $system));
+        $system.terms.get_or_insert_key($crate::systems::bool::BoolTerm::Or(terms))
         }};
-    (($lhs:tt && $rhs:tt); $system:expr) => {{
-        let lhs = $crate::bool_term!($lhs; $system);
-        let rhs = $crate::bool_term!($rhs; $system);
-        $system.terms.get_or_insert_key($crate::systems::bool::BoolTerm::And(Vec::from([lhs, rhs])))
+    (($lhs:tt $(&& $rest:tt)+); $system:expr) => {{
+        let mut terms = Vec::from([$($crate::bool_term!($rest; $system),)+]);
+        terms.push($crate::bool_term!($lhs; $system));
+        $system.terms.get_or_insert_key($crate::systems::bool::BoolTerm::And(terms))
     }};
 }
 
@@ -455,11 +462,11 @@ mod tests {
         for (key, term) in &sys.definitions {
             let var = *sys.names.get_value(key);
             match var {
-                "x" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "or(z, y)"),
-                "z" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "and(k, b)"),
+                "x" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "or(y, z)"),
+                "z" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "and(b, k)"),
                 "y" => assert_eq!(
                     sys.terms.get_value(*term).to_string(&sys),
-                    "and(or(z, x), and(k, a))"
+                    "and(and(a, k), or(x, z))"
                 ),
                 "k" | "a" => {
                     assert_eq!(sys.terms.get_value(*term).to_string(&sys), "tt");
@@ -467,7 +474,7 @@ mod tests {
                 "b" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "a"),
                 "h" => assert_eq!(
                     sys.terms.get_value(*term).to_string(&sys),
-                    "and(and(or(z, x), k), a)"
+                    "and(a, and(k, or(x, z)))"
                 ),
                 &_ => panic!("{var} not found"),
             }
@@ -506,6 +513,27 @@ mod tests {
                     assert_eq!(sys.terms.get_value(*term).to_string(&sys), "tt");
                 }
                 "y" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "ff"),
+                &_ => panic!("{var} not found"),
+            }
+        }
+    }
+
+    #[test]
+    fn bool_system_chain_and_or() {
+        let sys = bool_system! {
+            x = (x && y && z);
+            y = (x || y || z);
+            z = ((x && y && z) || (x && y) || (y || z));
+        };
+        for (key, term) in &sys.definitions {
+            let var = *sys.names.get_value(key);
+            match var {
+                "x" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "and(x, y, z)"),
+                "y" => assert_eq!(sys.terms.get_value(*term).to_string(&sys), "or(x, y, z)"),
+                "z" => assert_eq!(
+                    sys.terms.get_value(*term).to_string(&sys),
+                    "or(and(x, y), and(x, y, z), or(y, z))"
+                ),
                 &_ => panic!("{var} not found"),
             }
         }
