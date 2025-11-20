@@ -13,7 +13,7 @@ use orx_priority_queue::PriorityQueueDecKey;
 use slotmap::{Key, SecondaryMap};
 
 use crate::{
-    Arguments, Assignment, System, Universe,
+    Arguments, System, Universe,
     ordered::{
         StrategicLocalOracle,
         strategy::{
@@ -479,14 +479,14 @@ impl<
     V: PartialOrd,
     S: System<K, V> + Arguments<K, HashSet<K>> + Universe<HashSet<K>>,
     PS: Strategy<(K, K)> + Default + Extend<StrategyItem<(K, K)>> + FromIterator<StrategyItem<(K, K)>>,
-> StrategicLocalOracle<K, V, HashSet<K>, PS, S> for StrategicHeightOracle
+> StrategicLocalOracle<K, V, PS, S> for StrategicHeightOracle
 where
     for<'a> &'a PS: IntoIterator<Item = StrategyItem<(K, K)>>,
 {
     fn get_strategy(
         &self,
         _visited: &HashSet<K>,
-        _assignment: &impl Assignment<K, V>,
+        _assignment: &HashMap<K, V>,
         strategy: &PS,
         system: &S,
     ) -> PS {
