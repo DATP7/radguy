@@ -495,14 +495,14 @@ where
 }
 
 impl StrategicHeightOracle {
-    // Makes the oracle consider the weights of pairs (y, x) in the relation where y is not an argument of x. Will be slower than the simple function
+    /// Makes the oracle consider the weights of pairs (y, x) in the relation where y is not an argument of x. Will be slower than the simple function
     #[must_use]
     pub const fn transitive() -> Self {
         Self {
             transitive_weights: true,
         }
     }
-    // Makes the oracle only consider the weights of pairs (y, x) in the relation if y is an argument of x. Will be faster than the transitive function
+    /// Makes the oracle only consider the weights of pairs (y, x) in the relation if y is an argument of x. Will be faster than the transitive function
     #[must_use]
     pub const fn simple() -> Self {
         Self {

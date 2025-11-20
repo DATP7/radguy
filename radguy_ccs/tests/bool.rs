@@ -241,7 +241,8 @@ mod ordered {
         StrategicArgumentsOracle::default().and_by(StrategicHeightOracle::transitive(), std::cmp::min), args_s_and_height_transitive;
         StrategicHeightOracle::simple(), height_simple;
         StrategicHeightOracle::simple().and_by(CountOracle::default(), std::cmp::min), height_simple_and_min_count;
-        StrategicHeightOracle::transitive().and_by(InverseCountOracle::default(), std::cmp::min), height_transitive_and_min_count_inverse;
         StrategicHeightOracle::simple().then(CountOracle::default()), height_simple_then_count;
+        StrategicHeightOracle::transitive(), height_transitive;
+        StrategicHeightOracle::transitive().and_by(InverseCountOracle::default(), std::cmp::min), height_transitive_and_min_count_inverse;
     }
 }
