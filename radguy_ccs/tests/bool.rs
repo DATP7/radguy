@@ -213,8 +213,8 @@ mod ordered {
         oracle::{IdentityOracle, SMax, TrivialOracle},
         ordered::{
             oracle::{
-                CountOracle, InverseCountOracle, StrategicArgumentsOracle, StrategicLocalOracle,
-                ToConstant,
+                CountOracle, InverseCountOracle, StrategicArgumentsOracle, StrategicHeightOracle,
+                StrategicLocalOracle, ToConstant,
             },
             strategy::StrategyWeight,
         },
@@ -237,5 +237,12 @@ mod ordered {
         StrategicArgumentsOracle::default(), arguments_s;
         StrategicArgumentsOracle::default().and_by(CountOracle::default(), std::cmp::min), args_s_and_min_count;
         StrategicArgumentsOracle::default().and_by(InverseCountOracle::default(), std::cmp::min), args_s_and_min_count_inverse;
+        StrategicArgumentsOracle::default().then(StrategicHeightOracle::transitive()), args_s_then_height_transitive;
+        StrategicArgumentsOracle::default().and_by(StrategicHeightOracle::transitive(), std::cmp::min), args_s_and_height_transitive;
+        StrategicHeightOracle::simple(), height_simple;
+        StrategicHeightOracle::simple().and_by(CountOracle::default(), std::cmp::min), height_simple_and_min_count;
+        StrategicHeightOracle::simple().then(CountOracle::default()), height_simple_then_count;
+        StrategicHeightOracle::transitive(), height_transitive;
+        StrategicHeightOracle::transitive().and_by(InverseCountOracle::default(), std::cmp::min), height_transitive_and_min_count_inverse;
     }
 }

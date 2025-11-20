@@ -7,8 +7,8 @@ use radguy::{
     ordered::{
         self,
         oracle::{
-            CountOracle, InverseCountOracle, StrategicArgumentsOracle, StrategicLocalOracle,
-            ToConstant,
+            CountOracle, InverseCountOracle, StrategicArgumentsOracle, StrategicHeightOracle,
+            StrategicLocalOracle, ToConstant,
         },
         strategy::{BinaryHeapStrategy, HashMapStrategy, LazyHeap, OrxStrategy, StrategyWeight},
     },
@@ -118,6 +118,10 @@ macro_rules! bisim_bench_problem_ordered {
             StrategicArgumentsOracle::default().then(InverseCountOracle::default()),
             StrategicArgumentsOracle::default().and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(CountOracle::default()),
             StrategicArgumentsOracle::default().and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(InverseCountOracle::default()),
+            StrategicArgumentsOracle::default().then(StrategicHeightOracle::simple()),
+            StrategicArgumentsOracle::default().then(StrategicHeightOracle::transitive()),
+            LocalMaxR::default().constant(StrategyWeight::Infinity).then(InverseCountOracle::default()).then(StrategicHeightOracle::simple()),
+            LocalMaxR::default().constant(StrategyWeight::Infinity).then(InverseCountOracle::default()).then(StrategicHeightOracle::transitive()),
         };
     };
 }

@@ -2,6 +2,7 @@ use std::{
     cmp::{Ordering, Reverse},
     fmt::Display,
     hash::Hash,
+    ops::Add,
 };
 
 use crate::System;
@@ -44,6 +45,17 @@ impl Display for StrategyWeight {
         match self {
             Self::Infinity => write!(f, "∞"),
             Self::Num(x) => write!(f, "{x}"),
+        }
+    }
+}
+
+impl Add for StrategyWeight {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Self::Num(r), Self::Num(l)) => Self::Num(l + r),
+            _ => Self::Infinity,
         }
     }
 }
