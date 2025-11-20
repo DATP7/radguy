@@ -1,3 +1,4 @@
+use crate::Intersect;
 use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
@@ -5,8 +6,8 @@ use std::{
 };
 
 use crate::ordered::strategy::{
-    Domain, Intersect, IntersectBy, LeftSliced, Length, Retain, RightSliced, Singleton, SliceLeft,
-    SliceRight, Strategy, StrategyItem, StrategyWeight,
+    Domain, IntersectBy, LeftSliced, Length, Retain, RightSliced, Singleton, SliceLeft, SliceRight,
+    Strategy, StrategyItem, StrategyWeight,
 };
 
 #[derive(Default, Clone, Debug)]

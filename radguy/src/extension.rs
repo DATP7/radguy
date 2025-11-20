@@ -24,7 +24,6 @@ pub trait LocalExtension<
     fn depends(
         &self,
         term: TermKey,
-        visited: &HashSet<VarKey>,
         assignment: &HashMap<VarKey, VarValue>,
         possible: &PairSet,
         system: &System,
@@ -38,7 +37,6 @@ pub trait LocalExtension<
         VarValue: PartialOrd,
         TermKey: Copy + Eq,
         PairSet: Union + FromIterator<(VarKey, VarKey)>,
-        System: Universe<HashSet<VarKey>>,
     {
         ExtensionOracle::from(Self::default())
     }
@@ -66,27 +64,16 @@ impl<
     E: LocalExtension<K, V, T, PS, S>,
 > LocalOracle<K, V, PS, S> for ExtensionOracle<K, V, T, PS, S, E>
 {
-    fn approximate_flow(
-        &self,
-        visited: &HashSet<K>,
-        assignment: &HashMap<K, V>,
-        possible: &PS,
-        system: &S,
-    ) -> PS {
-        let unvisited = system.universe().without(visited);
+    fn approximate_flow(&self, assignment: &HashMap<K, V>, possible: &PS, system: &S) -> PS {
+        let visited = system.visited();
+        let unvisited = system.universe().without(&visited);
         let unvisited_dep = system.universe().cartesian(&unvisited);
         let self_dep: PS = visited.iter().map(|&x| (x, x)).collect();
         let term_dep: PS = visited
             .iter()
             .flat_map(|var| {
                 self.extension
-                    .depends(
-                        system.definition(*var),
-                        visited,
-                        assignment,
-                        possible,
-                        system,
-                    )
+                    .depends(system.definition(*var), assignment, possible, system)
                     .into_iter()
                     .map(|dep| (dep, *var))
             })
@@ -101,7 +88,7 @@ impl<
     V: PartialOrd,
     T: Copy + Eq,
     PS: Union + FromIterator<(K, K)>,
-    S: TermSystem<K, V, T> + Universe<HashSet<K>>,
+    S: TermSystem<K, V, T>,
     E: LocalExtension<K, V, T, PS, S>,
 > From<E> for ExtensionOracle<K, V, T, PS, S, E>
 {
@@ -135,7 +122,7 @@ impl<
     V: PartialOrd,
     T: Copy + Eq,
     PS: Union + FromIterator<(K, K)>,
-    S: TermSystem<K, V, T> + Universe<HashSet<K>>,
+    S: TermSystem<K, V, T>,
     E: LocalExtension<K, V, T, PS, S> + Display,
 > Display for ExtensionOracle<K, V, T, PS, S, E>
 {

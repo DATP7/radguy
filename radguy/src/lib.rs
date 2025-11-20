@@ -52,6 +52,14 @@ pub trait Diagonal {
     fn diagonal(&self) -> Self::Output;
 }
 
+pub trait System<VarKey: Copy, VarValue: PartialOrd> {
+    fn evaluate(&self, key: VarKey, assignment: &HashMap<VarKey, VarValue>) -> VarValue;
+    fn bottom_assignment(&self) -> HashMap<VarKey, VarValue>;
+    fn lock(&mut self);
+    fn unlock(&mut self);
+    fn visited(&self) -> HashSet<VarKey>;
+}
+
 pub trait Universe<S> {
     /// Returns a structure S containing all variables in the system
     #[must_use]
@@ -62,13 +70,6 @@ pub trait PairUniverse<S> {
     /// Returns the cartesian product of all the variables, $VV times VV$
     #[must_use]
     fn pair_universe(&self) -> S;
-}
-
-pub trait System<VarKey: Copy, VarValue: PartialOrd> {
-    fn evaluate(&self, key: VarKey, assignment: &HashMap<VarKey, VarValue>) -> VarValue;
-    fn bottom_assignment(&self) -> HashMap<VarKey, VarValue>;
-    fn lock(&mut self);
-    fn unlock(&mut self);
 }
 
 pub trait Assignment<K, V> {
@@ -148,7 +149,7 @@ pub fn kleene_local<
     K: Copy + Hash + Eq + Debug,
     V: Eq + PartialOrd + Bottom + Clone,
     PS: Debug + Union,
-    S: System<K, V> + PairUniverse<PS> + Arguments<K, HashSet<K>>,
+    S: System<K, V> + Arguments<K, HashSet<K>> + Universe<HashSet<K>>,
 >(
     system: &mut S,
     target: K,
@@ -159,13 +160,15 @@ where
     HashSet<K>: Cartesian<Output = PS>,
 {
     let mut assignment = system.bottom_assignment();
-    let mut visited = HashSet::default();
-    let mut discovered = HashSet::from([target]);
+    let mut discovered = system.universe();
     let mut rel = discovered.cartesian(&discovered);
-    let mut todo = vec![target];
+    // PERF: This should run the oracle instead of using the full universe
+    let mut todo = local_dependencies(target, &discovered, &assignment, oracle, system, &mut rel);
+    if todo.is_empty() {
+        todo.push(target);
+    }
     let mut iter = todo.iter();
     while let Some(&x) = iter.next() {
-        visited.insert(x);
         let evaluated = system.evaluate(x, &assignment);
         let args = system.arguments(x);
         if assignment.get_assignment(&x) != evaluated || !args.is_subset(&discovered) {
@@ -182,16 +185,8 @@ where
             let axd = args.cartesian(&discovered);
             let dxa = discovered.cartesian(&args);
             rel = rel.union(axa).union(axd).union(dxa);
-            discovered = discovered.union(args);
-            todo = local_dependencies(
-                target,
-                &visited,
-                &discovered,
-                &assignment,
-                oracle,
-                system,
-                &mut rel,
-            );
+            discovered = system.universe();
+            todo = local_dependencies(target, &discovered, &assignment, oracle, system, &mut rel);
             iter = todo.iter();
         }
     }
@@ -199,9 +194,8 @@ where
     assignment.get_assignment(&target)
 }
 
-fn local_dependencies<K: Hash + Copy + Eq, V: PartialOrd, PS, S: System<K, V>>(
+fn local_dependencies<K: Hash + Copy + Eq, V: PartialOrd, PS: Debug, S: System<K, V>>(
     variable: K,
-    visited: &HashSet<K>,
     discovered: &HashSet<K>,
     assignment: &HashMap<K, V>,
     oracle: &impl LocalOracle<K, V, PS, S>,
@@ -212,7 +206,7 @@ where
     for<'a> &'a PS: IntoIterator<Item = &'a (K, K)>,
 {
     system.lock();
-    *rel = oracle.approximate_flow(visited, assignment, rel, system);
+    *rel = oracle.approximate_flow(assignment, rel, system);
     system.unlock();
     rel.into_iter()
         .copied()

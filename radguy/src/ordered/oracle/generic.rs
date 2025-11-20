@@ -29,19 +29,13 @@ impl<
     K: Eq + Copy + Hash,
     V: PartialOrd,
     VS: Strategy<K> + Length,
-    PS: Strategy<(K, K)> + SliceRight<K, K, VS> + FromIterator<StrategyItem<(K, K)>> + Clone,
+    PS: Strategy<(K, K)> + SliceRight<K, K, VS> + FromIterator<StrategyItem<(K, K)>> + Clone + Debug,
     S: System<K, V>,
 > StrategicLocalOracle<K, V, PS, S> for CountOracle<VS>
 where
     for<'a> &'a PS: IntoIterator<Item = StrategyItem<(K, K)>>,
 {
-    fn get_strategy(
-        &self,
-        _visited: &HashSet<K>,
-        _assignment: &HashMap<K, V>,
-        strategy: &PS,
-        _system: &S,
-    ) -> PS {
+    fn get_strategy(&self, _assignment: &HashMap<K, V>, strategy: &PS, _system: &S) -> PS {
         let mut lens = HashMap::<K, u64>::new();
         strategy
             .into_iter()
@@ -78,13 +72,7 @@ impl<
 where
     for<'a> &'a PS: IntoIterator<Item = StrategyItem<(K, K)>>,
 {
-    fn get_strategy(
-        &self,
-        _visited: &HashSet<K>,
-        _assignment: &HashMap<K, V>,
-        strategy: &PS,
-        _system: &S,
-    ) -> PS {
+    fn get_strategy(&self, _assignment: &HashMap<K, V>, strategy: &PS, _system: &S) -> PS {
         let mut lens = HashMap::<K, u64>::new();
         strategy
             .into_iter()
@@ -227,7 +215,7 @@ impl<
     }
 }
 
-impl<K: Eq + Copy + Hash + Debug, H: PriorityQueueDecKey<(K, K), StrategyWeight> + Clone>
+impl<K: Eq + Copy + Hash + Debug, H: PriorityQueueDecKey<(K, K), StrategyWeight> + Clone + Debug>
     StrategicArgumentsOracle<K, OrxStrategy<(K, K), H>>
 {
     fn get_updated_closure_orx<S: Arguments<K, HashSet<K>>>(
@@ -339,14 +327,9 @@ impl<
     S: System<K, V> + Arguments<K, HashSet<K>>,
 > StrategicLocalOracle<K, V, PS, S> for StrategicArgumentsOracle<K, PS>
 {
-    fn get_strategy(
-        &self,
-        visited: &HashSet<K>,
-        _assignment: &HashMap<K, V>,
-        _strategy: &PS,
-        system: &S,
-    ) -> PS {
-        self.get_updated_closure_generic(visited, system)
+    fn get_strategy(&self, _assignment: &HashMap<K, V>, _strategy: &PS, system: &S) -> PS {
+        let visited = system.visited();
+        self.get_updated_closure_generic(&visited, system)
     }
 }
 
@@ -354,19 +337,19 @@ impl<
 impl<
     K: Eq + Copy + Hash + Debug,
     V: PartialOrd,
-    H: PriorityQueueDecKey<(K, K), StrategyWeight> + Clone,
+    H: PriorityQueueDecKey<(K, K), StrategyWeight> + Clone + Debug,
     S: System<K, V> + Arguments<K, HashSet<K>>,
 > StrategicLocalOracle<K, V, OrxStrategy<(K, K), H>, S>
     for StrategicArgumentsOracle<K, OrxStrategy<(K, K), H>>
 {
     fn get_strategy(
         &self,
-        visited: &HashSet<K>,
         _assignment: &HashMap<K, V>,
         _strategy: &OrxStrategy<(K, K), H>,
         system: &S,
     ) -> OrxStrategy<(K, K), H> {
-        self.get_updated_closure_orx(visited, system)
+        let visited = system.visited();
+        self.get_updated_closure_orx(&visited, system)
     }
 }
 

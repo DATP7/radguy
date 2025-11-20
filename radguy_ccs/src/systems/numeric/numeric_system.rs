@@ -1,7 +1,6 @@
 use itertools::iproduct;
 use radguy::Assignment;
 use radguy::extension::TermSystem;
-use radguy::ordered::strategy::{InitialStrategy, Strategy, StrategyItem};
 use radguy::{Arguments, PairUniverse, System, Universe};
 use radguy::{Set, Union, bislotmap::BiSlotMap};
 use slotmap::{Key, SecondaryMap};
@@ -120,7 +119,7 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone + Debug> NumericSystemImpl<K, T, N> {
 
 impl<K: Key, T: Key, N: Hash + Eq + Clone> Universe<HashSet<K>> for NumericSystemImpl<K, T, N> {
     fn universe(&self) -> HashSet<K> {
-        self.definitions.keys().collect()
+        self.names.keys().collect()
     }
 }
 
@@ -145,11 +144,15 @@ impl<VarKey: Key, TermKey: Key, VarName: Hash + Eq + Clone> System<VarKey, Numbe
     }
 
     fn lock(&mut self) {
-        todo!()
+        // Nothing to do
     }
 
     fn unlock(&mut self) {
-        todo!()
+        // Nothing to do
+    }
+
+    fn visited(&self) -> HashSet<VarKey> {
+        self.definitions.keys().collect()
     }
 }
 
@@ -170,20 +173,6 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone>
             .definitions
             .get(variable)
             .expect("variable should have a definition")
-    }
-}
-
-impl<
-    VarKey: Key + Hash + Clone,
-    TermKey: Key + Hash,
-    VarName: Hash + Eq + Clone,
-    PS: Strategy<(VarKey, VarKey)> + FromIterator<StrategyItem<(VarKey, VarKey)>>,
-> InitialStrategy<VarKey, Number, PS> for NumericSystemImpl<VarKey, TermKey, VarName>
-{
-    fn get_initial_strategy(&self) -> PS {
-        iproduct!(self.names.keys(), self.names.keys())
-            .map(|(x, y)| StrategyItem::infinite((x, y)))
-            .collect()
     }
 }
 

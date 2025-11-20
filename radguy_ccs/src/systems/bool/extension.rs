@@ -22,11 +22,9 @@ impl<
 > LocalExtension<VarKey, bool, TermKey, HashSet<(VarKey, VarKey)>, System>
     for BoolExtension<TermKey, VarName>
 {
-    #[expect(clippy::used_underscore_binding)]
     fn depends(
         &self,
         term_key: TermKey,
-        _visited: &HashSet<VarKey>,
         assignment: &HashMap<VarKey, bool>,
         possible: &HashSet<(VarKey, VarKey)>,
         system: &System,
@@ -47,7 +45,7 @@ impl<
                 {
                     term_keys
                         .into_iter()
-                        .flat_map(|t| self.depends(t, _visited, assignment, possible, system))
+                        .flat_map(|t| self.depends(t, assignment, possible, system))
                         .collect()
                 } else {
                     HashSet::new()
@@ -64,7 +62,7 @@ impl<
 
                 // x can influence at least one false term and all false terms are dependent on some var (can change)
                 for term in term_keys {
-                    let term_deps = self.depends(term, _visited, assignment, possible, system);
+                    let term_deps = self.depends(term, assignment, possible, system);
                     if term_deps.is_empty() && !system.evaluate_term(term_key, assignment) {
                         return HashSet::new();
                     }

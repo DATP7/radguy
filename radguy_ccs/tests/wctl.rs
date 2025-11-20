@@ -11,6 +11,7 @@ macro_rules! wctl_test {
     ($($(#ignore($reason:literal))? $test_name:ident: $($process_name:literal, $formula_str:expr => $eq:literal),* $(,)? in $wccs:expr;)*) => {
         $(
             $(#[ignore = $reason])?
+            // #[ignore = "reason"]
             #[test]
             fn $test_name()
             {
@@ -58,7 +59,7 @@ wctl_test! {
     recursive: "S", "AF dump" => true in "S := <go>.dump:S;";
     recursive_neg: "S", "AF mow" => false in "S := <go>.dump:S;";
     compare: "S", "mow == 4" => true in "S := mow:0 + mow:0 + mow:0 + mow:0;";
-    leader_election:
+    leader_election: // Fails
     "Ring", "EF leader > 1" => false,
     "Ring", "EF leader" => true
     in include_str!("../systems/wccs/LeaderElection2.wccs");
