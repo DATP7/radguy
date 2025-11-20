@@ -1,50 +1,83 @@
 use crate::{
-    Arguments, Assignment, Bottom, System, Union,
+    Arguments, Assignment, Bottom, Cartesian, Intersect, PairUniverse, System, Union,
     ordered::{
         oracle::StrategicLocalOracle,
-        strategy::{InitialStrategy, Intersect, Singleton, SliceRight, Strategy},
+        strategy::{Singleton, SliceRight, Strategy, StrategyItem, StrategyWeight},
     },
 };
+use crate::{Universe, Without};
 use std::{collections::HashSet, fmt::Debug, hash::Hash};
 
 pub mod oracle;
 pub mod strategy;
 
+#[expect(clippy::similar_names)]
 pub fn kleene_local<
     VarKey: Copy + Eq + Debug + Hash,
     VarValue: PartialOrd + Bottom + Copy,
     VarStrategy: Strategy<VarKey> + Intersect<HashSet<VarKey>> + Singleton<VarKey> + Debug,
-    PairStrat: Strategy<(VarKey, VarKey)> + SliceRight<VarKey, VarKey, VarStrategy>,
+    PairStrat: Strategy<(VarKey, VarKey)>
+        + Clone
+        + SliceRight<VarKey, VarKey, VarStrategy>
+        + Singleton<(VarKey, VarKey)>
+        + Extend<StrategyItem<(VarKey, VarKey)>>
+        + Debug
+        + Default,
     S: System<VarKey, VarValue>
-        + InitialStrategy<VarKey, VarValue, PairStrat>
-        + Arguments<VarKey, HashSet<VarKey>>,
+        + Arguments<VarKey, HashSet<VarKey>>
+        + Universe<HashSet<VarKey>>
+        + PairUniverse<HashSet<(VarKey, VarKey)>>,
 >(
     system: &mut S,
     target: VarKey,
     oracle: &impl StrategicLocalOracle<VarKey, VarValue, PairStrat, S>,
-) -> VarValue {
+) -> VarValue
+where
+    for<'a> &'a PairStrat: IntoIterator<Item = StrategyItem<(VarKey, VarKey)>>,
+{
     let mut assignment = system.bottom_assignment();
-    let mut discovered = HashSet::from([target]);
-    let mut visited = HashSet::default();
-    let mut todo = VarStrategy::singleton(target);
+    let mut discovered = system.universe();
+    let mut strategy = PairStrat::default();
+    let initial_pairs = system
+        .pair_universe()
+        .into_iter()
+        .map(|(x, y)| StrategyItem::infinite((x, y)));
+    strategy.extend(initial_pairs);
+    strategy = oracle.get_strategy(&assignment, &strategy, system);
+    // We do this since not all oracle implementations are sound for V=Ø
+    // TODO: Ensure those implementations are also sound.
+    if (&strategy).into_iter().next().is_none() {
+        strategy = PairStrat::singleton((target, target));
+    }
+    let mut todo = strategy.clone().slice_right(target).intersect(&discovered);
 
     while let Some(x) = todo.extract_min() {
         let evaluated = system.evaluate(x, &assignment);
-        visited.insert(x);
-        if assignment.get_assignment(&x) != evaluated || !system.arguments(x).is_subset(&discovered)
-        {
+        let args = system.arguments(x);
+        if assignment.get_assignment(&x) != evaluated || !args.is_subset(&discovered) {
             assignment.update_assignment(x, evaluated);
-            discovered = discovered.union(system.arguments(x));
+            // At this point `rel` is D x D with some elements pruned by oracles
+            // We expand it with args to create (D u A) x (D u A), still with those elements
+            // pruned, by unioning with the elements of the square below.
+            // +-------------+-------+
+            // | A x D       | A x A |
+            // +-------------+-------+
+            // | D x D (rel) | D x A |
+            // +-------------+-------+
+            let new_args = args.without(&discovered);
+            let axa = new_args.cartesian(&new_args);
+            let axd = new_args.cartesian(&discovered);
+            let dxa = discovered.cartesian(&new_args);
+            let new_pairs = axa
+                .union(axd)
+                .union(dxa)
+                .into_iter()
+                .map(|p| StrategyItem(StrategyWeight::Infinity, p));
+            strategy.extend(new_pairs);
+            discovered = system.universe();
             system.lock();
-            todo = oracle
-                .get_strategy(
-                    &visited,
-                    &assignment,
-                    &system.get_initial_strategy(),
-                    system,
-                )
-                .slice_right(target)
-                .intersect(&discovered);
+            strategy = oracle.get_strategy(&assignment, &strategy, system);
+            todo = strategy.clone().slice_right(target).intersect(&discovered);
             system.unlock();
         }
     }

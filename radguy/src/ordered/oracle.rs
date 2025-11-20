@@ -1,9 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    fmt::Display,
-    hash::Hash,
-    marker::PhantomData,
-};
+use std::{collections::HashMap, fmt::Display, hash::Hash, marker::PhantomData};
 
 use crate::{
     System,
@@ -26,7 +21,6 @@ pub trait StrategicLocalOracle<
 {
     fn get_strategy(
         &self,
-        visited: &HashSet<K>,
         assignment: &HashMap<K, V>,
         strategy: &PairStrategy,
         system: &S,
@@ -92,13 +86,12 @@ impl<
 {
     fn get_strategy(
         &self,
-        visited: &HashSet<K>,
         assignment: &HashMap<K, V>,
         strategy: &PairStrategy,
         system: &S,
     ) -> PairStrategy {
         self.oracle
-            .approximate_flow(visited, assignment, &strategy.clone().domain(), system)
+            .approximate_flow(assignment, &strategy.clone().domain(), system)
             .into_iter()
             .map(|v| StrategyItem(self.value, v))
             .collect()
@@ -161,17 +154,13 @@ impl<
 {
     fn get_strategy(
         &self,
-        visited: &HashSet<K>,
         assignment: &HashMap<K, V>,
         strategy: &PairStrategy,
         system: &S,
     ) -> PairStrategy {
         self.outer.get_strategy(
-            visited,
             assignment,
-            &self
-                .inner
-                .get_strategy(visited, assignment, strategy, system),
+            &self.inner.get_strategy(assignment, strategy, system),
             system,
         )
     }
@@ -219,18 +208,15 @@ impl<
 {
     fn get_strategy(
         &self,
-        visited: &HashSet<K>,
         assignment: &HashMap<K, V>,
         strategy: &PairStrategy,
         system: &S,
     ) -> PairStrategy {
         // PERF: it might be a lot more efficient to just have a hard-coded `IntersectMin`
         self.left
-            .get_strategy(visited, assignment, strategy, system)
+            .get_strategy(assignment, strategy, system)
             .intersect_by(
-                &self
-                    .right
-                    .get_strategy(visited, assignment, strategy, system),
+                &self.right.get_strategy(assignment, strategy, system),
                 &self.f,
             )
     }

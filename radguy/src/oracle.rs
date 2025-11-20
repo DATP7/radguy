@@ -9,13 +9,7 @@ use std::fmt::{Debug, Display};
 use std::{collections::HashSet, hash::Hash, marker::PhantomData};
 
 pub trait LocalOracle<K: Hash + Eq + Copy, V: PartialOrd, PS, S: System<K, V>> {
-    fn approximate_flow(
-        &self,
-        visited: &HashSet<K>,
-        assignment: &HashMap<K, V>,
-        possible: &PS,
-        system: &S,
-    ) -> PS;
+    fn approximate_flow(&self, assignment: &HashMap<K, V>, possible: &PS, system: &S) -> PS;
 
     #[must_use]
     fn then<O: LocalOracle<K, V, PS, S>>(self, other: O) -> ComposeLocal<K, V, PS, S, O, Self>
@@ -56,14 +50,9 @@ impl<
 where
     for<'a> &'a U: IntoIterator<Item = &'a K>,
 {
-    fn approximate_flow(
-        &self,
-        visited: &HashSet<K>,
-        assignment: &HashMap<K, V>,
-        _possible: &PS,
-        system: &S,
-    ) -> PS {
-        let unvisited = system.universe().without(visited);
+    fn approximate_flow(&self, assignment: &HashMap<K, V>, _possible: &PS, system: &S) -> PS {
+        let visited = system.visited();
+        let unvisited = system.universe().without(&visited);
         let universe = system.universe();
         let unvisited_dep = universe.cartesian(&unvisited);
         let self_dep = visited.diagonal();
@@ -107,7 +96,6 @@ impl<
 {
     fn approximate_flow(
         &self,
-        _visited: &HashSet<K>,
         assignment: &HashMap<K, V>,
         possible: &HashSet<(K, K)>,
         _system: &S,
@@ -150,16 +138,14 @@ impl<
 {
     fn approximate_flow(
         &self,
-        visited: &HashSet<K>,
         assignment: &HashMap<K, V>,
         possible: &PairSet,
         system: &S,
     ) -> PairSet {
         let Self { outer, inner, .. } = self;
         outer.approximate_flow(
-            visited,
             assignment,
-            &inner.approximate_flow(visited, assignment, possible, system),
+            &inner.approximate_flow(assignment, possible, system),
             system,
         )
     }
@@ -203,14 +189,13 @@ impl<
 {
     fn approximate_flow(
         &self,
-        visited: &HashSet<K>,
         assignment: &HashMap<K, V>,
         possible: &PairSet,
         system: &S,
     ) -> PairSet {
         let Self { left, right, .. } = self;
-        let left = left.approximate_flow(visited, assignment, possible, system);
-        let right = right.approximate_flow(visited, assignment, possible, system);
+        let left = left.approximate_flow(assignment, possible, system);
+        let right = right.approximate_flow(assignment, possible, system);
         left.intersect(&right)
     }
 }
@@ -276,7 +261,6 @@ impl<K: Hash + Eq + Copy, V: Maximal, PairSet, S: System<K, V> + PairUniverse<Pa
 {
     fn approximate_flow(
         &self,
-        _visited: &HashSet<K>,
         _assignment: &HashMap<K, V>,
         _possible: &PairSet,
         system: &S,
@@ -409,12 +393,12 @@ impl<K: Eq + Copy + Hash + Debug, V: PartialOrd, S: System<K, V> + Arguments<K, 
 {
     fn approximate_flow(
         &self,
-        visited: &HashSet<K>,
         _assignment: &HashMap<K, V>,
         _relation: &HashSet<(K, K)>,
         system: &S,
     ) -> HashSet<(K, K)> {
-        self.get_updated_closure(visited, system)
+        let visited = system.visited();
+        self.get_updated_closure(&visited, system)
     }
 }
 
@@ -432,7 +416,6 @@ impl<K: Hash + Eq + Copy, V: Maximal, PairSet: Clone, S: System<K, V> + PairUniv
 {
     fn approximate_flow(
         &self,
-        _visited: &HashSet<K>,
         _assignment: &HashMap<K, V>,
         possible: &PairSet,
         _system: &S,

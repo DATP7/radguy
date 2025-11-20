@@ -5,7 +5,6 @@ use std::{
     marker::PhantomData,
 };
 
-use radguy::ordered::strategy::{InitialStrategy, Strategy};
 use radguy::{Arguments, Assignment, PairUniverse, System, Universe, extension::TermSystem};
 use slotmap::Key;
 
@@ -223,6 +222,10 @@ impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKe
     fn unlock(&mut self) {
         self.locked = false;
     }
+
+    fn visited(&self) -> HashSet<VarKey> {
+        self.bool_system.borrow().visited()
+    }
 }
 
 impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKey>>
@@ -253,21 +256,6 @@ impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKe
 {
     fn pair_universe(&self) -> HashSet<(VarKey, VarKey)> {
         self.bool_system.borrow().pair_universe()
-    }
-}
-impl<
-    'a,
-    ProcKey: Key,
-    VarKey: Key + Hash + Clone,
-    TermKey: Key + Hash,
-    T: TransitionSystem<'a, ProcKey>,
-    OutStrategy: Strategy<(VarKey, VarKey)>,
-> InitialStrategy<VarKey, bool, OutStrategy> for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
-where
-    BoolSystemImpl<VarKey, TermKey, (ProcKey, ProcKey)>: InitialStrategy<VarKey, bool, OutStrategy>,
-{
-    fn get_initial_strategy(&self) -> OutStrategy {
-        self.bool_system.borrow().get_initial_strategy()
     }
 }
 

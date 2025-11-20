@@ -1,3 +1,4 @@
+use crate::Intersect;
 use std::fmt::Debug;
 use std::{
     cmp::Reverse,
@@ -10,8 +11,8 @@ use std::{
 use orx_priority_queue::{DaryHeapWithMap, NodeKeyRef, PriorityQueueDecKey};
 
 use crate::ordered::strategy::{
-    Domain, Intersect, IntersectBy, LeftSliced, Length, RightSliced, Singleton, SliceLeft,
-    SliceRight, Strategy, StrategyItem, StrategyWeight,
+    Domain, IntersectBy, LeftSliced, Length, RightSliced, Singleton, SliceLeft, SliceRight,
+    Strategy, StrategyItem, StrategyWeight,
 };
 
 #[derive(Clone, Debug)]
@@ -177,7 +178,7 @@ impl<T: Copy, H: PriorityQueueDecKey<T, StrategyWeight>> Length for OrxStrategy<
     }
 }
 
-impl<T: Copy, H: PriorityQueueDecKey<T, StrategyWeight>> Extend<StrategyItem<T>>
+impl<T: Copy + Debug, H: PriorityQueueDecKey<T, StrategyWeight> + Debug> Extend<StrategyItem<T>>
     for OrxStrategy<T, H>
 {
     fn extend<I: IntoIterator<Item = StrategyItem<T>>>(&mut self, iter: I) {

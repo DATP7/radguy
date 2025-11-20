@@ -155,11 +155,6 @@ where
     fn slice_right(self, right: U) -> S;
 }
 
-pub trait Intersect<Other = Self> {
-    #[must_use]
-    fn intersect(self, other: &Other) -> Self;
-}
-
 pub trait IntersectBy<T: Eq, Other: Strategy<T> = Self> {
     #[must_use]
     /// Intersect the domains of two strategies, using `f` to compute the new weight elements

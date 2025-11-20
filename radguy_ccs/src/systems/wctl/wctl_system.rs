@@ -1,15 +1,10 @@
-use std::hash::Hash;
 use std::{
     cell::RefCell,
     collections::{BTreeSet, HashMap, HashSet},
 };
 
 use radguy::extension::TermSystem;
-use radguy::{
-    Arguments, PairUniverse, System, Universe,
-    bislotmap::BiSlotMap,
-    ordered::strategy::{InitialStrategy, Strategy},
-};
+use radguy::{Arguments, PairUniverse, System, Universe, bislotmap::BiSlotMap};
 use slotmap::Key;
 
 use crate::systems::{
@@ -314,6 +309,10 @@ impl<ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key> System
     fn unlock(&mut self) {
         self.locked = false;
     }
+
+    fn visited(&self) -> HashSet<VarKey> {
+        self.numeric_system.borrow().visited()
+    }
 }
 
 impl<ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
@@ -341,24 +340,6 @@ impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key>
 {
     fn pair_universe(&self) -> HashSet<(VarKey, VarKey)> {
         self.numeric_system.borrow().pair_universe()
-    }
-}
-
-impl<ProcKey, VarKey, TermKey, FormKey, ExprKey, OutStrategy>
-    InitialStrategy<VarKey, Number, OutStrategy>
-    for WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
-where
-    NumericSystemImpl<VarKey, TermKey, (ProcKey, FormKey)>:
-        InitialStrategy<VarKey, Number, OutStrategy>,
-    ProcKey: Key,
-    VarKey: Key + Clone + Hash,
-    TermKey: Key + Hash,
-    FormKey: Key,
-    ExprKey: Key,
-    OutStrategy: Strategy<(VarKey, VarKey)>,
-{
-    fn get_initial_strategy(&self) -> OutStrategy {
-        self.numeric_system.borrow().get_initial_strategy()
     }
 }
 

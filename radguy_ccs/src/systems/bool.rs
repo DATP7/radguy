@@ -10,7 +10,6 @@ use radguy::bislotmap::BiSlotMap;
 use radguy::{
     Arguments, Assignment, Cartesian, Intersect, PairUniverse, System, Universe,
     extension::TermSystem,
-    ordered::strategy::{InitialStrategy, Strategy, StrategyItem},
 };
 use slotmap::{Key, SecondaryMap};
 
@@ -23,23 +22,12 @@ pub trait BoolSystem<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone>:
     fn evaluate_term(&self, term_key: T, assignment: &dyn Assignment<V, bool>) -> bool;
 }
 
-macro_rules! assert_access_allowed {
-    ($self:expr, $key:expr) => {
-        debug_assert!(
-            !$self.locked || $self.definitions.contains_key($key),
-            "Variable {:?} was visited for the first time while the system was locked",
-            $self.names.get_value($key)
-        )
-    };
-}
-
 #[derive(Default, Debug)]
 pub struct BoolSystemImpl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone> {
     pub names: BiSlotMap<V, N>,
     pub definitions: SecondaryMap<V, T>,
     pub terms: BiSlotMap<T, BoolTerm<V, T>>,
     term_arguments_cache: RefCell<HashMap<T, HashSet<V>>>,
-    locked: bool,
 }
 
 impl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone> BoolSystemImpl<V, T, N> {
@@ -103,7 +91,6 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone + Debug
     System<VarKey, bool> for BoolSystemImpl<VarKey, TermKey, VarName>
 {
     fn evaluate(&self, key: VarKey, assignment: &HashMap<VarKey, bool>) -> bool {
-        assert_access_allowed!(self, key);
         let term_key = self
             .definitions
             .get(key)
@@ -116,11 +103,15 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone + Debug
     }
 
     fn lock(&mut self) {
-        self.locked = true;
+        // Nothing to do
     }
 
     fn unlock(&mut self) {
-        self.locked = false;
+        // Nothing to do
+    }
+
+    fn visited(&self) -> HashSet<VarKey> {
+        self.definitions.keys().collect()
     }
 }
 
@@ -128,7 +119,6 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone + Debug
     TermSystem<VarKey, bool, TermKey> for BoolSystemImpl<VarKey, TermKey, VarName>
 {
     fn definition(&self, variable: VarKey) -> TermKey {
-        assert_access_allowed!(self, variable);
         *self
             .definitions
             .get(variable)
@@ -140,7 +130,6 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone + Debug
     Arguments<VarKey, HashSet<VarKey>> for BoolSystemImpl<VarKey, TermKey, VarName>
 {
     fn arguments(&self, key: VarKey) -> HashSet<VarKey> {
-        assert_access_allowed!(self, key);
         let term_key = self.definitions.get(key).expect("variable must be defined");
         self.term_arguments(*term_key)
     }
@@ -168,20 +157,6 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone + Debug
     }
 }
 
-impl<
-    VarKey: Key + Hash + Clone,
-    TermKey: Key + Hash,
-    VarName: Hash + Eq + Clone + Debug,
-    PS: Strategy<(VarKey, VarKey)> + FromIterator<StrategyItem<(VarKey, VarKey)>>,
-> InitialStrategy<VarKey, bool, PS> for BoolSystemImpl<VarKey, TermKey, VarName>
-{
-    fn get_initial_strategy(&self) -> PS {
-        iproduct!(self.names.keys(), self.names.keys())
-            .map(|(x, y)| StrategyItem::infinite((x, y)))
-            .collect()
-    }
-}
-
 /// Lazy bool system which ensures variables are not expanded when locked.
 /// Intended for testing local oracles.
 /// Not for production use.
@@ -190,6 +165,7 @@ pub struct LazyBoolSystem<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone> {
     pub inner: RefCell<BoolSystemImpl<V, T, N>>,
     visited: RefCell<HashSet<V>>,
     discovered: RefCell<HashSet<V>>,
+    locked: bool,
 }
 
 impl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone> From<BoolSystemImpl<V, T, N>>
@@ -200,14 +176,15 @@ impl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone> From<BoolSystemImpl<V, 
             inner: RefCell::new(global_system),
             visited: RefCell::new(HashSet::new()),
             discovered: RefCell::new(HashSet::new()),
+            locked: false,
         }
     }
 }
 
 macro_rules! ensure_lazy_access {
     ($self:expr, $key:ident) => {
-        debug_assert!(!$self.inner.borrow().locked || $self.visited.borrow().contains(&$key));
-        if (!$self.inner.borrow().locked) {
+        debug_assert!(!$self.locked || $self.visited.borrow().contains(&$key));
+        if (!$self.locked) {
             $self.visited.borrow_mut().insert($key);
             let args = $self.inner.borrow().arguments($key);
             $self.discovered.borrow_mut().extend(args.into_iter());
@@ -270,6 +247,10 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone + Debug
     fn unlock(&mut self) {
         self.inner.borrow_mut().unlock();
     }
+
+    fn visited(&self) -> HashSet<VarKey> {
+        self.visited.borrow().clone()
+    }
 }
 
 impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone + Debug>
@@ -299,23 +280,6 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone + Debug
 
     fn evaluate_term(&self, term_key: TermKey, assignment: &dyn Assignment<VarKey, bool>) -> bool {
         self.inner.borrow().evaluate_term(term_key, assignment)
-    }
-}
-
-impl<
-    VarKey: Key + Hash + Clone,
-    TermKey: Key + Hash,
-    VarName: Hash + Eq + Clone + Debug,
-    PS: Strategy<(VarKey, VarKey)> + FromIterator<StrategyItem<(VarKey, VarKey)>>,
-> InitialStrategy<VarKey, bool, PS> for LazyBoolSystem<VarKey, TermKey, VarName>
-{
-    fn get_initial_strategy(&self) -> PS {
-        self.discovered
-            .borrow()
-            .cartesian(&self.discovered.borrow())
-            .into_iter()
-            .map(|(x, y)| StrategyItem::infinite((x, y)))
-            .collect()
     }
 }
 

@@ -1,10 +1,11 @@
+use crate::Intersect;
 use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
 };
 
 use crate::ordered::strategy::{
-    Domain, Intersect, IntersectBy, Length, Retain, RightSliced, Singleton, SliceRight, Strategy,
+    Domain, IntersectBy, Length, Retain, RightSliced, Singleton, SliceRight, Strategy,
     StrategyItem, StrategyWeight,
 };
 
