@@ -1,0 +1,53 @@
+# CSMA/CD Protocol example
+# Source: http://www.ict.kth.se/courses/2G1516/Docs05/CCS/CSMA-CD-Parrow.pdf
+
+# ***************************
+# Service specification
+# ***************************
+
+# Unidirectional buffer 1 (station1 => station2)
+B12 	:= <send1>.msg1:B12_;
+B12_ 	:= <p!>.(<send1>.<rec2!>.<v>.B12_ + <rec2!>.<v>.B12);
+
+# Unidirectional buffer 2 (station2 => station1)
+B21 	:= <send2>.msg2:B21_;
+B21_ 	:= <p!>.(<send2>.<rec1!>.<v>.B21_ + <rec1!>.<v>.B21);
+
+# Semaphore for syncing buffers
+# p: wait for semaphore, v: signal semaphore
+S 		:= <p>.<v!>.S;
+
+# Service specification
+SS 		:= (B12 | S | B21) \{p, v};
+
+# ***************************
+# CSMA Protocal specification
+# ***************************
+
+# Set-up medium with clients
+P 		:= (MAC1 | MAC2 | M) \{ b1,br1,e1,er1,c1, b2,br2,e2,er2,c2 };
+
+# Medium
+M 		:= <b1>.(<b2>.M_ + <br2!>.(<b2>.M_ + <e1>.(<b2>.M_ + <er2!>.M))) 
+                       +
+				 <b2>.(<b1>.M_ + <br1!>.(<b1>.M_ + <e2>.(<b1>.M_ + <er1!>.M)));    
+M_		:= <c1!>.<c2!>.collision:M + <c2!>.<c1!>.collision:M;
+
+# MAC client 1
+MAC1 	:= <send1>.MAC1_ + <br1>.(<er1>.error:(<rec1!>.MAC1 
+											 		+ <send1>.<rec1!>.MAC1_) 
+                 			 	+ <send1>.<er1>.<rec1!>.MAC1_);
+                 
+MAC1_ := <b1!>.(<c1>.MAC1_ + <e1!>.MAC1) 
+													 + <br1>.<er1>.<rec1!>.MAC1_;
+
+# MAC client 2
+MAC2 	:= <send2>.MAC2_ + <br2>.(<er2>.error:(<rec2!>.MAC2 
+											 		+ <send2>.<rec2!>.MAC2_) 
+                 			 	+ <send2>.<er2>.<rec2!>.MAC2_);
+                       
+MAC2_ := <b2!>.(<c2>.MAC2_ + <e2!>.MAC2) 
+				 									 + <br2>.<er2>.<rec2!>.MAC2_;
+
+
+

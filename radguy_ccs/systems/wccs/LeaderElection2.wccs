@@ -1,0 +1,12 @@
+#### Ring-based Leader Election Protocol
+# This example has processes P1 to P2, each process have several states denoted by process
+# name underscore largest rank received. E.g. P1_2 is P1 in a state where it has received a
+# message with rank 2.
+# Messages are on the form 'm:receiver r:rank'
+P1 := <m2r1!,1>.P1 + <m1r1>.leader:0 + <m1r2>.P1_2;
+P1_2 := <m2r2!,1>.P1_2 + <m1r1>.leader:0 + <m1r2>.P1_2;
+
+P2 := <m1r2!,1>.P2 + <m2r1>.P2 + <m2r2>.leader:0;
+
+Ring := (P1 | P2)
+        \ {m1r1, m1r2, m2r1, m2r2};

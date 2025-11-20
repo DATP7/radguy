@@ -4,3 +4,4 @@ ccs_examples
 .ignoreme
 .vscode
 profile.json.gz
+.DS_Store

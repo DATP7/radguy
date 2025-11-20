@@ -1,0 +1,7 @@
+F10 = EF[<=70] leader
+F11 = EF[<=11] leader
+F12 = EF[<=12] leader
+
+G1 = EF leader > 1
+G3 = AF leader > 1
+G2 = EF leader

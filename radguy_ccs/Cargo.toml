@@ -28,3 +28,7 @@ criterion = "0.7.0"
 [[bench]]
 name = "ccs_weak_bisim"
 harness = false
+
+[[bench]]
+name = "wctl"
+harness = false
