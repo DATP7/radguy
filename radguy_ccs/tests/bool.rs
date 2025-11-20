@@ -237,11 +237,11 @@ mod ordered {
         StrategicArgumentsOracle::default(), arguments_s;
         StrategicArgumentsOracle::default().and_by(CountOracle::default(), std::cmp::min), args_s_and_min_count;
         StrategicArgumentsOracle::default().and_by(InverseCountOracle::default(), std::cmp::min), args_s_and_min_count_inverse;
-        StrategicArgumentsOracle::default().then(StrategicHeightOracle::default()), args_s_then_height;
-        StrategicArgumentsOracle::default().and_by(StrategicHeightOracle::default(), std::cmp::min), args_s_and_height;
-        StrategicHeightOracle::default(), height;
-        StrategicHeightOracle::default().and_by(CountOracle::default(), std::cmp::min), height_and_min_count;
-        StrategicHeightOracle::default().and_by(InverseCountOracle::default(), std::cmp::min), height_and_min_count_inverse;
-        StrategicHeightOracle::default().then(CountOracle::default()), height_then_count;
+        StrategicArgumentsOracle::default().then(StrategicHeightOracle::transitive()), args_s_then_height_transitive;
+        StrategicArgumentsOracle::default().and_by(StrategicHeightOracle::transitive(), std::cmp::min), args_s_and_height_transitive;
+        StrategicHeightOracle::simple(), height_simple;
+        StrategicHeightOracle::simple().and_by(CountOracle::default(), std::cmp::min), height_simple_and_min_count;
+        StrategicHeightOracle::transitive().and_by(InverseCountOracle::default(), std::cmp::min), height_transitive_and_min_count_inverse;
+        StrategicHeightOracle::simple().then(CountOracle::default()), height_simple_then_count;
     }
 }
