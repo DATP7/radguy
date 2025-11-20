@@ -393,6 +393,7 @@ impl StrategicHeightOracle {
             + FromIterator<StrategyItem<(K, K)>>,
     >(
         &self,
+        visited: &HashSet<K>,
         system: &S,
         relation: &PS,
     ) -> PS
@@ -411,7 +412,7 @@ impl StrategicHeightOracle {
             let mut inner = SecondaryMap::new();
             for &j in &variables {
                 if let Some(weight) = weightmap.get(&(i, j))
-                    && (i == j || system.arguments(j).contains(&i))
+                    && (i == j || (visited.contains(&j) && system.arguments(j).contains(&i)))
                 {
                     inner.insert(j, *weight);
                 }
@@ -419,7 +420,6 @@ impl StrategicHeightOracle {
             graph.insert(i, inner);
         }
 
-        //PERF Find a way to remove the outer for loop so we only need to run the 3 inner loops once instead of twice (if possible)
         let loop_counter = if self.transitive_weights { 2 } else { 1 };
         for _ in 1..=loop_counter {
             for &k in &variables {
@@ -485,12 +485,12 @@ where
 {
     fn get_strategy(
         &self,
-        _visited: &HashSet<K>,
+        visited: &HashSet<K>,
         _assignment: &HashMap<K, V>,
         strategy: &PS,
         system: &S,
     ) -> PS {
-        Self::get_updated_weights(self, system, strategy)
+        Self::get_updated_weights(self, visited, system, strategy)
     }
 }
 
@@ -894,8 +894,8 @@ mod tests {
                         $transitive:tt
                     } with {$(
                         $var_name:ident = {$($dep:ident),* $(,)?};
-                    )*} in {
-                        $(($left:ident, $right:ident) -> $weight:tt),* $(,)?
+                    )*} in {$(
+                        ($left:ident, $right:ident) -> $weight:tt),* $(,)?
                     } expects {
                         $(($l:ident, $r:ident) -> $w:tt),* $(,)?
                     }
@@ -909,11 +909,13 @@ mod tests {
                             let (system, [$($var_name,)*]) = system_def! {$(
                                 $var_name = {$($dep,)*};
                             )*};
+                            let visited = HashSet::from_iter([$($var_name,)*]);
+
                             let relation = BinaryHeapStrategy::from_iter([$(create_strategyitem!{($left, $right) -> $weight},)*]);
 
                             let expected = BinaryHeapStrategy::from_iter([$(create_strategyitem!{($l, $r) -> $w},)*]);
                             let oracle = create_oracle!{$transitive};
-                            let got = StrategicHeightOracle::get_updated_weights(&oracle, &system, &relation);
+                            let got = StrategicHeightOracle::get_updated_weights(&oracle, &visited, &system, &relation);
 
                             let expected_domain: HashSet<_> = expected.clone().domain();
                             let got_domain: HashSet<_> = got.clone().domain();
