@@ -90,7 +90,7 @@ impl<U> Display for LocalMaxR<U> {
 }
 
 #[derive(Default, Clone)]
-pub struct SMax();
+pub struct SMax;
 
 impl Display for SMax {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -109,18 +109,19 @@ impl<
         &self,
         _visited: &HashSet<K>,
         assignment: &HashMap<K, V>,
-        _possible: &HashSet<(K, K)>,
-        system: &S,
+        possible: &HashSet<(K, K)>,
+        _system: &S,
     ) -> HashSet<(K, K)> {
-        // TODO: change this to use relation once we update the relation with discovered variables
-        // after each iteration
-        system
-            .pair_universe()
-            .into_iter()
+        // TODO: currently it's actually faster to just iterate over `system.pair_universe` with
+        // the ordered algorithm, because we construct the initial strategy each time.
+        // this (hopefully) isn't the case when we start reusing the relation
+        possible
+            .iter()
             .filter(|(x, y)| {
                 !assignment.get_assignment(x).is_maximal()
                     && !assignment.get_assignment(y).is_maximal()
             })
+            .copied()
             .collect::<HashSet<_>>()
     }
 }
