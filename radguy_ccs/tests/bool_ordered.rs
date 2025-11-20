@@ -69,7 +69,7 @@ macro_rules! test_oracle_system_ordered {
         mod $spec {
             use super::*;
 
-            use radguy::ordered::strategy::{BinaryHeapStrategy, HashMapStrategy, OrxStrategy};
+            use radguy::ordered::strategy::{BinaryHeapStrategy, HashMapStrategy, OrxStrategy, LazyHeap};
             use orx_priority_queue::DaryHeapWithMap;
 
             test_oracle_system_strategy! {
@@ -80,6 +80,12 @@ macro_rules! test_oracle_system_ordered {
             }
             test_oracle_system_strategy! {
                 orx_quad: test $oracle, with OrxStrategy<_, DaryHeapWithMap<_, StrategyWeight, 4>>, on: $spec
+            }
+            test_oracle_system_strategy! {
+                std_binary_lazy: test $oracle, with LazyHeap<_, BinaryHeapStrategy<_>>, on: $spec
+            }
+            test_oracle_system_strategy! {
+                orx_quad_lazy: test $oracle, with LazyHeap<_, OrxStrategy<_, DaryHeapWithMap<_, StrategyWeight, 4>>>, on: $spec
             }
         }
         )*
