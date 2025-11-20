@@ -379,7 +379,9 @@ impl<VarKey: Eq + Copy + Hash, PS: Strategy<(VarKey, VarKey)>> Display
 }
 
 #[derive(Default, Clone, Debug)]
-pub struct StrategicHeightOracle {}
+pub struct StrategicHeightOracle {
+    transitive_weights: bool,
+}
 #[expect(clippy::similar_names)]
 impl StrategicHeightOracle {
     fn get_updated_weights<
@@ -390,6 +392,7 @@ impl StrategicHeightOracle {
             + Extend<StrategyItem<(K, K)>>
             + FromIterator<StrategyItem<(K, K)>>,
     >(
+        &self,
         system: &S,
         relation: &PS,
     ) -> PS
@@ -417,7 +420,8 @@ impl StrategicHeightOracle {
         }
 
         //PERF Find a way to remove the outer for loop so we only need to run the 3 inner loops once instead of twice (if possible)
-        for _ in 1..=2 {
+        let loop_counter = if self.transitive_weights { 2 } else { 1 };
+        for _ in 1..=loop_counter {
             for &k in &variables {
                 let k_map = graph
                     .get(k)
@@ -434,10 +438,19 @@ impl StrategicHeightOracle {
                             && let Some(dist_kj) = dist_kj
                             && let Some(graph_weight) = graph_weight
                         {
-                            let val = dist_ij.map_or_else(
-                                || min(*graph_weight, *dist_ik + *dist_kj),
-                                |dist_ij| min(*graph_weight, min(*dist_ij, *dist_ik + *dist_kj)),
-                            );
+                            let val = if self.transitive_weights {
+                                dist_ij.map_or_else(
+                                    || min(*graph_weight, *dist_ik + *dist_kj),
+                                    |dist_ij| {
+                                        min(*graph_weight, min(*dist_ij, *dist_ik + *dist_kj))
+                                    },
+                                )
+                            } else {
+                                dist_ij.map_or_else(
+                                    || *dist_ik + *dist_kj,
+                                    |dist_ij| min(*dist_ij, *dist_ik + *dist_kj),
+                                )
+                            };
                             i_map.insert(j, val);
                         }
                     }
@@ -477,7 +490,24 @@ where
         strategy: &PS,
         system: &S,
     ) -> PS {
-        Self::get_updated_weights(system, strategy)
+        Self::get_updated_weights(self, system, strategy)
+    }
+}
+
+impl StrategicHeightOracle {
+    // Makes the oracle consider the weights of pairs (y, x) in the relation where y is not an argument of x. Will be slower than the simple function
+    #[must_use]
+    pub const fn transitive() -> Self {
+        Self {
+            transitive_weights: true,
+        }
+    }
+    // Makes the oracle only consider the weights of pairs (y, x) in the relation if y is an argument of x. Will be faster than the transitive function
+    #[must_use]
+    pub const fn simple() -> Self {
+        Self {
+            transitive_weights: false,
+        }
     }
 }
 
@@ -839,6 +869,15 @@ mod tests {
         use super::*;
         use crate::ordered::oracle::StrategicHeightOracle;
 
+        macro_rules! create_oracle {
+            (transitive) => {
+                StrategicHeightOracle::transitive()
+            };
+            (simple) => {
+                StrategicHeightOracle::simple()
+            };
+        }
+
         macro_rules! create_strategyitem {
             (($left:ident, $right:ident) -> inf) => {
                 StrategyItem(StrategyWeight::Infinity, ($left, $right))
@@ -851,7 +890,9 @@ mod tests {
         macro_rules! test_height {
             ($(
                 $test_name:ident: {
-                    with {$(
+                    oracle {
+                        $transitive:tt
+                    } with {$(
                         $var_name:ident = {$($dep:ident),* $(,)?};
                     )*} in {
                         $(($left:ident, $right:ident) -> $weight:tt),* $(,)?
@@ -871,7 +912,8 @@ mod tests {
                             let relation = BinaryHeapStrategy::from_iter([$(create_strategyitem!{($left, $right) -> $weight},)*]);
 
                             let expected = BinaryHeapStrategy::from_iter([$(create_strategyitem!{($l, $r) -> $w},)*]);
-                            let got = StrategicHeightOracle::get_updated_weights(&system, &relation);
+                            let oracle = create_oracle!{$transitive};
+                            let got = StrategicHeightOracle::get_updated_weights(&oracle, &system, &relation);
 
                             let expected_domain: HashSet<_> = expected.clone().domain();
                             let got_domain: HashSet<_> = got.clone().domain();
@@ -906,8 +948,10 @@ mod tests {
         }
 
         test_height! {
-            single_variable: {
-                with {
+            single_variable_transitive: {
+                oracle {
+                    transitive
+                } with {
                     x = {};
                 } in {
                     (x, x) -> 0,
@@ -915,8 +959,21 @@ mod tests {
                     (x, x) -> 0,
                 }
             };
-            chain_2: {
-                with {
+            single_variable_simple: {
+                oracle {
+                    simple
+                } with {
+                    x = {};
+                } in {
+                    (x, x) -> 0,
+                } expects {
+                    (x, x) -> 0,
+                }
+            };
+            chain_2_transitive: {
+                oracle {
+                    transitive
+                } with {
                     x = {y};
                     y = {};
                 } in {
@@ -925,19 +982,48 @@ mod tests {
                     (x, x) -> 0, (y, y) -> 0, (y, x) -> 1,
                 }
             };
-            chain_3: {
-                with {
+            chain_2_simple: {
+                oracle {
+                    simple
+                } with {
+                    x = {y};
+                    y = {};
+                } in {
+                    (x, x) -> 0, (y, y) -> 0, (y, x) -> 1,
+                } expects {
+                    (x, x) -> 0, (y, y) -> 0, (y, x) -> 1,
+                }
+            };
+            chain_3_transitive: {
+                oracle {
+                    transitive
+                } with {
                     x = {y};
                     y = {z};
                     z = {};
                 } in {
-                    (x, x) -> 0, (y, y) -> 0, (z, z) -> 0, (y, x) -> 1, (z, x) -> 5, (z, y) -> 1,
+                    (x, x) -> 0, (y, y) -> 0, (z, z) -> 0, (y, x) -> 1, (z, x) -> 2, (z, y) -> 5,
                 } expects {
-                    (x, x) -> 0, (y, y) -> 0, (z, z) -> 0, (y, x) -> 1, (z, x) -> 2, (z, y) -> 1,
+                    (x, x) -> 0, (y, y) -> 0, (z, z) -> 0, (y, x) -> 1, (z, x) -> 2, (z, y) -> 5,
                 }
             };
-            chain_4: {
-                with {
+            chain_3_simple: {
+                oracle {
+                    simple
+                } with {
+                    x = {y};
+                    y = {z};
+                    z = {};
+                } in {
+                    (x, x) -> 0, (y, y) -> 0, (z, z) -> 0, (y, x) -> 1, (z, x) -> 2, (z, y) -> 5,
+                } expects {
+                    (x, x) -> 0, (y, y) -> 0, (z, z) -> 0, (y, x) -> 1, (z, x) -> 6, (z, y) -> 5,
+                }
+            };
+            chain_4_transitive: {
+                oracle {
+                    transitive
+                } with {
                     x = {y};
                     y = {z};
                     z = {k};
@@ -948,8 +1034,24 @@ mod tests {
                     (x, x) -> 0, (y, y) -> 0, (z, z) -> 0, (k, k) -> 0, (y, x) -> 5, (z, x) -> 2, (k, x) -> 3, (z, y) -> 5, (k, y) -> 5, (k, z) -> 1,
                 }
             };
-            chain_5: {
-                with {
+            chain_4_simple: {
+                oracle {
+                    simple
+                } with {
+                    x = {y};
+                    y = {z};
+                    z = {k};
+                    k = {};
+                } in {
+                    (x, x) -> 0, (y, y) -> 0, (z, z) -> 0, (k, k) -> 0, (y, x) -> 5, (z, x) -> 2, (k, x) -> 10, (z, y) -> 5, (k, y) -> 5, (k, z) -> 1,
+                } expects {
+                    (x, x) -> 0, (y, y) -> 0, (z, z) -> 0, (k, k) -> 0, (y, x) -> 5, (z, x) -> 10, (k, x) -> 11, (z, y) -> 5, (k, y) -> 6, (k, z) -> 1,
+                }
+            };
+            chain_5_transitive: {
+                oracle {
+                    transitive
+                } with {
                     x = {y};
                     y = {z};
                     z = {k};
@@ -961,8 +1063,25 @@ mod tests {
                     (x, x) -> 0, (y, y) -> 0, (z, z) -> 0, (k, k) -> 0, (i, i) -> 0, (y, x) -> 5, (z, x) -> 2, (k, x) -> 3, (i, x) -> 4, (z, y) -> 5, (k, y) -> 5, (i, y) -> 6, (k, z) -> 1, (i, z) -> 2, (i, k) -> 1,
                 }
             };
-            bad_edge: {
-                with {
+            chain_5_simple: {
+                oracle {
+                    simple
+                } with {
+                    x = {y};
+                    y = {z};
+                    z = {k};
+                    k = {i};
+                    i = {};
+                } in {
+                    (x, x) -> 0, (y, y) -> 0, (z, z) -> 0, (k, k) -> 0, (i, i) -> 0, (y, x) -> 5, (z, x) -> 2, (k, x) -> 10, (i, x) -> 20, (z, y) -> 5, (k, y) -> 5, (i, y) -> 10, (k, z) -> 1, (i, z) -> 10, (i, k) -> 1,
+                } expects {
+                    (x, x) -> 0, (y, y) -> 0, (z, z) -> 0, (k, k) -> 0, (i, i) -> 0, (y, x) -> 5, (z, x) -> 10, (k, x) -> 11, (i, x) -> 12, (z, y) -> 5, (k, y) -> 6, (i, y) -> 7, (k, z) -> 1, (i, z) -> 2, (i, k) -> 1,
+                }
+            };
+            bad_edge_transitive: {
+                oracle {
+                    transitive
+                } with {
                     x = {z, y};
                     y = {};
                     z = {};
@@ -972,8 +1091,23 @@ mod tests {
                     (x, x) -> 0, (y, y) -> 0, (z, z) -> 0, (z, x) -> 1, (y, x) -> 1,
                 }
             };
-            bad_edge_circular: {
-                with {
+            bad_edge_simple: {
+                oracle {
+                    simple
+                } with {
+                    x = {z, y};
+                    y = {};
+                    z = {};
+                } in {
+                    (x, x) -> 0, (y, y) -> 0, (z, z) -> 0, (z, x) -> 1, (y, x) -> 1, (y, z) -> 2,
+                } expects {
+                    (x, x) -> 0, (y, y) -> 0, (z, z) -> 0, (z, x) -> 1, (y, x) -> 1,
+                }
+            };
+            bad_edge_circular_transitive: {
+                oracle {
+                    transitive
+                } with {
                     x = {y};
                     y = {};
                 } in {
@@ -982,19 +1116,48 @@ mod tests {
                     (x, x) -> 0, (y, y) -> 0, (y, x) -> 1,
                 }
             };
-            edge_removed_in_relation: {
-                with {
+            bad_edge_circular_simple: {
+                oracle {
+                    simple
+                } with {
+                    x = {y};
+                    y = {};
+                } in {
+                    (x, x) -> 0, (y, y) -> 0, (y, x) -> 1, (x, y) -> 1,
+                } expects {
+                    (x, x) -> 0, (y, y) -> 0, (y, x) -> 1,
+                }
+            };
+            edge_removed_in_relation_transitive: {
+                oracle {
+                    transitive
+                } with {
                     x = {y, z};
                     y = {};
                     z = {};
                 } in {
-                    (x, x) ->0 , (y, y) -> 0, (y, x) ->1,
+                    (x, x) -> 0 , (y, y) -> 0, (y, x) ->1,
                 } expects {
-                    (x, x) ->0 , (y, y) -> 0, (y, x) ->1,
+                    (x, x) -> 0 , (y, y) -> 0, (y, x) ->1,
                 }
             };
-            circular: {
-                with {
+            edge_removed_in_relation_simple: {
+                oracle {
+                    simple
+                } with {
+                    x = {y, z};
+                    y = {};
+                    z = {};
+                } in {
+                    (x, x) -> 0 , (y, y) -> 0, (y, x) ->1,
+                } expects {
+                    (x, x) -> 0 , (y, y) -> 0, (y, x) ->1,
+                }
+            };
+            circular_transitive: {
+                oracle {
+                    transitive
+                } with {
                     x = {y};
                     y = {x};
                 } in {
@@ -1003,8 +1166,22 @@ mod tests {
                     (x, x) -> 0, (y, y) -> 0, (y, x) -> 1, (x, y) -> 1,
                 }
             };
-            circular_2: {
-                with {
+            circular_simple: {
+                oracle {
+                    simple
+                } with {
+                    x = {y};
+                    y = {x};
+                } in {
+                    (x, x) -> 0, (y, y) -> 0, (y, x) -> 1, (x, y) -> 1,
+                } expects {
+                    (x, x) -> 0, (y, y) -> 0, (y, x) -> 1, (x, y) -> 1,
+                }
+            };
+            circular_2_transitive: {
+                oracle {
+                    transitive
+                } with {
                     x = {y};
                     y = {x};
                 } in {
@@ -1013,8 +1190,22 @@ mod tests {
                     (x, x) -> 2, (y, y) -> 2, (y, x) -> 1, (x, y) -> 1,
                 }
             };
-            infinite: {
-                with {
+            circular_2_simple: {
+                oracle {
+                    simple
+                } with {
+                    x = {y};
+                    y = {x};
+                } in {
+                    (x, x) -> 5, (y, y) -> 5, (y, x) -> 1, (x, y) -> 1,
+                } expects {
+                    (x, x) -> 2, (y, y) -> 2, (y, x) -> 1, (x, y) -> 1,
+                }
+            };
+            infinite_transitive: {
+                oracle {
+                    transitive
+                } with {
                     x = {y};
                     y = {};
                 } in {
@@ -1023,8 +1214,22 @@ mod tests {
                     (x, x) -> 0, (y, y) -> 0, (y, x) -> inf,
                 }
             };
-            infinite_2: {
-                with {
+            infinite_simple: {
+                oracle {
+                    simple
+                } with {
+                    x = {y};
+                    y = {};
+                } in {
+                    (x, x) -> 0, (y, y) -> 0, (y, x) -> inf,
+                } expects {
+                    (x, x) -> 0, (y, y) -> 0, (y, x) -> inf,
+                }
+            };
+            infinite_2_transitive: {
+                oracle {
+                    transitive
+                } with {
                     x = {y};
                     y = {z};
                     z = {};
@@ -1034,8 +1239,23 @@ mod tests {
                     (x, x) -> 0, (y, y) -> 0, (z, z) -> 0, (y, x) -> 1, (z, x) -> 2, (z, y) -> 1,
                 }
             };
-            circular_infinite: {
-                with {
+            infinite_2_simple: {
+                oracle {
+                    simple
+                } with {
+                    x = {y};
+                    y = {z};
+                    z = {};
+                } in {
+                    (x, x) -> 0, (y, y) -> 0, (z, z) -> 0, (y, x) -> 1, (z, x) -> inf, (z, y) -> 1,
+                } expects {
+                    (x, x) -> 0, (y, y) -> 0, (z, z) -> 0, (y, x) -> 1, (z, x) -> 2, (z, y) -> 1,
+                }
+            };
+            circular_infinite_transitive: {
+                oracle {
+                    transitive
+                } with {
                     x = {y};
                     y = {x};
                 } in {
@@ -1044,8 +1264,34 @@ mod tests {
                     (x, x) -> 2, (y, y) -> 2, (y, x) -> 1, (x, y) -> 1,
                 }
             };
-            circular_infinite_2: {
-                with {
+            circular_infinite_simple: {
+                oracle {
+                    simple
+                } with {
+                    x = {y};
+                    y = {x};
+                } in {
+                    (x, x) -> inf, (y, y) -> inf, (y, x) -> 1, (x, y) -> 1,
+                } expects {
+                    (x, x) -> 2, (y, y) -> 2, (y, x) -> 1, (x, y) -> 1,
+                }
+            };
+            circular_infinite_2_transitive: {
+                oracle {
+                    transitive
+                } with {
+                    x = {y};
+                    y = {x};
+                } in {
+                    (x, x) -> 0, (y, y) -> 0, (y, x) -> inf, (x, y) -> inf,
+                } expects {
+                    (x, x) -> 0, (y, y) -> 0, (y, x) -> inf, (x, y) -> inf,
+                }
+            };
+            circular_infinite_2_simple: {
+                oracle {
+                    simple
+                } with {
                     x = {y};
                     y = {x};
                 } in {
