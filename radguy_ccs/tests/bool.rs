@@ -185,23 +185,23 @@ mod unordered {
     use radguy_ccs::systems::bool::extension::BoolExtension;
 
     test_oracles_unordered! {
-        SMax::default(), smax;
+        SMax, smax;
         TrivialOracle, trivialoracle;
         IdentityOracle, identityoracle;
         LocalMaxR::default(), localmaxr;
-        TrivialOracle.and(SMax::default()), trivialoracle_and_smax;
-        LocalMaxR::default().and(SMax::default()), localmaxr_and_smax;
+        TrivialOracle.and(SMax), trivialoracle_and_smax;
+        LocalMaxR::default().and(SMax), localmaxr_and_smax;
         LocalMaxR::default().and(TrivialOracle), localmaxr_and_trivialoracle;
-        TrivialOracle.then(SMax::default()), trivialoracle_then_smax;
+        TrivialOracle.then(SMax), trivialoracle_then_smax;
         TrivialOracle.then(LocalMaxR::default()), trivialoracle_then_localmaxr;
-        SMax::default().then(TrivialOracle), smax_then_trivialoracle;
-        SMax::default().then(LocalMaxR::default()), smax_then_localmaxr;
-        LocalMaxR::default().then(SMax::default()), localmaxr_then_smax;
+        SMax.then(TrivialOracle), smax_then_trivialoracle;
+        SMax.then(LocalMaxR::default()), smax_then_localmaxr;
+        LocalMaxR::default().then(SMax), localmaxr_then_smax;
         LocalMaxR::default().then(TrivialOracle), localmaxr_then_trivialoracle;
         ExtensionOracle::from(BoolExtension::default()), bool_extension;
-        SMax::default().then(ExtensionOracle::from(BoolExtension::default())), smax_then_bool_extension;
-        ExtensionOracle::from(BoolExtension::default()).then(SMax::default()), bool_extension_then_smax;
-        SMax::default().and(ExtensionOracle::from(BoolExtension::default())), smax_and_bool_extension;
+        SMax.then(ExtensionOracle::from(BoolExtension::default())), smax_then_bool_extension;
+        ExtensionOracle::from(BoolExtension::default()).then(SMax), bool_extension_then_smax;
+        SMax.and(ExtensionOracle::from(BoolExtension::default())), smax_and_bool_extension;
         LocalMaxR::default().then(ExtensionOracle::from(BoolExtension::default())), localmaxr_then_bool_extension;
         ArgumentsOracle::default(), arguments;
     }
@@ -224,10 +224,10 @@ mod ordered {
     test_oracles_ordered! {
         IdentityOracle.constant(StrategyWeight::Infinity), identity_oracle_inf;
         TrivialOracle.constant(StrategyWeight::Infinity), trivial_oracle_inf;
-        SMax::default().constant(StrategyWeight::Num(0)), smax_const_0;
-        SMax::default().constant(StrategyWeight::Infinity), smax_const_infinity;
-        SMax::default().constant(StrategyWeight::Num(0)).then(CountOracle::default()), smax_then_count;
-        SMax::default().constant(StrategyWeight::Num(10)).and_by(CountOracle::default(), std::cmp::min), smax_10_and_min_count;
+        SMax.constant(StrategyWeight::Num(0)), smax_const_0;
+        SMax.constant(StrategyWeight::Infinity), smax_const_infinity;
+        SMax.constant(StrategyWeight::Num(0)).then(CountOracle::default()), smax_then_count;
+        SMax.constant(StrategyWeight::Num(10)).and_by(CountOracle::default(), std::cmp::min), smax_10_and_min_count;
         BoolExtension::oracle().constant(StrategyWeight::Num(0)), bool_extension_0;
         BoolExtension::oracle().constant(StrategyWeight::Num(0)).and_by(CountOracle::default(), std::cmp::min), bool_extension_0_and_min_count;
         BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(CountOracle::default(), std::cmp::min), bool_extension_inf_and_min_count;
