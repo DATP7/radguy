@@ -5,8 +5,6 @@ use std::{
     ops::Add,
 };
 
-use crate::System;
-
 mod binary_heap;
 mod hashmap;
 mod lazy;
@@ -99,30 +97,6 @@ pub trait Strategy<T> {
     /// Returns `None` if there are no more elements in the strategy
     // TODO: should we just have an iterator instead?
     fn extract_min(&mut self) -> Option<T>;
-}
-
-pub trait ConstantStrategy<T: Copy>: Strategy<T> + FromIterator<StrategyItem<T>>
-where
-    for<'a> &'a Self: IntoIterator<Item = StrategyItem<T>>,
-{
-    /// Sets all weights to [`StrategyWeight::Infinity`].
-    /// PERF: Implement this manually on strategies where it can be sped up
-    #[must_use]
-    fn as_const(&mut self, weight: StrategyWeight) -> Self {
-        self.into_iter()
-            .map(|StrategyItem(_, x)| StrategyItem(weight, x))
-            .collect()
-    }
-}
-
-pub trait InitialStrategy<
-    VarKey: Copy,
-    VarValue: PartialOrd,
-    OutStrategy: Strategy<(VarKey, VarKey)>,
->: System<VarKey, VarValue>
-{
-    /// Get a strategy where all variables are assigned to infinity
-    fn get_initial_strategy(&self) -> OutStrategy;
 }
 
 // We have `LeftSliced` and `RightSliced` so we can easily have the same implementation of
