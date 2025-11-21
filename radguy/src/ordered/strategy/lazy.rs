@@ -1,4 +1,4 @@
-use crate::Intersect;
+use crate::{Intersect, ordered::strategy::ResetWeights};
 use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
@@ -158,5 +158,13 @@ impl<T: Hash + Eq, H> Extend<StrategyItem<T>> for LazyHeap<T, H> {
     fn extend<I: IntoIterator<Item = StrategyItem<T>>>(&mut self, iter: I) {
         self.items_mut()
             .extend(iter.into_iter().map(|StrategyItem(w, v)| (v, w)));
+    }
+}
+
+impl<T, H> ResetWeights for LazyHeap<T, H> {
+    fn reset_weights(&mut self) {
+        for v in self.items_mut().values_mut() {
+            *v = StrategyWeight::Infinity;
+        }
     }
 }

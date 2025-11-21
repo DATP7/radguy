@@ -11,8 +11,8 @@ use std::{
 use orx_priority_queue::{DaryHeapWithMap, NodeKeyRef, PriorityQueueDecKey};
 
 use crate::ordered::strategy::{
-    Domain, IntersectBy, LeftSliced, Length, RightSliced, Singleton, SliceLeft, SliceRight,
-    Strategy, StrategyItem, StrategyWeight,
+    Domain, IntersectBy, LeftSliced, Length, ResetWeights, RightSliced, Singleton, SliceLeft,
+    SliceRight, Strategy, StrategyItem, StrategyWeight,
 };
 
 #[derive(Clone, Debug)]
@@ -241,5 +241,15 @@ impl<T: Copy, H: PriorityQueueDecKey<T, StrategyWeight>> IntoIterator for &OrxSt
         // PERF: avoid collecting into a vec. this currently isn't possible because none of the orx
         // priority queues have an `IntoIterator` implementation
         self.0.iter().map(|x| StrategyItem(*x.key(), *x.node()))
+    }
+}
+
+impl<T: Clone, H: PriorityQueueDecKey<T, StrategyWeight>> ResetWeights for OrxStrategy<T, H> {
+    fn reset_weights(&mut self) {
+        let items: Vec<_> = self.iter().map(|x| x.node()).cloned().collect();
+
+        for it in items {
+            self.update_key(&it, StrategyWeight::Infinity);
+        }
     }
 }

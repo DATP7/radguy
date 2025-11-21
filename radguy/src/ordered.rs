@@ -2,7 +2,7 @@ use crate::{
     Arguments, Assignment, Bottom, Cartesian, Intersect, PairUniverse, System, Union,
     ordered::{
         oracle::StrategicLocalOracle,
-        strategy::{Singleton, SliceRight, Strategy, StrategyItem, StrategyWeight},
+        strategy::{ResetWeights, Singleton, SliceRight, Strategy, StrategyItem, StrategyWeight},
     },
 };
 use crate::{Universe, Without};
@@ -21,6 +21,7 @@ pub fn kleene_local<
         + SliceRight<VarKey, VarKey, VarStrategy>
         + Singleton<(VarKey, VarKey)>
         + Extend<StrategyItem<(VarKey, VarKey)>>
+        + ResetWeights
         + Debug
         + Default,
     S: System<VarKey, VarValue>
@@ -74,6 +75,7 @@ where
                 .into_iter()
                 .map(|p| StrategyItem(StrategyWeight::Infinity, p));
             strategy.extend(new_pairs);
+            strategy.reset_weights();
             discovered = system.universe();
             system.lock();
             strategy = oracle.get_strategy(&assignment, &strategy, system);

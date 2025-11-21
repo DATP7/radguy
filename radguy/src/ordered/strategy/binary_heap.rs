@@ -1,4 +1,4 @@
-use crate::Intersect;
+use crate::{Intersect, ordered::strategy::ResetWeights};
 use std::{
     cmp::Reverse,
     collections::{BinaryHeap, HashMap, HashSet},
@@ -196,5 +196,15 @@ impl<T: Copy> Extend<StrategyItem<T>> for BinaryHeapStrategy<T> {
         I: IntoIterator<Item = StrategyItem<T>>,
     {
         self.0.extend(iter.into_iter().map(Reverse));
+    }
+}
+
+impl<T: Clone> ResetWeights for BinaryHeapStrategy<T> {
+    fn reset_weights(&mut self) {
+        self.0 = self
+            .0
+            .iter()
+            .map(|Reverse(StrategyItem(_, v))| StrategyItem::infinite(v.clone()).reversed())
+            .collect();
     }
 }
