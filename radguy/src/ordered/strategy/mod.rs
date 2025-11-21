@@ -174,3 +174,8 @@ pub trait Retain<T> {
     where
         F: FnMut(&StrategyItem<T>) -> bool;
 }
+
+pub trait ResetWeights {
+    /// Set the weights of all items in the strategy to infinity
+    fn reset_weights(&mut self);
+}

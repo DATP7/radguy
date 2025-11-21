@@ -1,4 +1,4 @@
-use crate::Intersect;
+use crate::{Intersect, ordered::strategy::ResetWeights};
 use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
@@ -171,6 +171,14 @@ impl<T: Copy + Eq + Hash> Extend<StrategyItem<T>> for HashMapStrategy<T> {
     {
         self.0
             .extend(iter.into_iter().map(|StrategyItem(w, v)| (v, w)));
+    }
+}
+
+impl<T> ResetWeights for HashMapStrategy<T> {
+    fn reset_weights(&mut self) {
+        for v in self.0.values_mut() {
+            *v = StrategyWeight::Infinity;
+        }
     }
 }
 
