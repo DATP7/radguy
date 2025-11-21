@@ -50,6 +50,7 @@ impl Display for StrategyWeight {
 impl Add for StrategyWeight {
     type Output = Self;
 
+    #[track_caller]
     fn add(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
             (Self::Num(r), Self::Num(l)) => Self::Num(l + r),

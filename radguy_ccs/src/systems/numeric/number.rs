@@ -38,6 +38,7 @@ impl Maximal for Number {
 impl Add for Number {
     type Output = Self;
 
+    #[track_caller]
     fn add(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
             (Self::Val(l), Self::Val(r)) => Self::Val(l + r),
@@ -49,6 +50,7 @@ impl Add for Number {
 impl Mul for Number {
     type Output = Self;
 
+    #[track_caller]
     fn mul(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
             (Self::Val(l), Self::Val(r)) => Self::Val(l * r),
@@ -60,6 +62,7 @@ impl Mul for Number {
 impl Div for Number {
     type Output = Self;
 
+    #[track_caller]
     fn div(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
             (Self::Val(l), Self::Val(r)) => Self::Val(l / r),
@@ -71,6 +74,7 @@ impl Div for Number {
 impl Sub for Number {
     type Output = Self;
 
+    #[track_caller]
     fn sub(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
             (Self::Val(l), Self::Val(r)) => Self::Val(l - r),
