@@ -75,7 +75,7 @@ pub trait System<VarKey: Copy, VarValue: PartialOrd> {
 }
 
 pub trait Universe<S> {
-    /// Returns a structure S containing all variables in the system
+    /// Returns a structure S containing all discovered variables in the system
     #[must_use]
     fn universe(&self) -> S;
 }
