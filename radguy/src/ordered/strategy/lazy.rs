@@ -1,4 +1,4 @@
-use crate::Intersect;
+use crate::{Intersect, ordered::strategy::ConstantStrategy};
 use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
@@ -69,6 +69,11 @@ impl<T: Copy, H> IntoIterator for &LazyHeap<T, H> {
     fn into_iter(self) -> Self::IntoIter {
         self.items.iter().map(|(v, w)| StrategyItem(*w, *v))
     }
+}
+
+impl<T: Copy + Eq + Hash, H: Strategy<T> + FromIterator<StrategyItem<T>>> ConstantStrategy<T>
+    for LazyHeap<T, H>
+{
 }
 
 impl<T: Hash + Eq, H> Intersect<HashSet<T>> for LazyHeap<T, H> {

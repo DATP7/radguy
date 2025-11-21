@@ -409,6 +409,7 @@ impl StrategicHeightOracle {
                 let k_map = graph
                     .get(k)
                     .expect("All variables should be mapped")
+                    // TODO: Refcell or cow remove this clone
                     .clone();
                 for &i in &variables {
                     let i_map = graph.get_mut(i).expect("All variables should be mapped");
@@ -466,14 +467,9 @@ impl<
 where
     for<'a> &'a PS: IntoIterator<Item = StrategyItem<(K, K)>>,
 {
-    fn get_strategy(
-        &self,
-        visited: &HashSet<K>,
-        _assignment: &HashMap<K, V>,
-        strategy: &PS,
-        system: &S,
-    ) -> PS {
-        Self::get_updated_weights(self, visited, system, strategy)
+    fn get_strategy(&self, _assignment: &HashMap<K, V>, strategy: &PS, system: &S) -> PS {
+        let visited = system.visited();
+        self.get_updated_weights(&visited, system, strategy)
     }
 }
 

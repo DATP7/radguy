@@ -11,8 +11,8 @@ use std::{
 use orx_priority_queue::{DaryHeapWithMap, NodeKeyRef, PriorityQueueDecKey};
 
 use crate::ordered::strategy::{
-    Domain, IntersectBy, LeftSliced, Length, RightSliced, Singleton, SliceLeft, SliceRight,
-    Strategy, StrategyItem, StrategyWeight,
+    ConstantStrategy, Domain, IntersectBy, LeftSliced, Length, RightSliced, Singleton, SliceLeft,
+    SliceRight, Strategy, StrategyItem, StrategyWeight,
 };
 
 #[derive(Clone, Debug)]
@@ -242,4 +242,9 @@ impl<T: Copy, H: PriorityQueueDecKey<T, StrategyWeight>> IntoIterator for &OrxSt
         // priority queues have an `IntoIterator` implementation
         self.0.iter().map(|x| StrategyItem(*x.key(), *x.node()))
     }
+}
+
+impl<T: Copy, H: PriorityQueueDecKey<T, StrategyWeight> + Default> ConstantStrategy<T>
+    for OrxStrategy<T, H>
+{
 }
