@@ -56,7 +56,7 @@ impl<V: Key, T: Key> NumericTerm<V, T> {
         }
     }
 
-    pub fn to_string<N: Hash + Clone + Eq + Display>(
+    pub fn to_string<N: Hash + Clone + Eq + Display + Debug>(
         &self,
         sys: &NumericSystemImpl<V, T, N>,
     ) -> String {

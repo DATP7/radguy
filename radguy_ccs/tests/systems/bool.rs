@@ -17,6 +17,7 @@ macro_rules! system_spec {
         $($val:literal => $varname:ident = $def:tt;)*
     };)*) => {
         $(
+            #[must_use]
             pub fn $name() -> SystemSpec {
                 let system = bool_system! {
                     $($varname = $def;)*
