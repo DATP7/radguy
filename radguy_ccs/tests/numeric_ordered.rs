@@ -1,5 +1,4 @@
 use radguy::{
-    extension::LocalExtension,
     oracle::{IdentityOracle, SMax, TrivialOracle},
     ordered::{
         oracle::{
@@ -9,22 +8,20 @@ use radguy::{
         strategy::StrategyWeight,
     },
 };
-use radguy_ccs::systems::bool::extension::BoolExtension;
 
 pub mod systems;
-
-macro_rules! test_oracle_system_strategy {
+macro_rules! test_oracle_system_strategy_numerical {
     ($name:ident: test $oracle:expr, with $strategy:ty, on: $spec:ident) => {
         mod $name {
             use super::*;
 
             #[test]
             fn eager() {
-                let $crate::systems::bool::SystemSpec {
+                let $crate::systems::numeric::NumericSystemSpec {
                     mut system,
                     variables,
                     goal,
-                } = $crate::systems::bool::$spec();
+                } = $crate::systems::numeric::$spec();
                 for (var, goal) in variables.into_iter().zip(goal.into_iter()) {
                     let start = system.names.get_or_insert_key(var);
                     assert_eq!(
@@ -38,15 +35,18 @@ macro_rules! test_oracle_system_strategy {
                     );
                 }
             }
-
             #[test]
             fn lazy() {
-                let $crate::systems::bool::SystemSpec {
+                let $crate::systems::numeric::NumericSystemSpec {
                     system,
                     variables,
                     goal,
-                } = $crate::systems::bool::$spec();
-                let mut system: radguy_ccs::systems::bool::LazyBoolSystem<_, _, _> = system.into();
+                } = $crate::systems::numeric::$spec();
+                let mut system: radguy_ccs::systems::numeric::numeric_system::LazyNumericSystem<
+                    _,
+                    _,
+                    _,
+                > = system.into();
                 for (var, goal) in variables.into_iter().zip(goal.into_iter()) {
                     let start = system.init_target(var);
                     assert_eq!(
@@ -63,7 +63,7 @@ macro_rules! test_oracle_system_strategy {
         }
     };
 }
-macro_rules! test_oracle_system_ordered {
+macro_rules! test_oracle_system_ordered_numerical {
     (test $oracle:expr, on: $($spec:ident),* $(,)?) => {
         $(
         mod $spec {
@@ -72,19 +72,19 @@ macro_rules! test_oracle_system_ordered {
             use radguy::ordered::strategy::{BinaryHeapStrategy, HashMapStrategy, OrxStrategy, LazyHeap};
             use orx_priority_queue::DaryHeapWithMap;
 
-            test_oracle_system_strategy! {
+            test_oracle_system_strategy_numerical! {
                 std_binary: test $oracle, with BinaryHeapStrategy<_>, on: $spec
             }
-            test_oracle_system_strategy! {
+            test_oracle_system_strategy_numerical! {
                 std_hashmap: test $oracle, with HashMapStrategy<_>, on: $spec
             }
-            test_oracle_system_strategy! {
+            test_oracle_system_strategy_numerical! {
                 orx_quad: test $oracle, with OrxStrategy<_, DaryHeapWithMap<_, StrategyWeight, 4>>, on: $spec
             }
-            test_oracle_system_strategy! {
+            test_oracle_system_strategy_numerical! {
                 std_binary_lazy: test $oracle, with LazyHeap<_, BinaryHeapStrategy<_>>, on: $spec
             }
-            test_oracle_system_strategy! {
+            test_oracle_system_strategy_numerical! {
                 orx_quad_lazy: test $oracle, with LazyHeap<_, OrxStrategy<_, DaryHeapWithMap<_, StrategyWeight, 4>>>, on: $spec
             }
         }
@@ -92,51 +92,55 @@ macro_rules! test_oracle_system_ordered {
     };
 }
 
-macro_rules! test_oracle_ordered {
+macro_rules! test_oracle_ordered_numerical {
     ($oracle:expr, $name:ident) => {
         mod $name {
             use super::*;
-            test_oracle_system_ordered! {
+            test_oracle_system_ordered_numerical! {
                 test $oracle, on:
                 large,
-                self_reference_true,
-                self_reference_false,
-                true_single,
-                false_single,
-                and_00,
-                and_01,
-                and_10,
-                and_11,
-                or_00,
-                or_01,
-                or_10,
-                or_11,
-                parens_true,
-                parens_false,
-                chain,
+                inf,
+                literal,
+                reference,
+                add_literal_literal,
+                add_inf_literal,
+                add_literal_inf,
+                add_inf_inf,
+                mult_literal_literal,
+                mult_inf_literal,
+                mult_literal_inf,
+                mult_inf_inf,
+                max_literal_literal,
+                max_inf_literal,
+                max_literal_inf,
+                max_inf_inf,
+                min_literal_literal,
+                min_inf_literal,
+                min_literal_inf,
+                min_inf_inf,
+                chain_literal,
+                chain_infinity,
+                recursive,
+                mutual_recursion,
             }
         }
     };
 }
-macro_rules! test_oracles_ordered {
+
+macro_rules! test_oracles_ordered_numerical {
     ( $( $oracle:expr, $name:ident; )*) => {
             $(
-                test_oracle_ordered!($oracle, $name);
+                test_oracle_ordered_numerical!($oracle, $name);
             )*
     };
 }
-
-test_oracles_ordered! {
+test_oracles_ordered_numerical! {
     IdentityOracle.constant(StrategyWeight::Infinity), identity_oracle_inf;
     TrivialOracle.constant(StrategyWeight::Infinity), trivial_oracle_inf;
     SMax.constant(StrategyWeight::Num(0)), smax_const_0;
     SMax.constant(StrategyWeight::Infinity), smax_const_infinity;
     SMax.constant(StrategyWeight::Num(0)).then(CountOracle::default()), smax_then_count;
     SMax.constant(StrategyWeight::Num(10)).and_by(CountOracle::default(), std::cmp::min), smax_10_and_min_count;
-    BoolExtension::oracle().constant(StrategyWeight::Num(0)), bool_extension_0;
-    BoolExtension::oracle().constant(StrategyWeight::Num(0)).and_by(CountOracle::default(), std::cmp::min), bool_extension_0_and_min_count;
-    BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(CountOracle::default(), std::cmp::min), bool_extension_inf_and_min_count;
-    BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(InverseCountOracle::default(), std::cmp::min), bool_extension_inf_and_min_count_inverse;
     CountOracle::default(), count;
     InverseCountOracle::default(), count_inverse;
     StrategicArgumentsOracle::default(), arguments_s;
