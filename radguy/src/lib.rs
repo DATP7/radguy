@@ -52,11 +52,25 @@ pub trait Diagonal {
     fn diagonal(&self) -> Self::Output;
 }
 
+/// System of equations
 pub trait System<VarKey: Copy, VarValue: PartialOrd> {
+    /// Evaluates a variable w.r.t. a given assignment, returning the new value
     fn evaluate(&self, key: VarKey, assignment: &HashMap<VarKey, VarValue>) -> VarValue;
+    /// The bottom element of the systems domain.
+    ///
+    /// # Example
+    /// `true` for boolean domains, `0` or infinity for numeric systems.
     fn bottom_assignment(&self) -> HashMap<VarKey, VarValue>;
+
+    /// Locks the system s.t. no changes can be made to the set of visited or discovered variables.
     fn lock(&mut self);
+
+    /// Unlocks the system after `self.lock()`, allowing changes to the set of visited and
+    /// discovered variables.
     fn unlock(&mut self);
+
+    /// The set of visited variables. These are the variables for which an evaluation function is
+    /// known.
     fn visited(&self) -> HashSet<VarKey>;
 }
 

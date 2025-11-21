@@ -96,9 +96,23 @@ impl<T> Eq for StrategyItem<T> {}
 pub trait Strategy<T> {
     /// Extract the element in the strategy with the lowest weight
     ///
-    /// Returns `None` of there are no more elements in the strategy
+    /// Returns `None` if there are no more elements in the strategy
     // TODO: should we just have an iterator instead?
     fn extract_min(&mut self) -> Option<T>;
+}
+
+pub trait ConstantStrategy<T: Copy>: Strategy<T> + FromIterator<StrategyItem<T>>
+where
+    for<'a> &'a Self: IntoIterator<Item = StrategyItem<T>>,
+{
+    /// Sets all weights to [`StrategyWeight::Infinity`].
+    /// PERF: Implement this manually on strategies where it can be sped up
+    #[must_use]
+    fn as_const(&mut self, weight: StrategyWeight) -> Self {
+        self.into_iter()
+            .map(|StrategyItem(_, x)| StrategyItem(weight, x))
+            .collect()
+    }
 }
 
 pub trait InitialStrategy<

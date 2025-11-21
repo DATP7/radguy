@@ -1,4 +1,4 @@
-use crate::Intersect;
+use crate::{Intersect, ordered::strategy::ConstantStrategy};
 use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
@@ -59,6 +59,8 @@ impl<T: Copy> IntoIterator for &HashMapStrategy<T> {
         self.0.iter().map(|(v, w)| StrategyItem(*w, *v))
     }
 }
+
+impl<T: Copy + Eq + Hash> ConstantStrategy<T> for HashMapStrategy<T> {}
 
 impl<T: Copy + Eq + Hash> Strategy<T> for HashMapStrategy<T> {
     fn extract_min(&mut self) -> Option<T> {

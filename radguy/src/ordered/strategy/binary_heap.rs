@@ -1,4 +1,4 @@
-use crate::Intersect;
+use crate::{Intersect, ordered::strategy::ConstantStrategy};
 use std::{
     cmp::Reverse,
     collections::{BinaryHeap, HashMap, HashSet},
@@ -73,6 +73,8 @@ impl<T: Copy> Strategy<T> for BinaryHeapStrategy<T> {
         self.pop().map(|Reverse(StrategyItem(_, v))| v)
     }
 }
+
+impl<T: Copy> ConstantStrategy<T> for BinaryHeapStrategy<T> {}
 
 impl<T: Eq + Copy + Hash> Intersect<HashSet<T>> for BinaryHeapStrategy<T> {
     fn intersect(mut self, other: &HashSet<T>) -> Self {
