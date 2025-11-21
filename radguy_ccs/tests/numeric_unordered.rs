@@ -84,18 +84,32 @@ macro_rules! test_oracles_unordered_numerical {
     };
 }
 test_oracles_unordered_numerical! {
-    SMax, smax;
-    TrivialOracle, trivialoracle;
-    IdentityOracle, identityoracle;
-    LocalMaxR::default(), localmaxr;
-    TrivialOracle.and(SMax), trivialoracle_and_smax;
-    LocalMaxR::default().and(SMax), localmaxr_and_smax;
-    LocalMaxR::default().and(TrivialOracle), localmaxr_and_trivialoracle;
-    TrivialOracle.then(SMax), trivialoracle_then_smax;
-    TrivialOracle.then(LocalMaxR::default()), trivialoracle_then_localmaxr;
-    SMax.then(TrivialOracle), smax_then_trivialoracle;
-    SMax.then(LocalMaxR::default()), smax_then_localmaxr;
-    LocalMaxR::default().then(SMax), localmaxr_then_smax;
-    LocalMaxR::default().then(TrivialOracle), localmaxr_then_trivialoracle;
-    ArgumentsOracle::default(), arguments;
+    SMax::bitset(), smax_bitset;
+    TrivialOracle::bitset(), trivialoracle_bitset;
+    IdentityOracle::bitset(), identityoracle_bitset;
+    LocalMaxR::bitset(), localmaxr_bitset;
+    TrivialOracle::bitset().and(SMax::bitset()), trivialoracle_and_smax_bitset;
+    LocalMaxR::bitset().and(SMax::bitset()), localmaxr_and_smax_bitset;
+    LocalMaxR::bitset().and(TrivialOracle::bitset()), localmaxr_and_trivialoracle_bitset;
+    TrivialOracle::bitset().then(SMax::bitset()), trivialoracle_then_smax_bitset;
+    TrivialOracle::bitset().then(LocalMaxR::bitset()), trivialoracle_then_localmaxr_bitset;
+    SMax::bitset().then(TrivialOracle::bitset()), smax_then_trivialoracle_bitset;
+    SMax::bitset().then(LocalMaxR::bitset()), smax_then_localmaxr_bitset;
+    LocalMaxR::bitset().then(SMax::bitset()), localmaxr_then_smax_bitset;
+    LocalMaxR::bitset().then(TrivialOracle::bitset()), localmaxr_then_trivialoracle_bitset;
+    ArgumentsOracle::bitset(), arguments_bitset;
+    SMax::hashset(), smax_hashset;
+    TrivialOracle::hashset(), trivialoracle_hashset;
+    IdentityOracle::hashset(), identityoracle_hashset;
+    LocalMaxR::hashset(), localmaxr_hashset;
+    TrivialOracle::hashset().and(SMax::hashset()), trivialoracle_and_smax_hashset;
+    LocalMaxR::hashset().and(SMax::hashset()), localmaxr_and_smax_hashset;
+    LocalMaxR::hashset().and(TrivialOracle::hashset()), localmaxr_and_trivialoracle_hashset;
+    TrivialOracle::hashset().then(SMax::hashset()), trivialoracle_then_smax_hashset;
+    TrivialOracle::hashset().then(LocalMaxR::hashset()), trivialoracle_then_localmaxr_hashset;
+    SMax::hashset().then(TrivialOracle::hashset()), smax_then_trivialoracle_hashset;
+    SMax::hashset().then(LocalMaxR::hashset()), smax_then_localmaxr_hashset;
+    LocalMaxR::hashset().then(SMax::hashset()), localmaxr_then_smax_hashset;
+    LocalMaxR::hashset().then(TrivialOracle::hashset()), localmaxr_then_trivialoracle_hashset;
+    ArgumentsOracle::hashset(), arguments_hashset;
 }

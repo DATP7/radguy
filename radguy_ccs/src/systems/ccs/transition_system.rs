@@ -1,6 +1,5 @@
+use radguy::arena::Key;
 use std::collections::{HashMap, HashSet};
-
-use slotmap::Key;
 
 use crate::systems::ccs::ast::{Action, Binding};
 

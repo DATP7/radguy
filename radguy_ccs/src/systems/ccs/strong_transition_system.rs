@@ -3,8 +3,7 @@ use std::{
     collections::{HashMap, HashSet},
 };
 
-use radguy::bislotmap::BiSlotMap;
-use slotmap::{Key, SecondaryMap};
+use radguy::arena::{BiArena, Key, SecondaryArena};
 
 use crate::systems::ccs::{
     ast::{Action, Binding, Process},
@@ -15,8 +14,8 @@ use crate::systems::ccs::{
 #[derive(Default, Debug, Clone)]
 pub struct StrongTransitionSystem<'a, ProcKey: Key> {
     process_names: HashMap<&'a str, ProcKey>,
-    process_bindings: RefCell<BiSlotMap<ProcKey, FlatProcess<'a, ProcKey>>>,
-    transition_cache: RefCell<SecondaryMap<ProcKey, TransitionMap<'a, ProcKey>>>,
+    process_bindings: RefCell<BiArena<ProcKey, FlatProcess<'a, ProcKey>>>,
+    transition_cache: RefCell<SecondaryArena<ProcKey, TransitionMap<'a, ProcKey>>>,
 }
 
 impl<'a, ProcKey: Key> StrongTransitionSystem<'a, ProcKey> {
@@ -287,7 +286,6 @@ mod tests {
     use crate::systems::ccs::strong_transition_system::StrongTransitionSystem;
     use crate::systems::ccs::transition_system::TransitionMap;
     use crate::systems::ccs::transition_system::TransitionSystem;
-    use slotmap::DefaultKey;
     use std::collections::HashMap;
 
     macro_rules! transition_set {
@@ -309,7 +307,7 @@ mod tests {
             #[test]
             fn $name() {
                 #[allow(unused_mut)]
-                let mut lts = StrongTransitionSystem::<DefaultKey>::default();
+                let mut lts = StrongTransitionSystem::<usize>::default();
                 $(
                     let parser = ProgramParser::new();
                     let ast = parser

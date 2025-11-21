@@ -3,15 +3,13 @@ use radguy_ccs::systems::ccs::bisimulation_system::BisimulationSystem;
 use radguy_ccs::systems::ccs::grammar::ProgramParser;
 use radguy_ccs::systems::ccs::transition_system::TransitionSystem;
 use radguy_ccs::systems::ccs::weak_transition_system::WeakTransitionSystem;
-use slotmap::DefaultKey;
 
 use radguy::{
-    extension::LocalExtension,
     oracle::{IdentityOracle, SMax, TrivialOracle},
     ordered::{
         oracle::{
-            ArgumentsStrategy, SiblingsOracle, StrategicArgumentsOracle, StrategicLocalOracle,
-            ToConstant,
+            ArgumentsStrategy, DependencyCountOracle, SiblingsOracle, StrategicArgumentsOracle,
+            StrategicLocalOracle, ToConstant,
         },
         strategy::StrategyWeight,
     },
@@ -22,16 +20,15 @@ macro_rules! weak_bisim_test_fast {
     ($oracle:expr, $strategy_type:ty, $($name:ident: $left:expr, $right:expr => $eq:literal in $ccs:expr;)*) => {
         $(
             #[test]
-            fn $name()
-            {
+            fn $name() {
                 let parser = ProgramParser::new();
                 let program_ast = parser
                     .parse(&$ccs)
                     .expect("Failed to parse CCS program content.");
-                let mut weak_transition_system = WeakTransitionSystem::<DefaultKey>::default();
+                let mut weak_transition_system = WeakTransitionSystem::<usize>::default();
                 weak_transition_system.load_ast(program_ast);
 
-                let mut sys = BisimulationSystem::<DefaultKey, DefaultKey, DefaultKey, WeakTransitionSystem<DefaultKey>>::new(weak_transition_system);
+                let mut sys = BisimulationSystem::<usize, usize, usize, WeakTransitionSystem<usize>>::new(weak_transition_system);
                 let start = sys.specify_comparison($left, $right);
 
                 let (result, _) = kleene_local::<_, _, $strategy_type, $strategy_type, _>(&mut sys, start, &$oracle);
@@ -52,10 +49,10 @@ macro_rules! weak_bisim_test_slow {
                 let program_ast = parser
                     .parse(&$ccs)
                     .expect("Failed to parse CCS program content.");
-                let mut weak_transition_system = WeakTransitionSystem::<DefaultKey>::default();
+                let mut weak_transition_system = WeakTransitionSystem::<usize>::default();
                 weak_transition_system.load_ast(program_ast);
 
-                let mut sys = BisimulationSystem::<DefaultKey, DefaultKey, DefaultKey, WeakTransitionSystem<DefaultKey>>::new(weak_transition_system);
+                let mut sys = BisimulationSystem::<usize, usize, usize, WeakTransitionSystem<usize>>::new(weak_transition_system);
                 let start = sys.specify_comparison($left, $right);
 
                 let (result, _) = kleene_local::<_, _, $strategy_type, $strategy_type, _>(&mut sys, start, &$oracle);
@@ -140,10 +137,16 @@ macro_rules! weak_bisim_test_oracles {
 }
 
 weak_bisim_test_oracles! {
-    BoolExtension::oracle().constant(StrategyWeight::Num(1)).then(SiblingsOracle), bool_extension_1_then_siblings;
-    SMax.constant(StrategyWeight::Num(0)), smax_const_0;
-    TrivialOracle.constant(StrategyWeight::Infinity), trivial_oracle_inf;
-    IdentityOracle.constant(StrategyWeight::Infinity), identity_oracle_inf;
+    BoolExtension::bitset().as_oracle().constant(StrategyWeight::Num(1)).then(SiblingsOracle), bool_extension_1_then_siblings_bitset;
+    SMax::bitset().constant(StrategyWeight::Num(0)), smax_const_0_bitset;
+    SMax::bitset().constant(StrategyWeight::Num(0)).then(DependencyCountOracle::default()), smax_then_count_bitset;
+    TrivialOracle::bitset().constant(StrategyWeight::Infinity), trivial_oracle_inf_bitset;
+    IdentityOracle::bitset().constant(StrategyWeight::Infinity), identity_oracle_inf_bitset;
+    BoolExtension::hashset().as_oracle().constant(StrategyWeight::Num(1)).then(SiblingsOracle), bool_extension_1_then_siblings_hashset;
+    SMax::hashset().constant(StrategyWeight::Num(0)), smax_const_0_hashset;
+    SMax::hashset().constant(StrategyWeight::Num(0)).then(DependencyCountOracle::default()), smax_then_count_hashset;
+    TrivialOracle::hashset().constant(StrategyWeight::Infinity), trivial_oracle_inf_hashset;
+    IdentityOracle::hashset().constant(StrategyWeight::Infinity), identity_oracle_inf_hashset;
     StrategicArgumentsOracle::with(ArgumentsStrategy::Ancestors), arguments_s_a;
     StrategicArgumentsOracle::with(ArgumentsStrategy::Successors), arguments_s_s;
     StrategicArgumentsOracle::with(ArgumentsStrategy::AncestorsInverted), arguments_s_ai;

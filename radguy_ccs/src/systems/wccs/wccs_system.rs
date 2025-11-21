@@ -5,8 +5,7 @@ use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
 };
 
-use radguy::bislotmap::BiSlotMap;
-use slotmap::{Key, SecondaryMap};
+use radguy::arena::{BiArena, Key, SecondaryArena};
 
 use crate::systems::wccs::ast::{Action, Binding, Process, WeightedAction};
 
@@ -55,9 +54,9 @@ impl<T: Eq + Copy> MultiSet<T> for Vec<T> {
 
 #[derive(Default, Debug, Clone)]
 pub struct WCCSSystem<'a, ProcKey: Key> {
-    process_map: RefCell<BiSlotMap<ProcKey, FlatProcess<'a, ProcKey>>>,
+    process_map: RefCell<BiArena<ProcKey, FlatProcess<'a, ProcKey>>>,
     bindings: HashMap<&'a str, ProcKey>,
-    transition_cache: RefCell<SecondaryMap<ProcKey, TransitionMap<'a, ProcKey>>>,
+    transition_cache: RefCell<SecondaryArena<ProcKey, TransitionMap<'a, ProcKey>>>,
 }
 
 impl<'a, ProcKey: Key> WCCSSystem<'a, ProcKey> {
@@ -389,7 +388,6 @@ impl<'a, ProcKey: Key> WCCSSystem<'a, ProcKey> {
 mod test {
     use super::*;
     use crate::systems::wccs::grammar::ProgramParser;
-    use slotmap::DefaultKey;
 
     macro_rules! transition_set {
         ($lts:expr;) => {HashMap::new()};
@@ -425,7 +423,7 @@ mod test {
             #[allow(unused_variables)]
             fn $name() {
                 #[allow(unused_mut)]
-                let mut lts = WCCSSystem::<DefaultKey>::default();
+                let mut lts = WCCSSystem::<usize>::default();
                 $(
                     let parser = ProgramParser::new();
                     let ast_bindings = parser
@@ -449,7 +447,7 @@ mod test {
             #[allow(unused_variables)]
             fn $name() {
                 #[allow(unused_mut)]
-                let mut lts = WCCSSystem::<DefaultKey>::default();
+                let mut lts = WCCSSystem::<usize>::default();
                 $(
                     let parser = ProgramParser::new();
                     let ast_bindings = parser

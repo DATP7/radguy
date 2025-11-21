@@ -1,16 +1,19 @@
 use itertools::iproduct;
-use radguy::extension::TermSystem;
-use radguy::{Arguments, PairUniverse, System, Universe};
-use radguy::{Assignment, Cartesian, Intersect};
-use radguy::{Set, Union, bislotmap::BiSlotMap};
-use slotmap::{Key, SecondaryMap};
-use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
-use std::fmt::Debug;
-use std::hash::Hash;
+use radguy::{
+    Arguments, Assignment, Cartesian, Intersect, PairUniverse, Set, System, Union, Universe,
+    Visited,
+    arena::{BiArena, Key, SecondaryArena},
+    extension::TermSystem,
+    set::bitset::{BitSet, BitsetRelation},
+};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    fmt::Debug,
+    hash::Hash,
+};
 
-use crate::systems::numeric::number::Number;
-use crate::systems::numeric::numeric_term::NumericTerm;
+use crate::systems::numeric::{number::Number, numeric_term::NumericTerm};
 
 pub trait NumericSystem<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone>:
     TermSystem<V, Number, T>
@@ -32,10 +35,10 @@ macro_rules! assert_access_allowed {
 }
 
 #[derive(Default, Debug, Clone)]
-pub struct NumericSystemImpl<K: Key, T: Key, N: Hash + Eq + Clone + Debug> {
-    pub names: BiSlotMap<K, N>,
-    pub definitions: SecondaryMap<K, T>,
-    pub terms: BiSlotMap<T, NumericTerm<K, T>>,
+pub struct NumericSystemImpl<K: Key, T: Key, N: Hash + Eq + Clone> {
+    pub names: BiArena<K, N>,
+    pub definitions: SecondaryArena<K, T>,
+    pub terms: BiArena<T, NumericTerm<K, T>>,
     locked: bool,
 }
 
@@ -117,7 +120,7 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone + Debug> NumericSystemImpl<K, T, N> {
 
 impl<K: Key, T: Key, N: Hash + Eq + Clone + Debug> NumericSystemImpl<K, T, N> {
     pub fn print_assignment(&self, a: &HashMap<K, Number>) {
-        for (key, name) in self.names.iter() {
+        for (key, name) in &self.names {
             println!("{name:?} = {:?}", a.get(&key));
         }
     }
@@ -149,6 +152,23 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone + Debug> PairUniverse<HashSet<(K, K)>>
     }
 }
 
+impl<K: Key, T: Key, N: Hash + Eq + Clone + Debug> Universe<BitSet<K>>
+    for NumericSystemImpl<K, T, N>
+{
+    fn universe(&self) -> BitSet<K> {
+        self.names.keys().collect()
+    }
+}
+
+impl<K: Key, T: Key, N: Hash + Eq + Clone + Debug> PairUniverse<BitsetRelation<K, K>>
+    for NumericSystemImpl<K, T, N>
+{
+    fn pair_universe(&self) -> BitsetRelation<K, K> {
+        let u: BitSet<_> = self.universe();
+        u.cartesian(&u)
+    }
+}
+
 impl<VarKey: Key, TermKey: Key, VarName: Hash + Eq + Clone + Debug> System<VarKey, Number>
     for NumericSystemImpl<VarKey, TermKey, VarName>
 {
@@ -169,8 +189,12 @@ impl<VarKey: Key, TermKey: Key, VarName: Hash + Eq + Clone + Debug> System<VarKe
     fn unlock(&mut self) {
         self.locked = false;
     }
+}
 
-    fn visited(&self) -> HashSet<VarKey> {
+impl<VarKey: Key, TermKey: Key, VarName: Hash + Eq + Clone + Debug, S: FromIterator<VarKey>>
+    Visited<S> for NumericSystemImpl<VarKey, TermKey, VarName>
+{
+    fn visited(&self) -> S {
         self.definitions.keys().collect()
     }
 }
@@ -252,20 +276,36 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone + Debug> Universe<HashSet<K>>
     for LazyNumericSystem<K, T, N>
 {
     fn universe(&self) -> HashSet<K> {
-        self.inner
-            .borrow()
-            .universe()
-            .intersect(&self.discovered.borrow())
+        let u: HashSet<_> = self.inner.borrow().universe();
+        u.intersect(&self.discovered.borrow())
     }
 }
 
-impl<K: Key, T: Key, N: Hash + Eq + Clone + Debug> PairUniverse<HashSet<(K, K)>>
+impl<K: Key + Hash + Eq, T: Key, N: Hash + Eq + Clone + Debug> PairUniverse<HashSet<(K, K)>>
     for LazyNumericSystem<K, T, N>
 {
     fn pair_universe(&self) -> HashSet<(K, K)> {
         self.discovered
             .borrow()
-            .cartesian(&self.discovered.borrow())
+            .cartesian(&*self.discovered.borrow())
+    }
+}
+
+impl<K: Key, T: Key, N: Hash + Eq + Clone + Debug> Universe<BitSet<K>>
+    for LazyNumericSystem<K, T, N>
+{
+    fn universe(&self) -> BitSet<K> {
+        let u: BitSet<_> = self.inner.borrow().universe();
+        u.intersect(&*self.discovered.borrow())
+    }
+}
+
+impl<K: Key + Hash + Eq, T: Key, N: Hash + Eq + Clone + Debug> PairUniverse<BitsetRelation<K, K>>
+    for LazyNumericSystem<K, T, N>
+{
+    fn pair_universe(&self) -> BitsetRelation<K, K> {
+        let u: BitSet<_> = self.universe();
+        u.cartesian(&u)
     }
 }
 impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone + Debug>
@@ -287,9 +327,12 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone + Debug
     fn unlock(&mut self) {
         self.inner.borrow_mut().unlock();
     }
-
-    fn visited(&self) -> HashSet<VarKey> {
-        self.visited.borrow().clone()
+}
+impl<VarKey: Key, TermKey: Key, VarName: Hash + Eq + Clone + Debug, S: FromIterator<VarKey>>
+    Visited<S> for LazyNumericSystem<VarKey, TermKey, VarName>
+{
+    fn visited(&self) -> S {
+        self.visited.borrow().iter().copied().collect()
     }
 }
 
@@ -381,7 +424,7 @@ macro_rules! numeric_def {
 macro_rules! numeric_system {
     ($($id:ident = $term:tt;)*) => {
         {
-            let mut system = $crate::systems::numeric::numeric_system::NumericSystemImpl::<slotmap::DefaultKey, slotmap::DefaultKey, &str>::default();
+            let mut system = $crate::systems::numeric::numeric_system::NumericSystemImpl::<usize, usize, &str>::default();
             $(
                 $crate::numeric_def!($id = $term; system);
             )*

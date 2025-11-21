@@ -1,7 +1,6 @@
 use radguy::{
-    Arguments, Bottom, Cartesian, PairUniverse, System, Union, Universe,
-    extension::LocalExtension,
-    kleene_local,
+    Arguments, Bottom, Cartesian, CopiedIter, Intersect, IsSubset, PairUniverse, Set, SliceRight,
+    System, Union, Universe, Visited, kleene_local,
     oracle::{ArgumentsOracle, LocalMaxR, LocalOracle, SMax, WeightedDepOracle},
     ordered::{
         self,
@@ -22,7 +21,6 @@ use radguy_ccs::systems::{
     wctl::{self, wctl_system::WCTLSystem},
 };
 use rayon::prelude::*;
-use slotmap::DefaultKey;
 use std::{
     collections::HashSet,
     fmt::{Debug, Display},
@@ -74,26 +72,26 @@ macro_rules! weak_bisim_oracles {
         $({
         weak_bisim_system! {
             $file_path, $name, $left, $right => $ccs,
-            SMax::default(),
-            LocalMaxR::default(),
-            ArgumentsOracle::default(),
-            ArgumentsOracle::default().then(SMax::default()),
-            ArgumentsOracle::default().then(LocalMaxR::default()),
-            ArgumentsOracle::default().and(SMax::default()),
-            ArgumentsOracle::default().and(LocalMaxR::default()),
-            BoolExtension::oracle(),
-            SMax::default().then(BoolExtension::oracle()),
-            LocalMaxR::default().then(BoolExtension::oracle()),
+            SMax::bitset(),
+            LocalMaxR::bitset(),
+            ArgumentsOracle::bitset(),
+            ArgumentsOracle::bitset().then(SMax::bitset()),
+            ArgumentsOracle::bitset().then(LocalMaxR::bitset()),
+            ArgumentsOracle::bitset().and(SMax::bitset()),
+            ArgumentsOracle::bitset().and(LocalMaxR::bitset()),
+            BoolExtension::bitset().as_oracle(),
+            SMax::bitset().then(BoolExtension::bitset().as_oracle()),
+            LocalMaxR::bitset().then(BoolExtension::bitset().as_oracle()),
         }
         weak_bisim_system_ordered! {
             $file_path, $name, $left, $right => $ccs,
-            SMax::default().constant(StrategyWeight::Infinity),
-            LocalMaxR::default().constant(StrategyWeight::Infinity),
-            LocalMaxR::default().constant(StrategyWeight::Infinity).then(DependencyCountOracle::default()),
-            LocalMaxR::default().constant(StrategyWeight::Infinity).then(InverseDependencyCountOracle::default()),
-            BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(InverseDependencyCountOracle::default(), std::cmp::min),
-            BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(DependencyCountOracle::default(), std::cmp::min),
-            BoolExtension::oracle().constant(StrategyWeight::Num(1)).then(SiblingsOracle),
+            SMax::bitset().constant(StrategyWeight::Infinity),
+            LocalMaxR::bitset().constant(StrategyWeight::Infinity),
+            LocalMaxR::bitset().constant(StrategyWeight::Infinity).then(DependencyCountOracle::default()),
+            LocalMaxR::bitset().constant(StrategyWeight::Infinity).then(InverseDependencyCountOracle::default()),
+            BoolExtension::bitset().as_oracle().constant(StrategyWeight::Infinity).and_by(InverseDependencyCountOracle::default(), std::cmp::min),
+            BoolExtension::bitset().as_oracle().constant(StrategyWeight::Infinity).and_by(DependencyCountOracle::default(), std::cmp::min),
+            BoolExtension::bitset().as_oracle().constant(StrategyWeight::Num(1)).then(SiblingsOracle),
             StrategicArgumentsOracle::default(),
             StrategicArgumentsOracle::default().and_by(DependencyCountOracle::default(), std::cmp::min),
             StrategicArgumentsOracle::default().and_by(InverseDependencyCountOracle::default(), std::cmp::min),
@@ -101,8 +99,8 @@ macro_rules! weak_bisim_oracles {
             InverseDependencyCountOracle::default().then(StrategicArgumentsOracle::default()),
             StrategicArgumentsOracle::default().then(DependencyCountOracle::default()),
             StrategicArgumentsOracle::default().then(InverseDependencyCountOracle::default()),
-            StrategicArgumentsOracle::default().and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(DependencyCountOracle::default()),
-            StrategicArgumentsOracle::default().and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(InverseDependencyCountOracle::default()),
+            StrategicArgumentsOracle::default().and_by(SMax::bitset().constant(StrategyWeight::Infinity), std::cmp::min).then(DependencyCountOracle::default()),
+            StrategicArgumentsOracle::default().and_by(SMax::bitset().constant(StrategyWeight::Infinity), std::cmp::min).then(InverseDependencyCountOracle::default()),
         }
         })*
     };
@@ -132,15 +130,15 @@ macro_rules! weak_bisim_system_ordered {
 
 fn generate_weak_ccs_system(
     ccs: &str,
-) -> BisimulationSystem<DefaultKey, DefaultKey, DefaultKey, WeakTransitionSystem<DefaultKey>> {
+) -> BisimulationSystem<usize, usize, usize, WeakTransitionSystem<usize>> {
     let parser = ProgramParser::new();
     let program_ast = parser
         .parse(ccs)
         .expect("Failed to parse CCS program content.");
-    let mut weak_transition_system = WeakTransitionSystem::<DefaultKey>::default();
+    let mut weak_transition_system = WeakTransitionSystem::<usize>::default();
     weak_transition_system.load_ast(program_ast);
 
-    BisimulationSystem::<DefaultKey, DefaultKey, DefaultKey, WeakTransitionSystem<DefaultKey>>::new(
+    BisimulationSystem::<usize, usize, usize, WeakTransitionSystem<usize>>::new(
         weak_transition_system,
     )
 }
@@ -150,21 +148,21 @@ macro_rules! wctl_oracles {
         $({
         wctl_system! {
             $file_path, $name: $proc, $formula => $wccs,
-            SMax::default(),
-            LocalMaxR::default(),
+            SMax::bitset(),
+            LocalMaxR::bitset(),
             WeightedDepOracle::default(),
-            ArgumentsOracle::default(),
-            ArgumentsOracle::default().then(SMax::default()),
-            ArgumentsOracle::default().then(LocalMaxR::default()),
-            ArgumentsOracle::default().and(SMax::default()),
-            ArgumentsOracle::default().and(LocalMaxR::default()),
+            ArgumentsOracle::bitset(),
+            ArgumentsOracle::bitset().then(SMax::bitset()),
+            ArgumentsOracle::bitset().then(LocalMaxR::bitset()),
+            ArgumentsOracle::bitset().and(SMax::bitset()),
+            ArgumentsOracle::bitset().and(LocalMaxR::bitset()),
         }
         wctl_system_ordered! {
             $file_path, $name: $proc, $formula => $wccs,
-            SMax::default().constant(StrategyWeight::Infinity),
-            LocalMaxR::default().constant(StrategyWeight::Infinity),
-            LocalMaxR::default().constant(StrategyWeight::Infinity).then(DependencyCountOracle::default()),
-            LocalMaxR::default().constant(StrategyWeight::Infinity).then(InverseDependencyCountOracle::default()),
+            SMax::bitset().constant(StrategyWeight::Infinity),
+            LocalMaxR::bitset().constant(StrategyWeight::Infinity),
+            LocalMaxR::bitset().constant(StrategyWeight::Infinity).then(DependencyCountOracle::default()),
+            LocalMaxR::bitset().constant(StrategyWeight::Infinity).then(InverseDependencyCountOracle::default()),
             WeightedDepOracle::default().constant(StrategyWeight::Num(1)).then(SiblingsOracle),
             StrategicArgumentsOracle::default(),
             StrategicArgumentsOracle::default().and_by(DependencyCountOracle::default(), std::cmp::min),
@@ -173,12 +171,12 @@ macro_rules! wctl_oracles {
             InverseDependencyCountOracle::default().then(StrategicArgumentsOracle::default()),
             StrategicArgumentsOracle::default().then(DependencyCountOracle::default()),
             StrategicArgumentsOracle::default().then(InverseDependencyCountOracle::default()),
-            StrategicArgumentsOracle::default().and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(DependencyCountOracle::default()),
-            StrategicArgumentsOracle::default().and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(InverseDependencyCountOracle::default()),
+            StrategicArgumentsOracle::default().and_by(SMax::bitset().constant(StrategyWeight::Infinity), std::cmp::min).then(DependencyCountOracle::default()),
+            StrategicArgumentsOracle::default().and_by(SMax::bitset().constant(StrategyWeight::Infinity), std::cmp::min).then(InverseDependencyCountOracle::default()),
             StrategicArgumentsOracle::default().then(StrategicHeightOracle::simple()),
             StrategicArgumentsOracle::default().then(StrategicHeightOracle::transitive()),
-            LocalMaxR::default().constant(StrategyWeight::Infinity).then(InverseDependencyCountOracle::default()).then(StrategicHeightOracle::simple()),
-            LocalMaxR::default().constant(StrategyWeight::Infinity).then(InverseDependencyCountOracle::default()).then(StrategicHeightOracle::transitive()),
+            LocalMaxR::bitset().constant(StrategyWeight::Infinity).then(InverseDependencyCountOracle::default()).then(StrategicHeightOracle::simple()),
+            LocalMaxR::bitset().constant(StrategyWeight::Infinity).then(InverseDependencyCountOracle::default()).then(StrategicHeightOracle::transitive()),
         }
         })*
 
@@ -219,27 +217,33 @@ macro_rules! wctl_system_ordered {
     };
 }
 
-fn generate_wctl_system(
-    wccs: &str,
-) -> WCTLSystem<DefaultKey, DefaultKey, DefaultKey, DefaultKey, DefaultKey> {
+fn generate_wctl_system(wccs: &str) -> WCTLSystem<usize, usize, usize, usize, usize> {
     let wccs_parser = wccs::ProgramParser::new();
     let wccs_ast = wccs_parser
         .parse(wccs)
         .expect("Failed to parse WCCS program content.");
-    let mut wccs_system = WCCSSystem::<DefaultKey>::default();
+    let mut wccs_system = WCCSSystem::<usize>::default();
     wccs_system.insert_ast_bindings(wccs_ast);
 
-    WCTLSystem::<DefaultKey, DefaultKey, DefaultKey, DefaultKey, DefaultKey>::new(wccs_system)
+    WCTLSystem::<usize, usize, usize, usize, usize>::new(wccs_system)
 }
 
 fn run_unordered_kleene<
     K: Copy + Hash + Eq + Debug + Sync,
     V: Eq + PartialOrd + Bottom + Clone,
-    PS: Debug + Union,
+    VS: Set<K>
+        + Intersect
+        + Default
+        + Cartesian<HashSet<K>, Output = PS>
+        + Cartesian<Output = PS>
+        + Union<HashSet<K>>
+        + for<'a> CopiedIter<'a, K>,
+    PS: Set<(K, K)> + Union + SliceRight<K, K, VS> + Union<HashSet<(K, K)>>,
     S: System<K, V>
         + PairUniverse<PS>
         + Arguments<K, HashSet<K>>
-        + Universe<HashSet<K>>
+        + Universe<VS>
+        + Visited<VS>
         + Clone
         + Send,
     O: LocalOracle<K, V, PS, S> + Display + Clone + Send,
@@ -251,8 +255,7 @@ fn run_unordered_kleene<
     target: K,
     oracle: &O,
 ) where
-    for<'a> &'a PS: IntoIterator<Item = &'a (K, K)>,
-    HashSet<K>: Cartesian<Output = PS>,
+    HashSet<K>: Cartesian<Output = HashSet<(K, K)>> + Cartesian<VS, Output = PS> + IsSubset<VS>,
 {
     let pairs = (1..=ITERATIONS)
         .map(|_| ((*oracle).clone(), (*system).clone()))

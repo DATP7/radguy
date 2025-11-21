@@ -5,9 +5,11 @@ use std::{
     marker::PhantomData,
 };
 
-use radguy::DependencyGraphSystem;
-use radguy::{Arguments, Assignment, PairUniverse, System, Universe, extension::TermSystem};
-use slotmap::{Key, SecondaryMap};
+use radguy::{
+    Arguments, Assignment, DependencyGraphSystem, PairUniverse, System, Universe, Visited,
+    arena::{Key, SecondaryArena},
+    extension::TermSystem,
+};
 
 use crate::systems::{
     bool::{BoolSystem, BoolSystemImpl, BoolTerm},
@@ -37,7 +39,7 @@ pub enum FlatProcess<'a, K: Key> {
     Compose(K, K),
 }
 
-type HyperedgeMap<VarKey> = SecondaryMap<VarKey, Vec<Vec<VarKey>>>;
+type HyperedgeMap<VarKey> = SecondaryArena<VarKey, Vec<Vec<VarKey>>>;
 
 #[derive(Default, Debug, Clone)]
 pub struct BisimulationSystem<
@@ -227,8 +229,14 @@ impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKe
     fn unlock(&mut self) {
         self.locked = false;
     }
+}
 
-    fn visited(&self) -> HashSet<VarKey> {
+impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKey>, S> Visited<S>
+    for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
+where
+    BoolSystemImpl<VarKey, TermKey, (ProcKey, ProcKey)>: Visited<S>,
+{
+    fn visited(&self) -> S {
         self.bool_system.borrow().visited()
     }
 }
@@ -247,19 +255,22 @@ impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKe
     }
 }
 
-impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKey>>
-    Universe<HashSet<VarKey>> for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
+impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKey>, S> Universe<S>
+    for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
+where
+    BoolSystemImpl<VarKey, TermKey, (ProcKey, ProcKey)>: Universe<S>,
 {
-    fn universe(&self) -> HashSet<VarKey> {
-        self.bool_system.borrow().names.keys().collect()
+    fn universe(&self) -> S {
+        self.bool_system.borrow().universe()
     }
 }
 
-impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKey>>
-    PairUniverse<HashSet<(VarKey, VarKey)>>
-    for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
+impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKey>, S>
+    PairUniverse<S> for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
+where
+    BoolSystemImpl<VarKey, TermKey, (ProcKey, ProcKey)>: PairUniverse<S>,
 {
-    fn pair_universe(&self) -> HashSet<(VarKey, VarKey)> {
+    fn pair_universe(&self) -> S {
         self.bool_system.borrow().pair_universe()
     }
 }

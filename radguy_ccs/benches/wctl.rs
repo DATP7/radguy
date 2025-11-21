@@ -8,10 +8,13 @@ use radguy::ordered::strategy::HashMapStrategy;
 use radguy::ordered::strategy::OrxStrategy;
 use radguy::{
     kleene_local,
-    oracle::{SMax, WeightedDepOracle},
+    oracle::{LocalMaxR, SMax, WeightedDepOracle},
     ordered::{
         self,
-        oracle::{SiblingsOracle, StrategicLocalOracle, ToConstant},
+        oracle::{
+            DependencyCountOracle, InverseDependencyCountOracle, SiblingsOracle,
+            StrategicLocalOracle, ToConstant,
+        },
         strategy::StrategyWeight,
     },
 };
@@ -21,7 +24,6 @@ use radguy_ccs::systems::wccs;
 use radguy_ccs::systems::wccs::wccs_system::WCCSSystem;
 use radguy_ccs::systems::wctl;
 use radguy_ccs::systems::wctl::wctl_system::WCTLSystem;
-use slotmap::DefaultKey;
 
 macro_rules! wctl_bench_oracles_ordered {
     ($name:ident: using $c:expr, strategy $s:ty; $sname:literal; bench $process_name:expr, $formula_str:expr => $sat:literal in $wccs:expr, with $($oracle:expr,)*) => {{
@@ -33,16 +35,16 @@ macro_rules! wctl_bench_oracles_ordered {
         let formula_parser = wctl::grammar::FormulaParser::new();
         let formula = formula_parser.parse($formula_str).expect("Formula should parse");
 
-        let mut wccs_system = WCCSSystem::<DefaultKey>::default();
+        let mut wccs_system = WCCSSystem::<usize>::default();
         wccs_system.insert_ast_bindings(wccs_ast.clone());
-        let sys = WCTLSystem::<DefaultKey, DefaultKey, DefaultKey, DefaultKey, DefaultKey>::new(wccs_system);
+        let sys = WCTLSystem::<usize, usize, usize, usize, usize>::new(wccs_system);
 
         let formula_key = sys.insert_ast_formula(formula.clone());
-
 
         let mut group = $c.benchmark_group(stringify!($name));
         $(
         {
+
             let oracle = $oracle;
             group.bench_with_input(BenchmarkId::new("ordered", format!("{}/{}", $sname, &oracle)), &oracle, |b, o| {
                 b.iter_batched(
@@ -82,15 +84,15 @@ macro_rules! wctl_bench_oracles_unordered {
         let formula_parser = wctl::grammar::FormulaParser::new();
         let formula = formula_parser.parse($formula_str).expect("Formula should parse");
 
-        let mut wccs_system = WCCSSystem::<DefaultKey>::default();
-        wccs_system.insert_ast_bindings(wccs_ast.clone());
-        let sys = WCTLSystem::<DefaultKey, DefaultKey, DefaultKey, DefaultKey, DefaultKey>::new(wccs_system);
-
-        let formula_key = sys.insert_ast_formula(formula.clone());
-
         let mut group = $c.benchmark_group(stringify!($name));
         $(
             {
+                let mut wccs_system = WCCSSystem::<usize>::default();
+                wccs_system.insert_ast_bindings(wccs_ast.clone());
+
+                let sys = WCTLSystem::<usize, usize, usize, usize, usize>::new(wccs_system);
+
+                let formula_key = sys.insert_ast_formula(formula.clone());
                 let oracle = $oracle;
                 group.bench_with_input(BenchmarkId::new("unordered", &oracle), &oracle, |b, o| {
                     b.iter_batched(
@@ -126,20 +128,14 @@ macro_rules! wctl_bench_problem_ordered {
 
         wctl_bench_oracles_ordered! {
             $name: using $c, strategy $s; $sname; bench $process_name, $formula_str => $sat in wccs, with
-            SMax::default().constant(StrategyWeight::Infinity),
             WeightedDepOracle::default().constant(StrategyWeight::Num(1)).then(SiblingsOracle::default()),
-            //SMax::default().constant(StrategyWeight::Num(1)).then(SiblingsOracle::default()),
-            // LocalMaxR::default().constant(StrategyWeight::Infinity),
-            // LocalMaxR::default().constant(StrategyWeight::Infinity).then(CountOracle::default()),
-            // LocalMaxR::default().constant(StrategyWeight::Infinity).then(InverseCountOracle::default()),
-            // // BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(InverseCountOracle, std::cmp::min),
-            // // BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(CountOracle, std::cmp::min),
-            // StrategicArgumentsOracle::successors(),
-            // StrategicArgumentsOracle::successors().and_by(CountOracle::default(), std::cmp::min),
-            // StrategicArgumentsOracle::successors().and_by(InverseCountOracle::default(), std::cmp::min),
-            // StrategicArgumentsOracle::ancestors(),
-            // StrategicArgumentsOracle::ancestors().and_by(CountOracle::default(), std::cmp::min),
-            // StrategicArgumentsOracle::ancestors().and_by(InverseCountOracle::default(), std::cmp::min),
+            SMax::hashset().constant(StrategyWeight::Num(1)).then(SiblingsOracle::default()),
+            SMax::hashset().constant(StrategyWeight::Infinity),
+            LocalMaxR::hashset().constant(StrategyWeight::Infinity).then(DependencyCountOracle::default()),
+            LocalMaxR::hashset().constant(StrategyWeight::Infinity).then(InverseDependencyCountOracle::default()),
+            // StrategicArgumentsOracle::default(),
+            // StrategicArgumentsOracle::default().and_by(CountOracle::default(), std::cmp::min),
+            // StrategicArgumentsOracle::default().and_by(InverseCountOracle::default(), std::cmp::min),
             // CountOracle::default().then(StrategicArgumentsOracle::default()),
             // InverseCountOracle::default().then(StrategicArgumentsOracle::default()),
             // StrategicArgumentsOracle::successors().then(CountOracle::default()),
@@ -158,10 +154,11 @@ macro_rules! wctl_bench_suite_problem {
     ($name:ident: using $c:expr, $process_name:expr, $formula_str:expr => $sat:literal in $wccs:expr) => {
         let wccs = $wccs;
         wctl_bench_oracles_unordered!($name: using $c, bench $process_name, $formula_str => $sat in wccs, with
-            SMax::default(),
+            SMax::bitset(),
+            SMax::hashset(),
+            LocalMaxR::bitset(),
+            LocalMaxR::hashset(),
             WeightedDepOracle::default(),
-            // TODO: LocalMaxR and Arguments should be fixed
-            // LocalMaxR::default(),
             // ArgumentsOracle::default(),
             // ArgumentsOracle::default().then(SMax::default()),
             // ArgumentsOracle::default().then(LocalMaxR::default()),

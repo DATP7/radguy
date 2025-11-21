@@ -2,10 +2,9 @@ use radguy_ccs::{
     numeric_system,
     systems::numeric::{Number, numeric_system::NumericSystemImpl},
 };
-use slotmap::DefaultKey;
 
 pub struct NumericSystemSpec {
-    pub system: NumericSystemImpl<DefaultKey, DefaultKey, &'static str>,
+    pub system: NumericSystemImpl<usize, usize, &'static str>,
     pub variables: Vec<&'static str>,
     pub goal: Vec<Number>,
 }

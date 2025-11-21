@@ -16,7 +16,6 @@ use radguy_ccs::systems::wccs;
 use radguy_ccs::systems::wccs::wccs_system::WCCSSystem;
 use radguy_ccs::systems::wctl;
 use radguy_ccs::systems::wctl::wctl_system::WCTLSystem;
-use slotmap::DefaultKey;
 
 macro_rules! wctl_test_fast {
     ($($test_name:ident: $oracle:expr, $strategy_type:ty, $($process_name:literal, $formula_str:expr => $eq:literal),* $(,)? in $wccs:expr;)*) => {
@@ -29,13 +28,13 @@ macro_rules! wctl_test_fast {
                     let wccs_ast = wccs_parser
                         .parse(&$wccs)
                         .expect("Failed to parse WCCS program content.");
-                    let mut wccs_system = WCCSSystem::<DefaultKey>::default();
+                    let mut wccs_system = WCCSSystem::<usize>::default();
                     wccs_system.insert_ast_bindings(wccs_ast);
 
                     let formula_parser = wctl::grammar::FormulaParser::new();
                     let formula = formula_parser.parse($formula_str).expect("Formula should parse");
 
-                    let mut sys = WCTLSystem::<DefaultKey, DefaultKey, DefaultKey, DefaultKey, DefaultKey>::new(wccs_system);
+                    let mut sys = WCTLSystem::<usize, usize, usize, usize, usize>::new(wccs_system);
                     let process_key = sys.get_process_definition($process_name).expect("Process name should be bound");
                     let formula_key = sys.insert_ast_formula(formula.clone());
                     let start = sys.get_var(process_key, formula_key);
@@ -62,13 +61,13 @@ macro_rules! wctl_test_slow {
                     let wccs_ast = wccs_parser
                         .parse(&$wccs)
                         .expect("Failed to parse WCCS program content.");
-                    let mut wccs_system = WCCSSystem::<DefaultKey>::default();
+                    let mut wccs_system = WCCSSystem::<usize>::default();
                     wccs_system.insert_ast_bindings(wccs_ast);
 
                     let formula_parser = wctl::grammar::FormulaParser::new();
                     let formula = formula_parser.parse($formula_str).expect("Formula should parse");
 
-                    let mut sys = WCTLSystem::<DefaultKey, DefaultKey, DefaultKey, DefaultKey, DefaultKey>::new(wccs_system);
+                    let mut sys = WCTLSystem::<usize, usize, usize, usize, usize>::new(wccs_system);
                     let process_key = sys.get_process_definition($process_name).expect("Process name should be bound");
                     let formula_key = sys.insert_ast_formula(formula.clone());
                     let start = sys.get_var(process_key, formula_key);
@@ -148,12 +147,18 @@ macro_rules! wctl_test_oracles {
 }
 
 wctl_test_oracles! {
-    IdentityOracle.constant(StrategyWeight::Infinity), identity_oracle_inf;
-    TrivialOracle.constant(StrategyWeight::Infinity), trivial_oracle_inf;
-    SMax.constant(StrategyWeight::Num(0)), smax_const_0;
-    SMax.constant(StrategyWeight::Infinity), smax_const_infinity;
-    SMax.constant(StrategyWeight::Num(0)).then(DependencyCountOracle::default()), smax_then_count;
-    SMax.constant(StrategyWeight::Num(10)).and_by(DependencyCountOracle::default(), std::cmp::min), smax_10_and_min_count;
+    IdentityOracle::bitset().constant(StrategyWeight::Infinity), identity_oracle_inf_bitset;
+    TrivialOracle::bitset().constant(StrategyWeight::Infinity), trivial_oracle_inf_bitset;
+    SMax::bitset().constant(StrategyWeight::Num(0)), smax_const_0_bitset;
+    SMax::bitset().constant(StrategyWeight::Infinity), smax_const_infinity_bitset;
+    SMax::bitset().constant(StrategyWeight::Num(0)).then(DependencyCountOracle::default()), smax_then_count_bitset;
+    SMax::bitset().constant(StrategyWeight::Num(10)).and_by(DependencyCountOracle::default(), std::cmp::min), smax_10_and_min_count_bitset;
+    IdentityOracle::hashset().constant(StrategyWeight::Infinity), identity_oracle_inf_hashset;
+    TrivialOracle::hashset().constant(StrategyWeight::Infinity), trivial_oracle_inf_hashset;
+    SMax::hashset().constant(StrategyWeight::Num(0)), smax_const_0_hashset;
+    SMax::hashset().constant(StrategyWeight::Infinity), smax_const_infinity_hashset;
+    SMax::hashset().constant(StrategyWeight::Num(0)).then(DependencyCountOracle::default()), smax_then_count_hashset;
+    SMax::hashset().constant(StrategyWeight::Num(10)).and_by(DependencyCountOracle::default(), std::cmp::min), smax_10_and_min_count_hashset;
     WeightedDepOracle::default().constant(StrategyWeight::Num(1)).then(SiblingsOracle), wctl_1_then_siblings;
     DependencyCountOracle::default(), dependency;
     InverseDependencyCountOracle::default(), dependency_inverse;

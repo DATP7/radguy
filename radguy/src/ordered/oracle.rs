@@ -105,25 +105,21 @@ impl<K, V: PartialOrd, PS, S: System<K, V>, O: LocalOracle<K, V, PS, S> + Clone>
     }
 }
 
-impl<
-    K: Hash + Eq + Copy,
-    V: PartialOrd,
-    PS: IntoIterator<Item = (K, K)> + FromIterator<(K, K)>,
-    S: System<K, V>,
-    O: LocalOracle<K, V, PS, S> + Display,
-> Display for Constant<K, V, PS, S, O>
+impl<K: Hash + Eq + Copy, V: PartialOrd, PS, S: System<K, V>, O: LocalOracle<K, V, PS, S> + Display>
+    Display for Constant<K, V, PS, S, O>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}_({})", self.oracle, self.value)
     }
 }
 
-pub trait ToConstant<K: Hash + Eq + Copy, V: PartialOrd, PS, S: System<K, V>>:
-    LocalOracle<K, V, PS, S> + Sized
-{
+pub trait ToConstant<K: Hash + Eq + Copy, V: PartialOrd, S: System<K, V>>: Sized {
     /// Convert a classical local oracle to a strategic local oracle, where all elements in the
     /// relation are assigned to `value`
-    fn constant(self, value: StrategyWeight) -> Constant<K, V, PS, S, Self> {
+    fn constant<PS>(self, value: StrategyWeight) -> Constant<K, V, PS, S, Self>
+    where
+        Self: LocalOracle<K, V, PS, S>,
+    {
         Constant {
             oracle: self,
             value,
@@ -132,10 +128,7 @@ pub trait ToConstant<K: Hash + Eq + Copy, V: PartialOrd, PS, S: System<K, V>>:
     }
 }
 
-impl<K: Hash + Eq + Copy, V: PartialOrd, PS, S: System<K, V>, O: LocalOracle<K, V, PS, S>>
-    ToConstant<K, V, PS, S> for O
-{
-}
+impl<K: Hash + Eq + Copy, V: PartialOrd, S: System<K, V>, O> ToConstant<K, V, S> for O {}
 
 pub struct Ordered<K, V: PartialOrd, PS, S: System<K, V>, O: LocalOracle<K, V, PS, S>> {
     oracle: O,
@@ -193,12 +186,13 @@ impl<
     }
 }
 
-pub trait ToOrdered<K: Hash + Eq + Copy, V: PartialOrd, PS, S: System<K, V>>:
-    LocalOracle<K, V, PS, S> + Sized
-{
+pub trait ToOrdered<K: Hash + Eq + Copy, V: PartialOrd, S: System<K, V>>: Sized {
     /// Convert a classical local oracle to a strategic local oracle, keeping the weights of the
     /// input strategy
-    fn ordered(self) -> Ordered<K, V, PS, S, Self> {
+    fn ordered<PS>(self) -> Ordered<K, V, PS, S, Self>
+    where
+        Self: LocalOracle<K, V, PS, S>,
+    {
         Ordered {
             oracle: self,
             _phantom_data: PhantomData,
@@ -206,10 +200,7 @@ pub trait ToOrdered<K: Hash + Eq + Copy, V: PartialOrd, PS, S: System<K, V>>:
     }
 }
 
-impl<K: Hash + Eq + Copy, V: PartialOrd, PS, S: System<K, V>, O: LocalOracle<K, V, PS, S>>
-    ToOrdered<K, V, PS, S> for O
-{
-}
+impl<K: Hash + Eq + Copy, V: PartialOrd, S: System<K, V>, O> ToOrdered<K, V, S> for O {}
 
 pub struct ComposeStrategic<
     K: Eq + Copy,

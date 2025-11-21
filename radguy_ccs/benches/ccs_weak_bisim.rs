@@ -1,7 +1,6 @@
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use orx_priority_queue::DaryHeapWithMap;
 use radguy::{
-    extension::LocalExtension,
     kleene_local,
     oracle::{ArgumentsOracle, LocalMaxR, LocalOracle, SMax},
     ordered::{
@@ -15,12 +14,13 @@ use radguy::{
         strategy::{BinaryHeapStrategy, HashMapStrategy, LazyHeap, OrxStrategy, StrategyWeight},
     },
 };
-use radguy_ccs::systems::bool::extension::BoolExtension;
-use radguy_ccs::systems::ccs::{
-    bisimulation_system::BisimulationSystem, grammar::ProgramParser,
-    transition_system::TransitionSystem, weak_transition_system::WeakTransitionSystem,
+use radguy_ccs::systems::{
+    bool::extension::BoolExtension,
+    ccs::{
+        bisimulation_system::BisimulationSystem, grammar::ProgramParser,
+        transition_system::TransitionSystem, weak_transition_system::WeakTransitionSystem,
+    },
 };
-use slotmap::DefaultKey;
 
 macro_rules! bisim_bench_oracles_ordered {
     ($name:ident: using $c:expr, strategy $s:ty; $sname:literal; bench $left:expr, $right:expr => $eq:literal in $ccs:expr, with $($oracle:expr,)*) => {{
@@ -33,9 +33,9 @@ macro_rules! bisim_bench_oracles_ordered {
             group.bench_with_input(BenchmarkId::new("ordered", format!("{}/{}", $sname, &oracle)), &oracle, |b, o| {
                 b.iter_batched(
                     || {
-                        let mut lts = WeakTransitionSystem::<DefaultKey>::default();
+                        let mut lts = WeakTransitionSystem::<usize>::default();
                         lts.load_ast(ast.clone());
-                        (BisimulationSystem::<DefaultKey, DefaultKey, DefaultKey, _>::new(lts), (*o).clone())
+                        (BisimulationSystem::<usize, usize, usize, _>::new(lts), (*o).clone())
                     },
                     |(mut sys, o)| {
                         let target = sys.specify_comparison($left, $right);
@@ -75,9 +75,9 @@ macro_rules! bisim_bench_oracles_unordered {
             group.bench_with_input(BenchmarkId::new("unordered", &oracle), &oracle, |b, o| {
                 b.iter_batched(
                     || {
-                        let mut lts = WeakTransitionSystem::<DefaultKey>::default();
+                        let mut lts = WeakTransitionSystem::<usize>::default();
                         lts.load_ast(ast.clone());
-                        (BisimulationSystem::<DefaultKey, DefaultKey, DefaultKey, _>::new(lts), (*o).clone())
+                        (BisimulationSystem::<usize, usize, usize, _>::new(lts), (*o).clone())
                     },
                     |(mut sys, o)| {
                         let target = sys.specify_comparison($left, $right);
@@ -105,16 +105,10 @@ macro_rules! bisim_bench_problem_ordered {
 
         bisim_bench_oracles_ordered! {
             $name: using $c, strategy $s; $sname; bench $left, $right => $eq in ccs, with
-            SMax::default().constant(StrategyWeight::Infinity),
-            SMax::default().constant(StrategyWeight::Num(1)).then(SiblingsOracle::default()),
-            SMax::default().ordered(),
-            LocalMaxR::default().constant(StrategyWeight::Infinity),
-            LocalMaxR::default().constant(StrategyWeight::Infinity).then(DependencyCountOracle::default()),
-            LocalMaxR::default().constant(StrategyWeight::Infinity).then(InverseDependencyCountOracle::default()),
-            BoolExtension::oracle().constant(StrategyWeight::Infinity),
-            BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(InverseDependencyCountOracle::default(), std::cmp::min),
-            BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(DependencyCountOracle::default(), std::cmp::min),
-            BoolExtension::oracle().constant(StrategyWeight::Num(1)).then(SiblingsOracle::default()),
+            SMax::hashset().constant(StrategyWeight::Infinity),
+            SMax::hashset().constant(StrategyWeight::Num(1)).then(SiblingsOracle::default()),
+            DependencyCountOracle::default().then(StrategicArgumentsOracle::default()),
+            InverseDependencyCountOracle::default().then(StrategicArgumentsOracle::default()),
             StrategicArgumentsOracle::with(ArgumentsStrategy::Successors),
             StrategicArgumentsOracle::with(ArgumentsStrategy::Successors).and_by(DependencyCountOracle::default(), std::cmp::min),
             StrategicArgumentsOracle::with(ArgumentsStrategy::Successors).and_by(InverseDependencyCountOracle::default(), std::cmp::min),
@@ -131,30 +125,74 @@ macro_rules! bisim_bench_problem_ordered {
             InverseDependencyCountOracle::default().then(StrategicArgumentsOracle::default()),
             StrategicArgumentsOracle::with(ArgumentsStrategy::Successors).then(DependencyCountOracle::default()),
             StrategicArgumentsOracle::with(ArgumentsStrategy::Successors).then(InverseDependencyCountOracle::default()),
-            StrategicArgumentsOracle::with(ArgumentsStrategy::Successors).and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(DependencyCountOracle::default()),
-            StrategicArgumentsOracle::with(ArgumentsStrategy::Successors).and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(InverseDependentCountOracle::default()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::Successors).and_by(SMax::hashset().constant(StrategyWeight::Infinity), std::cmp::min).then(DependencyCountOracle::default()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::Successors).and_by(SMax::hashset().constant(StrategyWeight::Infinity), std::cmp::min).then(InverseDependentCountOracle::default()),
             StrategicArgumentsOracle::with(ArgumentsStrategy::Successors).then(StrategicHeightOracle::simple()),
             StrategicArgumentsOracle::with(ArgumentsStrategy::Successors).then(StrategicHeightOracle::transitive()),
             StrategicArgumentsOracle::with(ArgumentsStrategy::Ancestors).then(DependentCountOracle::default()),
             StrategicArgumentsOracle::with(ArgumentsStrategy::Ancestors).then(InverseDependentCountOracle::default()),
-            StrategicArgumentsOracle::with(ArgumentsStrategy::Ancestors).and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(DependencyCountOracle::default()),
-            StrategicArgumentsOracle::with(ArgumentsStrategy::Ancestors).and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(InverseDependencyCountOracle::default()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::Ancestors).and_by(SMax::hashset().constant(StrategyWeight::Infinity), std::cmp::min).then(DependencyCountOracle::default()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::Ancestors).and_by(SMax::hashset().constant(StrategyWeight::Infinity), std::cmp::min).then(InverseDependencyCountOracle::default()),
             StrategicArgumentsOracle::with(ArgumentsStrategy::Ancestors).then(StrategicHeightOracle::simple()),
             StrategicArgumentsOracle::with(ArgumentsStrategy::Ancestors).then(StrategicHeightOracle::transitive()),
             StrategicArgumentsOracle::with(ArgumentsStrategy::SuccessorsInverted).then(DependentCountOracle::default()),
             StrategicArgumentsOracle::with(ArgumentsStrategy::SuccessorsInverted).then(InverseDependentCountOracle::default()),
-            StrategicArgumentsOracle::with(ArgumentsStrategy::SuccessorsInverted).and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(DependencyCountOracle::default()),
-            StrategicArgumentsOracle::with(ArgumentsStrategy::SuccessorsInverted).and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(InverseDependencyCountOracle::default()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::SuccessorsInverted).and_by(SMax::hashset().constant(StrategyWeight::Infinity), std::cmp::min).then(DependencyCountOracle::default()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::SuccessorsInverted).and_by(SMax::hashset().constant(StrategyWeight::Infinity), std::cmp::min).then(InverseDependencyCountOracle::default()),
             StrategicArgumentsOracle::with(ArgumentsStrategy::SuccessorsInverted).then(StrategicHeightOracle::simple()),
             StrategicArgumentsOracle::with(ArgumentsStrategy::SuccessorsInverted).then(StrategicHeightOracle::transitive()),
             StrategicArgumentsOracle::with(ArgumentsStrategy::AncestorsInverted).then(DependentCountOracle::default()),
             StrategicArgumentsOracle::with(ArgumentsStrategy::AncestorsInverted).then(InverseDependentCountOracle::default()),
-            StrategicArgumentsOracle::with(ArgumentsStrategy::AncestorsInverted).and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(DependencyCountOracle::default()),
-            StrategicArgumentsOracle::with(ArgumentsStrategy::AncestorsInverted).and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(InverseDependentCountOracle::default()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::AncestorsInverted).and_by(SMax::hashset().constant(StrategyWeight::Infinity), std::cmp::min).then(DependencyCountOracle::default()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::AncestorsInverted).and_by(SMax::hashset().constant(StrategyWeight::Infinity), std::cmp::min).then(InverseDependentCountOracle::default()),
             StrategicArgumentsOracle::with(ArgumentsStrategy::AncestorsInverted).then(StrategicHeightOracle::simple()),
             StrategicArgumentsOracle::with(ArgumentsStrategy::AncestorsInverted).then(StrategicHeightOracle::transitive()),
-            LocalMaxR::default().constant(StrategyWeight::Infinity).then(InverseDependentCountOracle::default()).then(StrategicHeightOracle::simple()),
-            LocalMaxR::default().constant(StrategyWeight::Infinity).then(InverseDependentCountOracle::default()).then(StrategicHeightOracle::transitive()),
+            SMax::bitset().constant(StrategyWeight::Infinity),
+            SMax::bitset().constant(StrategyWeight::Num(1)).then(SiblingsOracle::default()),
+            DependencyCountOracle::default().then(StrategicArgumentsOracle::default()),
+            InverseDependencyCountOracle::default().then(StrategicArgumentsOracle::default()),
+            ArgumentsOracle::bitset().constant(StrategyWeight::Infinity).then(DependencyCountOracle::default()),
+            ArgumentsOracle::bitset().constant(StrategyWeight::Infinity).then(InverseDependencyCountOracle::default()),
+            (ArgumentsOracle::bitset().then(SMax::bitset())).constant(StrategyWeight::Infinity).then(DependencyCountOracle::default()),
+            (ArgumentsOracle::bitset().then(SMax::bitset())).constant(StrategyWeight::Infinity).then(InverseDependencyCountOracle::default()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::Successors),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::Successors).and_by(DependencyCountOracle::default(), std::cmp::min),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::Successors).and_by(InverseDependencyCountOracle::default(), std::cmp::min),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::Ancestors),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::Ancestors).and_by(DependencyCountOracle::default(), std::cmp::min),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::Ancestors).and_by(InverseDependencyCountOracle::default(), std::cmp::min),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::SuccessorsInverted),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::SuccessorsInverted).and_by(DependencyCountOracle::default(), std::cmp::min),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::SuccessorsInverted).and_by(InverseDependencyCountOracle::default(), std::cmp::min),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::AncestorsInverted),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::AncestorsInverted).and_by(DependencyCountOracle::default(), std::cmp::min),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::AncestorsInverted).and_by(InverseDependencyCountOracle::default(), std::cmp::min),
+            DependencyCountOracle::default().then(StrategicArgumentsOracle::default()),
+            InverseDependencyCountOracle::default().then(StrategicArgumentsOracle::default()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::Successors).then(DependencyCountOracle::default()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::Successors).then(InverseDependencyCountOracle::default()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::Successors).and_by(SMax::bitset().constant(StrategyWeight::Infinity), std::cmp::min).then(DependencyCountOracle::default()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::Successors).and_by(SMax::bitset().constant(StrategyWeight::Infinity), std::cmp::min).then(InverseDependentCountOracle::default()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::Successors).then(StrategicHeightOracle::simple()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::Successors).then(StrategicHeightOracle::transitive()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::Ancestors).then(DependentCountOracle::default()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::Ancestors).then(InverseDependentCountOracle::default()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::Ancestors).and_by(SMax::bitset().constant(StrategyWeight::Infinity), std::cmp::min).then(DependencyCountOracle::default()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::Ancestors).and_by(SMax::bitset().constant(StrategyWeight::Infinity), std::cmp::min).then(InverseDependencyCountOracle::default()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::Ancestors).then(StrategicHeightOracle::simple()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::Ancestors).then(StrategicHeightOracle::transitive()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::SuccessorsInverted).then(DependentCountOracle::default()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::SuccessorsInverted).then(InverseDependentCountOracle::default()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::SuccessorsInverted).and_by(SMax::bitset().constant(StrategyWeight::Infinity), std::cmp::min).then(DependencyCountOracle::default()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::SuccessorsInverted).and_by(SMax::bitset().constant(StrategyWeight::Infinity), std::cmp::min).then(InverseDependencyCountOracle::default()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::SuccessorsInverted).then(StrategicHeightOracle::simple()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::SuccessorsInverted).then(StrategicHeightOracle::transitive()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::AncestorsInverted).then(DependentCountOracle::default()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::AncestorsInverted).then(InverseDependentCountOracle::default()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::AncestorsInverted).and_by(SMax::bitset().constant(StrategyWeight::Infinity), std::cmp::min).then(DependencyCountOracle::default()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::AncestorsInverted).and_by(SMax::bitset().constant(StrategyWeight::Infinity), std::cmp::min).then(InverseDependentCountOracle::default()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::AncestorsInverted).then(StrategicHeightOracle::simple()),
+            StrategicArgumentsOracle::with(ArgumentsStrategy::AncestorsInverted).then(StrategicHeightOracle::transitive()),
         };
     };
 }
@@ -163,16 +201,26 @@ macro_rules! bisim_bench_problem {
     ($name:ident: using $c:expr, $left:expr, $right:expr => $eq:literal in $ccs:expr) => {
         let ccs = $ccs;
         bisim_bench_oracles_unordered! { $name: using $c, bench $left, $right => $eq in ccs, with
-            SMax::default(),
-            LocalMaxR::default(),
-            ArgumentsOracle::default(),
-            ArgumentsOracle::default().then(SMax::default()),
-            ArgumentsOracle::default().then(LocalMaxR::default()),
-            ArgumentsOracle::default().and(SMax::default()),
-            ArgumentsOracle::default().and(LocalMaxR::default()),
-            BoolExtension::oracle(),
-            SMax::default().then(BoolExtension::oracle()),
-            LocalMaxR::default().then(BoolExtension::oracle()),
+            SMax::hashset(),
+            LocalMaxR::hashset(),
+            ArgumentsOracle::hashset(),
+            ArgumentsOracle::hashset().then(SMax::hashset()),
+            ArgumentsOracle::hashset().then(LocalMaxR::hashset()),
+            ArgumentsOracle::hashset().and(SMax::hashset()),
+            ArgumentsOracle::hashset().and(LocalMaxR::hashset()),
+            BoolExtension::hashset().as_oracle(),
+            SMax::hashset().then(BoolExtension::hashset().as_oracle()),
+            LocalMaxR::hashset().then(BoolExtension::hashset().as_oracle()),
+            SMax::bitset(),
+            LocalMaxR::bitset(),
+            ArgumentsOracle::bitset(),
+            ArgumentsOracle::bitset().then(SMax::bitset()),
+            ArgumentsOracle::bitset().then(LocalMaxR::bitset()),
+            ArgumentsOracle::bitset().and(SMax::bitset()),
+            ArgumentsOracle::bitset().and(LocalMaxR::bitset()),
+            BoolExtension::bitset().as_oracle(),
+            SMax::bitset().then(BoolExtension::bitset().as_oracle()),
+            LocalMaxR::bitset().then(BoolExtension::bitset().as_oracle()),
         };
         bisim_bench_problem_ordered!($name: using $c, strategy BinaryHeapStrategy<_>; "std_binary"; $left, $right => $eq in $ccs);
         bisim_bench_problem_ordered!($name: using $c, strategy HashMapStrategy<_>; "hashmap"; $left, $right => $eq in $ccs);
@@ -202,8 +250,8 @@ bisim_bench_suite! {
     abpl_ok: "SPEC", "ABPl" => true in include_str!("../systems/ccs/abp_ok.ccs");
     abpl_ok_2: "SPEC", "ABPl_2" => true in include_str!("../systems/ccs/abp_ok.ccs");
     abpl_bad_2: "SPEC", "ABPl_2" => false in include_str!("../systems/ccs/abp_bad.ccs");
-    // abpl_ok_3: "SPEC", "ABPl_3" => true in include_str!("../systems/ccs/abp_ok.ccs");
-    // abpl_bad_3: "SPEC", "ABPl_3" => false in include_str!("../systems/ccs/abp_bad.ccs");
+    abpl_ok_3: "SPEC", "ABPl_3" => true in include_str!("../systems/ccs/abp_ok.ccs");
+    abpl_bad_3: "SPEC", "ABPl_3" => false in include_str!("../systems/ccs/abp_bad.ccs");
     // NOTE: these two actually *are* weakly bisimilar, so should not be used
     // abp_bad: "SPEC", "ABP" => false in include_str!("../systems/ccs/abp_bad.ccs");
     // abpl_bad: "SPEC", "ABPl" => false in include_str!("../systems/ccs/abp_bad.ccs");

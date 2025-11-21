@@ -1,4 +1,4 @@
-use slotmap::Key;
+use radguy::arena::Key;
 
 use crate::systems::{
     numeric::Number,
