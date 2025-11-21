@@ -29,7 +29,7 @@ impl<T, H> LazyHeap<T, H> {
     }
 }
 
-impl<T: Copy, H: FromIterator<StrategyItem<T>> + Strategy<T>> Strategy<T> for LazyHeap<T, H> {
+impl<T: Copy + Eq, H: FromIterator<StrategyItem<T>> + Strategy<T>> Strategy<T> for LazyHeap<T, H> {
     fn extract_min(&mut self) -> Option<T> {
         self.heap
             .get_or_insert_with(|| {
@@ -39,6 +39,12 @@ impl<T: Copy, H: FromIterator<StrategyItem<T>> + Strategy<T>> Strategy<T> for La
                     .collect()
             })
             .extract_min()
+    }
+
+    fn get_weight(&self, item: T) -> Option<StrategyWeight> {
+        self.iter()
+            .find(|StrategyItem(_, v)| *v == item)
+            .map(|StrategyItem(weight, _)| weight)
     }
 }
 

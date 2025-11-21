@@ -68,9 +68,15 @@ where
     }
 }
 
-impl<T: Copy> Strategy<T> for BinaryHeapStrategy<T> {
+impl<T: Copy + Eq> Strategy<T> for BinaryHeapStrategy<T> {
     fn extract_min(&mut self) -> Option<T> {
         self.pop().map(|Reverse(StrategyItem(_, v))| v)
+    }
+
+    fn get_weight(&self, item: T) -> Option<StrategyWeight> {
+        self.iter()
+            .find(|StrategyItem(_, v)| *v == item)
+            .map(|StrategyItem(weight, _)| weight)
     }
 }
 
@@ -106,21 +112,21 @@ impl<T: Eq + Copy + Hash> IntersectBy<T, Self> for BinaryHeapStrategy<T> {
     }
 }
 
-impl<T, U: Copy> LeftSliced<T, U> for BinaryHeapStrategy<(T, U)>
+impl<T: Eq, U: Copy + Eq> LeftSliced<T, U> for BinaryHeapStrategy<(T, U)>
 where
     (T, U): Copy,
 {
     type SlicedLeft = BinaryHeapStrategy<U>;
 }
 
-impl<T: Copy, U> RightSliced<T, U> for BinaryHeapStrategy<(T, U)>
+impl<T: Copy + Eq, U: Eq> RightSliced<T, U> for BinaryHeapStrategy<(T, U)>
 where
     (T, U): Copy,
 {
     type SlicedRight = BinaryHeapStrategy<T>;
 }
 
-impl<T: Eq, U: Copy> SliceLeft<T, U, BinaryHeapStrategy<U>> for BinaryHeapStrategy<(T, U)>
+impl<T: Eq, U: Copy + Eq> SliceLeft<T, U, BinaryHeapStrategy<U>> for BinaryHeapStrategy<(T, U)>
 where
     (T, U): Copy,
 {
@@ -140,7 +146,7 @@ where
     }
 }
 
-impl<T: Copy, U: Eq> SliceRight<T, U, BinaryHeapStrategy<T>> for BinaryHeapStrategy<(T, U)>
+impl<T: Copy + Eq, U: Eq> SliceRight<T, U, BinaryHeapStrategy<T>> for BinaryHeapStrategy<(T, U)>
 where
     (T, U): Copy,
 {
@@ -160,7 +166,7 @@ where
     }
 }
 
-impl<T: Copy, S: FromIterator<T>> Domain<T, S> for BinaryHeapStrategy<T> {
+impl<T: Copy + Eq, S: FromIterator<T>> Domain<T, S> for BinaryHeapStrategy<T> {
     fn domain(self) -> S {
         self.0
             .into_iter()

@@ -9,7 +9,11 @@ use radguy::ordered::strategy::OrxStrategy;
 use radguy::{
     kleene_local,
     oracle::SMax,
-    ordered::{self, oracle::ToConstant, strategy::StrategyWeight},
+    ordered::{
+        self,
+        oracle::{SiblingsOracle, StrategicLocalOracle, ToConstant},
+        strategy::StrategyWeight,
+    },
 };
 
 use radguy_ccs::systems::numeric::Number;
@@ -123,6 +127,7 @@ macro_rules! wctl_bench_problem_ordered {
         wctl_bench_oracles_ordered! {
             $name: using $c, strategy $s; $sname; bench $process_name, $formula_str => $sat in wccs, with
             SMax::default().constant(StrategyWeight::Infinity),
+            SMax::default().constant(StrategyWeight::Num(1)).then(SiblingsOracle::default()),
             // LocalMaxR::default().constant(StrategyWeight::Infinity),
             // LocalMaxR::default().constant(StrategyWeight::Infinity).then(CountOracle::default()),
             // LocalMaxR::default().constant(StrategyWeight::Infinity).then(InverseCountOracle::default()),

@@ -2,6 +2,7 @@ use std::{
     cmp::{Ordering, Reverse},
     fmt::Display,
     hash::Hash,
+    iter::Sum,
     ops::Add,
 };
 
@@ -53,9 +54,19 @@ impl Add for StrategyWeight {
     #[track_caller]
     fn add(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
-            (Self::Num(r), Self::Num(l)) => Self::Num(l + r),
+            (Self::Num(l), Self::Num(r)) => Self::Num(l + r),
             _ => Self::Infinity,
         }
+    }
+}
+
+impl Sum for StrategyWeight {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        let mut sum = Self::Num(0);
+        for item in iter {
+            sum = sum + item;
+        }
+        sum
     }
 }
 
@@ -98,6 +109,7 @@ pub trait Strategy<T> {
     /// Returns `None` if there are no more elements in the strategy
     // TODO: should we just have an iterator instead?
     fn extract_min(&mut self) -> Option<T>;
+    fn get_weight(&self, item: T) -> Option<StrategyWeight>;
 }
 
 // We have `LeftSliced` and `RightSliced` so we can easily have the same implementation of

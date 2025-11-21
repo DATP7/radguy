@@ -44,9 +44,15 @@ impl<T: Clone, H: PriorityQueueDecKey<T, StrategyWeight>> DerefMut for OrxStrate
     }
 }
 
-impl<T: Copy, H: PriorityQueueDecKey<T, StrategyWeight>> Strategy<T> for OrxStrategy<T, H> {
+impl<T: Copy + Eq, H: PriorityQueueDecKey<T, StrategyWeight>> Strategy<T> for OrxStrategy<T, H> {
     fn extract_min(&mut self) -> Option<T> {
         self.0.pop().map(|(v, _)| v)
+    }
+
+    fn get_weight(&self, item: T) -> Option<StrategyWeight> {
+        self.iter()
+            .find(|StrategyItem(_, v)| *v == item)
+            .map(|StrategyItem(weight, _)| weight)
     }
 }
 
@@ -154,7 +160,7 @@ where
     }
 }
 
-impl<T: Copy, S: FromIterator<T>, H: PriorityQueueDecKey<T, StrategyWeight>> Domain<T, S>
+impl<T: Copy + Eq, S: FromIterator<T>, H: PriorityQueueDecKey<T, StrategyWeight>> Domain<T, S>
     for OrxStrategy<T, H>
 {
     fn domain(self) -> S {

@@ -68,6 +68,10 @@ impl<T: Copy + Eq + Hash> Strategy<T> for HashMapStrategy<T> {
         }
         key
     }
+
+    fn get_weight(&self, item: T) -> Option<StrategyWeight> {
+        self.get(&item).copied()
+    }
 }
 
 impl<T: Eq + Copy + Hash> Intersect<HashSet<T>> for HashMapStrategy<T> {

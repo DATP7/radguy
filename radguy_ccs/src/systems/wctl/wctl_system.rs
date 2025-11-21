@@ -3,6 +3,7 @@ use std::{
     collections::{BTreeSet, HashMap, HashSet},
 };
 
+use radguy::DependencyGraphSystem;
 use radguy::extension::TermSystem;
 use radguy::{Arguments, PairUniverse, System, Universe, bislotmap::BiSlotMap};
 use slotmap::Key;
@@ -23,6 +24,7 @@ pub struct WCTLSystem<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key,
     pub(crate) formulas: RefCell<BiSlotMap<FormKey, FlatFormula<'a, FormKey, ExprKey>>>,
     pub(crate) expresions: RefCell<BiSlotMap<ExprKey, FlatExpr<'a, ExprKey>>>,
     locked: bool,
+    hyper_edge_cache: RefCell<HashMap<VarKey, Vec<Vec<VarKey>>>>,
 }
 
 impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
@@ -39,6 +41,7 @@ impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
             formulas: RefCell::new(BiSlotMap::default()),
             expresions: RefCell::new(BiSlotMap::default()),
             locked: false,
+            hyper_edge_cache: RefCell::default(),
         }
     }
     fn insert_term(&self, term: NumericTerm<VarKey, TermKey>) -> TermKey {
@@ -365,5 +368,60 @@ impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key>
         self.numeric_system
             .borrow()
             .evaluate_term(term_key, assignment)
+    }
+}
+
+impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key>
+    WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
+{
+    fn find_var_key(&self, term_key: TermKey) -> VarKey {
+        match self.get_term(term_key) {
+            NumericTerm::Var(var_key) => var_key,
+            NumericTerm::Add(_, right) => self.find_var_key(right),
+            _ => unreachable!(),
+        }
+    }
+
+    fn get_hyperedge(&self, term_key: TermKey) -> Vec<VarKey> {
+        match self.get_term(term_key) {
+            NumericTerm::Var(var_key) => Vec::from([var_key]),
+            NumericTerm::Add(_, _) => Vec::from([self.find_var_key(term_key)]),
+            NumericTerm::Max(elements) => elements
+                .into_iter()
+                .map(|term_key| self.find_var_key(term_key))
+                .collect(),
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key>
+    DependencyGraphSystem<VarKey, VarKey>
+    for WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
+{
+    fn get_hyperedges(&self, key: VarKey) -> Option<Vec<Vec<VarKey>>> {
+        if let Some(hyperedge) = self.hyper_edge_cache.borrow().get(&key) {
+            return Some(hyperedge.clone());
+        }
+
+        let term_key = *self.numeric_system.borrow().definitions.get(key)?;
+        let term = self.get_term(term_key);
+
+        let hyperedge: Vec<Vec<VarKey>> = match term {
+            NumericTerm::Const(_) => Vec::new(),
+            NumericTerm::Min(elements) => elements
+                .into_iter()
+                .map(|term_key| self.get_hyperedge(term_key))
+                .collect(),
+            NumericTerm::Max(_) => Vec::from([self.get_hyperedge(term_key)]),
+            NumericTerm::Bound { term: term_key, .. } => Vec::from([self.get_hyperedge(term_key)]),
+            _ => unreachable!(),
+        };
+
+        self.hyper_edge_cache
+            .borrow_mut()
+            .insert(key, hyperedge.clone());
+
+        Some(hyperedge)
     }
 }
