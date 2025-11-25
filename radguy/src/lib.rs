@@ -52,6 +52,28 @@ pub trait Diagonal {
     fn diagonal(&self) -> Self::Output;
 }
 
+/// System of equations
+pub trait System<VarKey: Copy, VarValue: PartialOrd> {
+    /// Evaluates a variable w.r.t. a given assignment, returning the new value
+    fn evaluate(&self, key: VarKey, assignment: &HashMap<VarKey, VarValue>) -> VarValue;
+    /// The bottom element of the systems domain.
+    ///
+    /// # Example
+    /// `true` for boolean domains, `0` or infinity for numeric systems.
+    fn bottom_assignment(&self) -> HashMap<VarKey, VarValue>;
+
+    /// Locks the system s.t. no changes can be made to the set of visited or discovered variables.
+    fn lock(&mut self);
+
+    /// Unlocks the system after `self.lock()`, allowing changes to the set of visited and
+    /// discovered variables.
+    fn unlock(&mut self);
+
+    /// The set of visited variables. These are the variables for which an evaluation function is
+    /// known.
+    fn visited(&self) -> HashSet<VarKey>;
+}
+
 pub trait Universe<S> {
     /// Returns a structure S containing all variables in the system
     #[must_use]
@@ -65,14 +87,8 @@ pub trait PairUniverse<S> {
 }
 
 pub trait DependencyGraphSystem<VarKey, ReturnType> {
+    /// Get hyperedges of a variable if expanded, otherwise None
     fn get_hyperedges(&self, key: VarKey) -> Option<Vec<Vec<ReturnType>>>;
-}
-
-pub trait System<VarKey: Copy, VarValue: PartialOrd> {
-    fn evaluate(&self, key: VarKey, assignment: &HashMap<VarKey, VarValue>) -> VarValue;
-    fn bottom_assignment(&self) -> HashMap<VarKey, VarValue>;
-    fn lock(&mut self);
-    fn unlock(&mut self);
 }
 
 pub trait Assignment<K, V> {
@@ -165,7 +181,7 @@ where
     let mut assignment = system.bottom_assignment();
     let mut visited = HashSet::default();
     let mut discovered = HashSet::from([target]);
-    let mut rel = discovered.cartesian(&discovered).dbg;
+    let mut rel = discovered.cartesian(&discovered);
     let mut todo = vec![target];
     let mut iter = todo.iter();
     while let Some(&x) = iter.next() {
@@ -216,7 +232,7 @@ where
     for<'a> &'a PS: IntoIterator<Item = &'a (K, K)>,
 {
     system.lock();
-    *rel = oracle.approximate_flow(visited, assignment, rel, system);
+    *rel = oracle.approximate_flow(assignment, rel, system);
     system.unlock();
     rel.into_iter()
         .copied()

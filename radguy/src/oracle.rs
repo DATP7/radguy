@@ -452,13 +452,7 @@ impl<
 where
     for<'a> &'a PS: IntoIterator<Item = &'a (K, K)>,
 {
-    fn approximate_flow(
-        &self,
-        _visited: &HashSet<K>,
-        assignment: &HashMap<K, V>,
-        possible: &PS,
-        system: &S,
-    ) -> PS {
+    fn approximate_flow(&self, assignment: &HashMap<K, V>, possible: &PS, system: &S) -> PS {
         possible
             .into_iter()
             .filter(|(x, y)| {

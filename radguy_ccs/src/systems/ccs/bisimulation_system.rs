@@ -5,11 +5,8 @@ use std::{
     marker::PhantomData,
 };
 
+use radguy::DependencyGraphSystem;
 use radguy::{Arguments, Assignment, PairUniverse, System, Universe, extension::TermSystem};
-use radguy::{
-    DependencyGraphSystem,
-    ordered::strategy::{InitialStrategy, Strategy},
-};
 use slotmap::Key;
 
 use crate::systems::{

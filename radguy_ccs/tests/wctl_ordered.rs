@@ -4,8 +4,8 @@ use radguy::{
     oracle::{IdentityOracle, SMax, TrivialOracle, WCTLOracle},
     ordered::{
         oracle::{
-            CountOracle, InverseCountOracle, StrategicArgumentsOracle, StrategicHeightOracle,
-            StrategicLocalOracle, ToConstant,
+            CountOracle, InverseCountOracle, SiblingsOracle, StrategicArgumentsOracle,
+            StrategicHeightOracle, StrategicLocalOracle, ToConstant,
         },
         strategy::StrategyWeight,
     },
@@ -120,6 +120,7 @@ wctl_test_oracles! {
     SMax.constant(StrategyWeight::Infinity), smax_const_infinity;
     SMax.constant(StrategyWeight::Num(0)).then(CountOracle::default()), smax_then_count;
     SMax.constant(StrategyWeight::Num(10)).and_by(CountOracle::default(), std::cmp::min), smax_10_and_min_count;
+    WCTLOracle::default().constant(StrategyWeight::Num(1)).then(SiblingsOracle::default()), wctl_1_then_siblings;
     CountOracle::default(), count;
     InverseCountOracle::default(), count_inverse;
     StrategicArgumentsOracle::default(), arguments_s;

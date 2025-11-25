@@ -35,13 +35,7 @@ impl<
 where
     for<'a> &'a PS: IntoIterator<Item = StrategyItem<(K, K)>>,
 {
-    fn get_strategy(
-        &self,
-        _visited: &HashSet<K>,
-        _assignment: &HashMap<K, V>,
-        strategy: &PS,
-        system: &S,
-    ) -> PS {
+    fn get_strategy(&self, _assignment: &HashMap<K, V>, strategy: &PS, system: &S) -> PS {
         strategy
             .into_iter()
             .map(|StrategyItem(weight, (x, y))| {
