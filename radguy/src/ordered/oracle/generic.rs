@@ -1281,9 +1281,67 @@ mod tests {
                     (x, x) -> 0, (y, y) -> 0, (y, x) -> inf, (x, y) -> inf,
                 }
             };
+            relation_skipping_arg_1_transitive: {
+                oracle {
+                    transitive
+                } with {
+                    x = {y, z};
+                    y = {x};
+                    z = {k};
+                    k = {};
+                } in {
+                    (x, x) -> 0, (y, y) -> 0, (y, x) -> 1, (k, x) -> 2,
+                } expects {
+                    (x, x) -> 0, (y, y) -> 0, (y, x) -> 1,
+                }
+            };
+            relation_skipping_arg_1_simple: {
+                oracle {
+                    simple
+                } with {
+                    x = {y, z};
+                    y = {x};
+                    z = {k};
+                    k = {};
+                } in {
+                    (x, x) -> 0, (y, y) -> 0, (y, x) -> 1, (k, x) -> 2,
+                } expects {
+                    (x, x) -> 0, (y, y) -> 0, (y, x) -> 1,
+                }
+            };
+            relation_skipping_arg_2_transitive: {
+                oracle {
+                    transitive
+                } with {
+                    x = {y, z};
+                    y = {x};
+                    z = {k};
+                    k = {};
+                } in {
+                    (x, x) -> 0, (y, y) -> 0, (y, x) -> 1, (k, x) -> 2, (k, z) -> 1,
+                } expects {
+                    (x, x) -> 0, (y, y) -> 0, (y, x) -> 1, (k, z) -> 1,
+                }
+            };
+            relation_skipping_arg_2_simple: {
+                oracle {
+                    simple
+                } with {
+                    x = {y, z};
+                    y = {x};
+                    z = {k};
+                    k = {};
+                } in {
+                    (x, x) -> 0, (y, y) -> 0, (y, x) -> 1, (k, x) -> 2, (k, z) -> 1,
+                } expects {
+                    (x, x) -> 0, (y, y) -> 0, (y, x) -> 1, (k, z) -> 1,
+                }
+            };
             /*
             template: {
-                with {
+                oracle {
+
+                } with {
 
                 } in {
 
