@@ -177,12 +177,13 @@ where
     let mut discovered = system.universe();
     let mut rel = discovered.cartesian(&discovered);
     // PERF: This should run the oracle instead of using the full universe
-    let mut todo = local_dependencies(target, &discovered, &assignment, oracle, system, &mut rel);
+    let mut todo = local_dependencies(target, &assignment, oracle, system, &mut rel);
     if todo.is_empty() {
         todo.push(target);
     }
     let mut iter = todo.iter();
     while let Some(&x) = iter.next() {
+        debug_assert!(discovered.contains(&x));
         let evaluated = system.evaluate(x, &assignment);
         let args = system.arguments(x);
         if assignment.get_assignment(&x) != evaluated || !args.is_subset(&discovered) {
@@ -200,7 +201,7 @@ where
             let dxa = discovered.cartesian(&args);
             rel = rel.union(axa).union(axd).union(dxa);
             discovered = system.universe();
-            todo = local_dependencies(target, &discovered, &assignment, oracle, system, &mut rel);
+            todo = local_dependencies(target, &assignment, oracle, system, &mut rel);
             iter = todo.iter();
         }
     }
@@ -210,7 +211,6 @@ where
 
 fn local_dependencies<K: Hash + Copy + Eq, V: PartialOrd, PS: Debug, S: System<K, V>>(
     variable: K,
-    discovered: &HashSet<K>,
     assignment: &HashMap<K, V>,
     oracle: &impl LocalOracle<K, V, PS, S>,
     system: &mut S,
@@ -225,7 +225,6 @@ where
     rel.into_iter()
         .copied()
         .filter_map(|(x, y)| if y == variable { Some(x) } else { None })
-        .filter(|x| discovered.contains(x))
         .collect()
 }
 

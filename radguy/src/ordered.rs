@@ -53,6 +53,7 @@ where
     let mut todo = strategy.clone().slice_right(target).intersect(&discovered);
 
     while let Some(x) = todo.extract_min() {
+        debug_assert!(discovered.contains(&x));
         let evaluated = system.evaluate(x, &assignment);
         let args = system.arguments(x);
         if assignment.get_assignment(&x) != evaluated || !args.is_subset(&discovered) {
@@ -79,7 +80,7 @@ where
             discovered = system.universe();
             system.lock();
             strategy = oracle.get_strategy(&assignment, &strategy, system);
-            todo = strategy.clone().slice_right(target).intersect(&discovered);
+            todo = strategy.clone().slice_right(target);
             system.unlock();
         }
     }
