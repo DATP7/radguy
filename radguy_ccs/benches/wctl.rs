@@ -8,7 +8,7 @@ use radguy::ordered::strategy::HashMapStrategy;
 use radguy::ordered::strategy::OrxStrategy;
 use radguy::{
     kleene_local,
-    oracle::SMax,
+    oracle::{SMax, WCTLOracle},
     ordered::{
         self,
         oracle::{SiblingsOracle, StrategicLocalOracle, ToConstant},
@@ -106,8 +106,8 @@ macro_rules! wctl_bench_oracles_unordered {
                                 result,
                                 "{} should{} satisfy {} in {} with oracle {}",
                                 $process_name,
-                                $formula_str,
                                 if !$sat { " not" } else { "" },
+                                $formula_str,
                                 $wccs,
                                 o
                             )
@@ -127,7 +127,8 @@ macro_rules! wctl_bench_problem_ordered {
         wctl_bench_oracles_ordered! {
             $name: using $c, strategy $s; $sname; bench $process_name, $formula_str => $sat in wccs, with
             SMax::default().constant(StrategyWeight::Infinity),
-            SMax::default().constant(StrategyWeight::Num(1)).then(SiblingsOracle::default()),
+            WCTLOracle::default().constant(StrategyWeight::Num(1)).then(SiblingsOracle::default()),
+            //SMax::default().constant(StrategyWeight::Num(1)).then(SiblingsOracle::default()),
             // LocalMaxR::default().constant(StrategyWeight::Infinity),
             // LocalMaxR::default().constant(StrategyWeight::Infinity).then(CountOracle::default()),
             // LocalMaxR::default().constant(StrategyWeight::Infinity).then(InverseCountOracle::default()),
@@ -151,6 +152,7 @@ macro_rules! wctl_bench_suite_problem {
         let wccs = $wccs;
         wctl_bench_oracles_unordered!($name: using $c, bench $process_name, $formula_str => $sat in wccs, with
             SMax::default(),
+            WCTLOracle::default(),
             // TODO: LocalMaxR and Arguments should be fixed
             // LocalMaxR::default(),
             // ArgumentsOracle::default(),

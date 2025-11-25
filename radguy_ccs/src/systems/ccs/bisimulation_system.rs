@@ -298,6 +298,7 @@ impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKe
         }
 
         let term_key = *self.bool_system.borrow().definitions.get(key)?;
+
         let term = self.get_term(term_key);
 
         let hyperedge: Vec<Vec<VarKey>> = match term {

@@ -45,26 +45,27 @@ where
         strategy
             .into_iter()
             .map(|StrategyItem(weight, (x, y))| {
-                let hyper_edges = system.get_hyperedges(y);
+                let Some(hyper_edges) = system.get_hyperedges(y) else {
+                    return StrategyItem(weight, (x, y));
+                };
 
                 StrategyItem(
                     weight
-                        + hyper_edges.map_or(StrategyWeight::Infinity, |some| {
-                            some.into_iter()
-                                .filter(|siblings| siblings.contains(&x))
-                                .map(|siblings| {
-                                    siblings
-                                        .into_iter()
-                                        .map(|sibling| {
-                                            strategy
-                                                .get_weight((sibling, y))
-                                                .unwrap_or(StrategyWeight::Infinity)
-                                        })
-                                        .sum()
-                                })
-                                .min()
-                                .unwrap_or(StrategyWeight::Infinity)
-                        }),
+                        + hyper_edges
+                            .into_iter()
+                            .filter(|siblings| siblings.contains(&x))
+                            .map(|siblings| {
+                                siblings
+                                    .into_iter()
+                                    .map(|sibling| {
+                                        strategy
+                                            .get_weight((sibling, y))
+                                            .unwrap_or(StrategyWeight::Infinity)
+                                    })
+                                    .sum()
+                            })
+                            .min()
+                            .unwrap_or(StrategyWeight::Infinity),
                     (x, y),
                 )
             })

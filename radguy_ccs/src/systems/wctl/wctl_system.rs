@@ -24,7 +24,7 @@ pub struct WCTLSystem<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key,
     pub(crate) formulas: RefCell<BiSlotMap<FormKey, FlatFormula<'a, FormKey, ExprKey>>>,
     pub(crate) expresions: RefCell<BiSlotMap<ExprKey, FlatExpr<'a, ExprKey>>>,
     locked: bool,
-    hyper_edge_cache: RefCell<HashMap<VarKey, Vec<Vec<VarKey>>>>,
+    hyper_edge_cache: RefCell<HashMap<VarKey, Vec<Vec<(VarKey, Number)>>>>,
 }
 
 impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
@@ -382,32 +382,39 @@ impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key>
         }
     }
 
-    fn get_hyperedge(&self, term_key: TermKey) -> Vec<VarKey> {
+    fn find_weight(&self, term_key: TermKey) -> Number {
         match self.get_term(term_key) {
-            NumericTerm::Var(var_key) => Vec::from([var_key]),
-            NumericTerm::Add(_, _) => Vec::from([self.find_var_key(term_key)]),
+            NumericTerm::Const(weight) => weight,
+            NumericTerm::Add(weight_term, _) => self.find_weight(weight_term),
+            NumericTerm::Var(_) => Number::Val(0),
+            _ => unreachable!(),
+        }
+    }
+
+    fn get_hyperedge(&self, term_key: TermKey) -> Vec<(VarKey, Number)> {
+        match self.get_term(term_key) {
+            NumericTerm::Var(var_key) => Vec::from([(var_key, Number::Val(0))]),
+            NumericTerm::Add(_, _) => {
+                Vec::from([(self.find_var_key(term_key), self.find_weight(term_key))])
+            }
             NumericTerm::Max(elements) => elements
                 .into_iter()
-                .map(|term_key| self.find_var_key(term_key))
+                .map(|term_key| (self.find_var_key(term_key), self.find_weight(term_key)))
                 .collect(),
             _ => unreachable!(),
         }
     }
-}
 
-impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key>
-    DependencyGraphSystem<VarKey, VarKey>
-    for WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
-{
-    fn get_hyperedges(&self, key: VarKey) -> Option<Vec<Vec<VarKey>>> {
+    fn get_weighted_hyperedges(&self, key: VarKey) -> Option<Vec<Vec<(VarKey, Number)>>> {
         if let Some(hyperedge) = self.hyper_edge_cache.borrow().get(&key) {
             return Some(hyperedge.clone());
         }
 
         let term_key = *self.numeric_system.borrow().definitions.get(key)?;
+
         let term = self.get_term(term_key);
 
-        let hyperedge: Vec<Vec<VarKey>> = match term {
+        let hyperedge: Vec<Vec<(VarKey, Number)>> = match term {
             NumericTerm::Const(_) => Vec::new(),
             NumericTerm::Min(elements) => elements
                 .into_iter()
@@ -423,5 +430,31 @@ impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key>
             .insert(key, hyperedge.clone());
 
         Some(hyperedge)
+    }
+
+    fn fmap<T, U>(hyperedges: Vec<Vec<T>>, f: fn(T) -> U) -> Vec<Vec<U>> {
+        hyperedges
+            .into_iter()
+            .map(|hyperedge| hyperedge.into_iter().map(&f).collect())
+            .collect()
+    }
+}
+
+impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key>
+    DependencyGraphSystem<VarKey, VarKey>
+    for WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
+{
+    fn get_hyperedges(&self, key: VarKey) -> Option<Vec<Vec<VarKey>>> {
+        self.get_weighted_hyperedges(key)
+            .map(|some| Self::fmap(some, |(var_key, _)| var_key))
+    }
+}
+
+impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key>
+    DependencyGraphSystem<VarKey, (VarKey, Number)>
+    for WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
+{
+    fn get_hyperedges(&self, key: VarKey) -> Option<Vec<Vec<(VarKey, Number)>>> {
+        self.get_weighted_hyperedges(key)
     }
 }
