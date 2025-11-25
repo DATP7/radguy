@@ -52,10 +52,10 @@ macro_rules! wctl_bench_oracles_ordered {
                     |(mut sys, o)| {
                         let process_key = sys.get_process_definition($process_name).expect("Process name should be bound");
                         let target = sys.get_var(process_key, formula_key);
-                        let result = ordered::kleene_local::<_, _, $s, $s, _>(&mut sys, target, &o) == Number::Val(0);
+                        let (result, _) = ordered::kleene_local::<_, _, $s, $s, _>(&mut sys, target, &o);
                         assert_eq!(
                             $sat,
-                            result,
+                            result == Number::Val(0),
                             "{} should{} satisfy {} in {} with oracle {}",
                             $process_name,
                             $formula_str,
@@ -100,10 +100,10 @@ macro_rules! wctl_bench_oracles_unordered {
                         |(mut sys, o)| {
                             let process_key = sys.get_process_definition($process_name).expect("Process name should be bound");
                             let target = sys.get_var(process_key, formula_key);
-                            let result = kleene_local(&mut sys, target, &o) == Number::Val(0);
+                            let (result, _) = kleene_local(&mut sys, target, &o);
                             assert_eq!(
                                 $sat,
-                                result,
+                                result == Number::Val(0),
                                 "{} should{} satisfy {} in {} with oracle {}",
                                 $process_name,
                                 if !$sat { " not" } else { "" },

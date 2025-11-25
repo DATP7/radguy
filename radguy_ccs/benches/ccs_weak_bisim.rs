@@ -37,10 +37,10 @@ macro_rules! bisim_bench_oracles_ordered {
                     },
                     |(mut sys, o)| {
                         let target = sys.specify_comparison($left, $right);
-                        let result = !ordered::kleene_local::<_, _, $s, $s, _>(&mut sys, target, &o);
+                        let (result, _) = ordered::kleene_local::<_, _, $s, $s, _>(&mut sys, target, &o);
                         assert_eq!(
                             $eq,
-                            result,
+                            !result,
                             "{} and {} should{} be bisimilar in{}",
                             $left,
                             $right,
@@ -65,7 +65,8 @@ macro_rules! bisim_bench_oracles_unordered {
     ($name:ident: using $c:expr, bench $left:expr, $right:expr => $eq:literal in $ccs:expr, with $($oracle:expr,)*) => {{
         let parser = ProgramParser::new();
         let ast = parser.parse($ccs).expect("Program should parse");
-        let mut group = $c.benchmark_group(stringify!($name));
+        let name = stringify!($name);
+        let mut group = $c.benchmark_group(name);
         $(
         {
             let oracle = $oracle;
@@ -78,10 +79,10 @@ macro_rules! bisim_bench_oracles_unordered {
                     },
                     |(mut sys, o)| {
                         let target = sys.specify_comparison($left, $right);
-                        let result = !kleene_local(&mut sys, target, &o);
+                        let (result, _) = kleene_local(&mut sys, target, &o);
                         assert_eq!(
                             $eq,
-                            result,
+                            !result,
                             "{} and {} should{} be bisimilar in{}",
                             $left,
                             $right,

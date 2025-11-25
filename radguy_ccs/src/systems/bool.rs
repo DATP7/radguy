@@ -22,7 +22,7 @@ pub trait BoolSystem<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone>:
     fn evaluate_term(&self, term_key: T, assignment: &dyn Assignment<V, bool>) -> bool;
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct BoolSystemImpl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone> {
     pub names: BiSlotMap<V, N>,
     pub definitions: SecondaryMap<V, T>,

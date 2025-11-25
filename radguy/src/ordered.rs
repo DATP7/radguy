@@ -32,7 +32,7 @@ pub fn kleene_local<
     system: &mut S,
     target: VarKey,
     oracle: &impl StrategicLocalOracle<VarKey, VarValue, PairStrat, S>,
-) -> VarValue
+) -> (VarValue, u32)
 where
     for<'a> &'a PairStrat: IntoIterator<Item = StrategyItem<(VarKey, VarKey)>>,
 {
@@ -52,8 +52,10 @@ where
     }
     let mut todo = strategy.clone().slice_right(target).intersect(&discovered);
 
+    let mut iterations = 0;
     while let Some(x) = todo.extract_min() {
         debug_assert!(discovered.contains(&x));
+        iterations += 1;
         let evaluated = system.evaluate(x, &assignment);
         let args = system.arguments(x);
         if assignment.get_assignment(&x) != evaluated || !args.is_subset(&discovered) {
@@ -85,5 +87,5 @@ where
         }
     }
 
-    assignment.get_assignment(&target)
+    (assignment.get_assignment(&target), iterations)
 }

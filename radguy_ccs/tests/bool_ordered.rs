@@ -27,15 +27,13 @@ macro_rules! test_oracle_system_strategy {
                 } = $crate::systems::bool::$spec();
                 for (var, goal) in variables.into_iter().zip(goal.into_iter()) {
                     let start = system.names.get_or_insert_key(var);
-                    assert_eq!(
+                    let (result, _) =
                         ::radguy::ordered::kleene_local::<_, _, $strategy, $strategy, _>(
                             &mut system,
                             start,
-                            &$oracle
-                        ),
-                        goal,
-                        "{var} did not have the expected value"
-                    );
+                            &$oracle,
+                        );
+                    assert_eq!(result, goal, "{var} did not have the expected value");
                 }
             }
 
@@ -49,15 +47,13 @@ macro_rules! test_oracle_system_strategy {
                 let mut system: radguy_ccs::systems::bool::LazyBoolSystem<_, _, _> = system.into();
                 for (var, goal) in variables.into_iter().zip(goal.into_iter()) {
                     let start = system.init_target(var);
-                    assert_eq!(
+                    let (result, _) =
                         ::radguy::ordered::kleene_local::<_, _, $strategy, $strategy, _>(
                             &mut system,
                             start,
-                            &$oracle
-                        ),
-                        goal,
-                        "{var} did not have the expected value"
-                    );
+                            &$oracle,
+                        );
+                    assert_eq!(result, goal, "{var} did not have the expected value");
                 }
             }
         }

@@ -173,7 +173,7 @@ pub fn kleene_local<
     system: &mut S,
     target: K,
     oracle: &impl LocalOracle<K, V, PS, S>,
-) -> V
+) -> (V, u32)
 where
     for<'a> &'a PS: IntoIterator<Item = &'a (K, K)>,
     HashSet<K>: Cartesian<Output = PS>,
@@ -187,8 +187,10 @@ where
         todo.push(target);
     }
     let mut iter = todo.iter();
+    let mut iterations = 0;
     while let Some(&x) = iter.next() {
         debug_assert!(discovered.contains(&x));
+        iterations += 1;
         let evaluated = system.evaluate(x, &assignment);
         let args = system.arguments(x);
         if assignment.get_assignment(&x) != evaluated || !args.is_subset(&discovered) {
@@ -211,7 +213,7 @@ where
         }
     }
 
-    assignment.get_assignment(&target)
+    (assignment.get_assignment(&target), iterations)
 }
 
 fn local_dependencies<K: Hash + Copy + Eq, V: PartialOrd, PS: Debug, S: System<K, V>>(

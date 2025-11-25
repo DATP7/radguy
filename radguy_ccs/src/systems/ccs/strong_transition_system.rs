@@ -12,7 +12,7 @@ use crate::systems::ccs::{
     transition_system::{TransitionMap, TransitionSystem},
 };
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct StrongTransitionSystem<'a, ProcKey: Key> {
     process_names: HashMap<&'a str, ProcKey>,
     process_bindings: RefCell<BiSlotMap<ProcKey, FlatProcess<'a, ProcKey>>>,
