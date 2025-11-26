@@ -140,6 +140,33 @@ impl<
     }
 }
 
+impl<
+    T: Hash + Eq + Copy,
+    U: Eq + Copy,
+    UH: FromIterator<StrategyItem<U>> + Strategy<U>,
+    PH: FromIterator<StrategyItem<(T, U)>> + Strategy<(T, U)> + LeftSliced<T, U, SlicedLeft = UH>,
+> LeftSliced<T, U> for LazyHeap<(T, U), PH>
+{
+    type SlicedLeft = LazyHeap<U, UH>;
+}
+
+impl<
+    T: Hash + Eq + Copy,
+    U: Hash + Eq + Copy,
+    UH: FromIterator<StrategyItem<U>> + Strategy<U>,
+    PH: FromIterator<StrategyItem<(T, U)>> + Strategy<(T, U)> + LeftSliced<T, U, SlicedLeft = UH>,
+> SliceLeft<T, U, LazyHeap<U, UH>> for LazyHeap<(T, U), PH>
+{
+    fn slice_left(self, left: T) -> LazyHeap<U, UH> {
+        let items = self
+            .items
+            .into_iter()
+            .filter_map(|((t, u), w)| if t == left { Some((u, w)) } else { None })
+            .collect();
+        LazyHeap { items, heap: None }
+    }
+}
+
 impl<T: Hash + Eq + Copy, H: FromIterator<StrategyItem<T>> + Strategy<T>> Domain<T, HashSet<T>>
     for LazyHeap<T, H>
 {

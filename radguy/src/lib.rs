@@ -53,7 +53,7 @@ pub trait Diagonal {
 }
 
 /// System of equations
-pub trait System<VarKey: Copy, VarValue: PartialOrd> {
+pub trait System<VarKey, VarValue: PartialOrd> {
     /// Evaluates a variable w.r.t. a given assignment, returning the new value
     fn evaluate(&self, key: VarKey, assignment: &HashMap<VarKey, VarValue>) -> VarValue;
     /// The bottom element of the systems domain.
