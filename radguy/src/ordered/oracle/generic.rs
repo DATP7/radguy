@@ -43,25 +43,24 @@ where
                     return StrategyItem(weight, (x, y));
                 };
 
-                StrategyItem(
-                    weight
-                        + hyper_edges
-                            .into_iter()
-                            .filter(|siblings| siblings.contains(&x))
-                            .map(|siblings| {
-                                siblings
-                                    .into_iter()
-                                    .map(|sibling| {
-                                        strategy
-                                            .get_weight((sibling, y))
-                                            .unwrap_or(StrategyWeight::Num(0))
-                                    })
-                                    .sum()
-                            })
-                            .min()
-                            .unwrap_or(StrategyWeight::Infinity),
-                    (x, y),
-                )
+                let out_weight = weight
+                    + hyper_edges
+                        .into_iter()
+                        .filter(|siblings| siblings.contains(&x))
+                        .map(|siblings| {
+                            siblings
+                                .into_iter()
+                                .map(|sibling| {
+                                    strategy
+                                        .get_weight((sibling, y))
+                                        .unwrap_or(StrategyWeight::Num(0))
+                                })
+                                .sum()
+                        })
+                        .min()
+                        .unwrap_or(StrategyWeight::Infinity);
+
+                StrategyItem(out_weight, (x, y))
             })
             .collect()
     }
