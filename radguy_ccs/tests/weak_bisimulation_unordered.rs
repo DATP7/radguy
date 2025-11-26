@@ -42,15 +42,15 @@ macro_rules! weak_bisim_test_oracles {
                 weak_bisim_test!{
                     abp_ok_small: $oracle, "SPEC", "ABP" => true in include_str!("../systems/ccs/abp_ok.ccs");
                     abpl_ok_small_1: $oracle, "SPEC", "ABPl" => true in include_str!("../systems/ccs/abp_ok.ccs");
-                    abpl_ok_small_2: $oracle, "SPEC", "ABPl2" => true in include_str!("../systems/ccs/abp_ok.ccs");
+                    abpl_ok_small_2: $oracle, "SPEC", "ABPl_2" => true in include_str!("../systems/ccs/abp_ok.ccs");
                     abp_bad_small: $oracle, "SPEC", "ABP" => true in include_str!("../systems/ccs/abp_bad.ccs");
-                    abpl_bad_small: $oracle, "SPEC", "ABPl" => false in include_str!("../systems/ccs/abp_bad.ccs");
                     abpl_bad_small_2: $oracle, "SPEC", "ABPl_2" => false in include_str!("../systems/ccs/abp_bad.ccs");
+                    abpl_bad_small_3: $oracle, "SPEC", "ABPl_3" => false in include_str!("../systems/ccs/abp_bad.ccs");
                     simple_infinite_tau_loop: $oracle, "S", "T" => true in r"
                     S = tau.S;
                     T = 0;
                     ";
-                    dual_tau_loop: $oracle, "S", "T" => true in r"
+                    dual_tau_loop: $oracle, "A", "B" => true in r"
                     A = tau.B + a.0;
                     B = tau.A + b.0;
                     Spec = a.0 + b.0;

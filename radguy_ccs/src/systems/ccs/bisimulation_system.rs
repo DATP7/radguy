@@ -319,6 +319,7 @@ impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKe
                     _ => unreachable!("Variable not defined as a collection of hyperedge!"),
                 })
                 .collect(),
+            BoolTerm::True | BoolTerm::False => Vec::new(),
             _ => unreachable!("Variable not defined as a collection of hyperedge!"),
         };
 

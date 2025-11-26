@@ -1,0 +1,12 @@
+P1 = 'm3r1.P1 + m1r1.leader.0 + m1r2.P1_2 + m1r3.P1_3;
+P1_2 = 'm2r2.P1_2 + m1r1.leader.0 + m1r2.P1_2 + m1r3.P1_3;
+P1_3 = 'm2r3.P1_3 + m1r1.leader.0 + m1r2.P1_3 + m1r3.P1_3;
+
+P2 = 'm1r2.P2 + m2r1.P2 + m2r2.leader.0 + m2r3.P2_3;
+P2_3 = 'm1r3.P2_3 + m2r2.leader.0 + m2r1.P2_3 + m2r3.P2_3;
+
+P3 = 'm2r3.P3 + m3r1.P3 + m3r2.P3 + m3r3.leader.0;
+
+Ring = (P1 | P2 | P3) \ {m1r1, m1r2, m1r3, m1r4, m1r5, m1r6, m2r1, m2r2, m2r3, m3r1, m3r2, m3r3};
+
+Spec = leader.0;
