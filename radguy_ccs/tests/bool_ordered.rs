@@ -4,7 +4,7 @@ use radguy::{
     ordered::{
         oracle::{
             CountOracle, InverseCountOracle, StrategicArgumentsOracle, StrategicHeightOracle,
-            StrategicLocalOracle, ToConstant,
+            StrategicLocalOracle, ToConstant, ToOrdered,
         },
         strategy::StrategyWeight,
     },
@@ -128,15 +128,22 @@ macro_rules! test_oracles_ordered {
 
 test_oracles_ordered! {
     IdentityOracle.constant(StrategyWeight::Infinity), identity_oracle_inf;
+    IdentityOracle.ordered(), identity_oracle_ord;
     TrivialOracle.constant(StrategyWeight::Infinity), trivial_oracle_inf;
+    TrivialOracle.ordered(), trivial_oracle_ord;
     SMax.constant(StrategyWeight::Num(0)), smax_const_0;
     SMax.constant(StrategyWeight::Infinity), smax_const_infinity;
     SMax.constant(StrategyWeight::Num(0)).then(CountOracle::default()), smax_then_count;
     SMax.constant(StrategyWeight::Num(10)).and_by(CountOracle::default(), std::cmp::min), smax_10_and_min_count;
+    SMax.ordered(), smax_ord;
+    SMax.ordered().then(CountOracle::default()), smax_ord_then_count;
     BoolExtension::oracle().constant(StrategyWeight::Num(0)), bool_extension_0;
     BoolExtension::oracle().constant(StrategyWeight::Num(0)).and_by(CountOracle::default(), std::cmp::min), bool_extension_0_and_min_count;
     BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(CountOracle::default(), std::cmp::min), bool_extension_inf_and_min_count;
     BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(InverseCountOracle::default(), std::cmp::min), bool_extension_inf_and_min_count_inverse;
+    BoolExtension::oracle().ordered(), bool_extension_ord;
+    BoolExtension::oracle().ordered().and_by(CountOracle::default(), std::cmp::min), bool_extension_ord_and_min_count;
+    BoolExtension::oracle().ordered().and_by(InverseCountOracle::default(), std::cmp::min), bool_extension_ord_and_min_count_inverse;
     CountOracle::default(), count;
     InverseCountOracle::default(), count_inverse;
     StrategicArgumentsOracle::default(), arguments_s;
