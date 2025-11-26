@@ -9,7 +9,9 @@ use crate::{
     },
 };
 
+mod dependency;
 mod generic;
+pub use dependency::*;
 pub use generic::*;
 
 pub trait StrategicLocalOracle<

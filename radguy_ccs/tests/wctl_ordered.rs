@@ -3,8 +3,8 @@ use radguy::{
     oracle::{IdentityOracle, SMax, TrivialOracle, WeightedDepOracle},
     ordered::{
         oracle::{
-            CountOracle, InverseCountOracle, SiblingsOracle, StrategicArgumentsOracle,
-            StrategicLocalOracle, ToConstant,
+            DependencyCountOracle, InverseDependencyCountOracle, SiblingsOracle,
+            StrategicArgumentsOracle, StrategicLocalOracle, ToConstant,
         },
         strategy::StrategyWeight,
     },
@@ -117,15 +117,12 @@ wctl_test_oracles! {
     TrivialOracle.constant(StrategyWeight::Infinity), trivial_oracle_inf;
     SMax.constant(StrategyWeight::Num(0)), smax_const_0;
     SMax.constant(StrategyWeight::Infinity), smax_const_infinity;
-    SMax.constant(StrategyWeight::Num(0)).then(CountOracle::default()), smax_then_count;
-    SMax.constant(StrategyWeight::Num(10)).and_by(CountOracle::default(), std::cmp::min), smax_10_and_min_count;
+    SMax.constant(StrategyWeight::Num(0)).then(DependencyCountOracle::default()), smax_then_count;
+    SMax.constant(StrategyWeight::Num(10)).and_by(DependencyCountOracle::default(), std::cmp::min), smax_10_and_min_count;
     WeightedDepOracle::default().constant(StrategyWeight::Num(1)).then(SiblingsOracle), wctl_1_then_siblings;
-    CountOracle::default(), count;
-    InverseCountOracle::default(), count_inverse;
-    StrategicArgumentsOracle::successors(), arguments_s_s;
-    StrategicArgumentsOracle::successors().and_by(CountOracle::default(), std::cmp::min), args_s_s_and_min_count;
-    StrategicArgumentsOracle::successors().and_by(InverseCountOracle::default(), std::cmp::min), args_s_s_and_min_count_inverse;
-    StrategicArgumentsOracle::ancestors(), arguments_s_a;
-    StrategicArgumentsOracle::ancestors().and_by(CountOracle::default(), std::cmp::min), args_s_a_and_min_count;
-    StrategicArgumentsOracle::ancestors().and_by(InverseCountOracle::default(), std::cmp::min), args_s_a_and_min_count_inverse;
+    DependencyCountOracle::default(), count;
+    InverseDependencyCountOracle::default(), count_inverse;
+    StrategicArgumentsOracle::successors(), arguments_s;
+    StrategicArgumentsOracle::successors().and_by(DependencyCountOracle::default(), std::cmp::min), args_s_and_min_count;
+    StrategicArgumentsOracle::successors().and_by(InverseDependencyCountOracle::default(), std::cmp::min), args_s_and_min_count_inverse;
 }

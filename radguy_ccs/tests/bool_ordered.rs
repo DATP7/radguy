@@ -3,7 +3,8 @@ use radguy::{
     oracle::{IdentityOracle, SMax, TrivialOracle},
     ordered::{
         oracle::{
-            CountOracle, InverseCountOracle, StrategicArgumentsOracle, StrategicHeightOracle,
+            DependencyCountOracle, DependentCountOracle, InverseDependencyCountOracle,
+            InverseDependentCountOracle, StrategicArgumentsOracle, StrategicHeightOracle,
             StrategicLocalOracle, ToConstant, ToOrdered,
         },
         strategy::StrategyWeight,
@@ -129,32 +130,34 @@ test_oracles_ordered! {
     TrivialOracle.ordered(), trivial_oracle_ord;
     SMax.constant(StrategyWeight::Num(0)), smax_const_0;
     SMax.constant(StrategyWeight::Infinity), smax_const_infinity;
-    SMax.constant(StrategyWeight::Num(0)).then(CountOracle::default()), smax_then_count;
-    SMax.constant(StrategyWeight::Num(10)).and_by(CountOracle::default(), std::cmp::min), smax_10_and_min_count;
+    SMax.constant(StrategyWeight::Num(0)).then(DependencyCountOracle::default()), smax_then_dependency_count;
+    SMax.constant(StrategyWeight::Num(10)).and_by(DependencyCountOracle::default(), std::cmp::min), smax_10_and_min_dependency_count;
     SMax.ordered(), smax_ord;
-    SMax.ordered().then(CountOracle::default()), smax_ord_then_count;
+    SMax.ordered().then(DependencyCountOracle::default()), smax_ord_then_dependency_count;
+    SMax.ordered().then(DependentCountOracle::default()), smax_ord_then_dependent_count;
     BoolExtension::oracle().constant(StrategyWeight::Num(0)), bool_extension_0;
-    BoolExtension::oracle().constant(StrategyWeight::Num(0)).and_by(CountOracle::default(), std::cmp::min), bool_extension_0_and_min_count;
-    BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(CountOracle::default(), std::cmp::min), bool_extension_inf_and_min_count;
-    BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(InverseCountOracle::default(), std::cmp::min), bool_extension_inf_and_min_count_inverse;
+    BoolExtension::oracle().constant(StrategyWeight::Num(0)).and_by(DependencyCountOracle::default(), std::cmp::min), bool_extension_0_and_min_dependency_count;
+    BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(DependencyCountOracle::default(), std::cmp::min), bool_extension_inf_and_min_dependency_count;
+    BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(InverseDependencyCountOracle::default(), std::cmp::min), bool_extension_inf_and_min_dependency_count_inverse;
     BoolExtension::oracle().ordered(), bool_extension_ord;
-    BoolExtension::oracle().ordered().and_by(CountOracle::default(), std::cmp::min), bool_extension_ord_and_min_count;
-    BoolExtension::oracle().ordered().and_by(InverseCountOracle::default(), std::cmp::min), bool_extension_ord_and_min_count_inverse;
-    CountOracle::default(), count;
-    InverseCountOracle::default(), count_inverse;
-    StrategicArgumentsOracle::successors(), arguments_s_s;
-    StrategicArgumentsOracle::successors().and_by(CountOracle::default(), std::cmp::min), args_s_s_and_min_count;
-    StrategicArgumentsOracle::successors().and_by(InverseCountOracle::default(), std::cmp::min), args_s_s_and_min_count_inverse;
-    StrategicArgumentsOracle::successors().then(StrategicHeightOracle::transitive()), args_s_s_then_height_transitive;
-    StrategicArgumentsOracle::successors().and_by(StrategicHeightOracle::transitive(), std::cmp::min), args_s_s_and_height_transitive;
-    StrategicArgumentsOracle::ancestors(), arguments_s_a;
-    StrategicArgumentsOracle::ancestors().and_by(CountOracle::default(), std::cmp::min), args_s_a_and_min_count;
-    StrategicArgumentsOracle::ancestors().and_by(InverseCountOracle::default(), std::cmp::min), args_s_a_and_min_count_inverse;
-    StrategicArgumentsOracle::ancestors().then(StrategicHeightOracle::transitive()), args_s_a_then_height_transitive;
-    StrategicArgumentsOracle::ancestors().and_by(StrategicHeightOracle::transitive(), std::cmp::min), args_s_a_and_height_transitive;
+    BoolExtension::oracle().ordered().and_by(DependencyCountOracle::default(), std::cmp::min), bool_extension_ord_and_min_dependency_count;
+    BoolExtension::oracle().ordered().and_by(InverseDependencyCountOracle::default(), std::cmp::min), bool_extension_ord_and_min_dependency_count_inverse;
+    BoolExtension::oracle().ordered().then(DependencyCountOracle::default()), bool_extension_ord_then_dependency_count;
+    BoolExtension::oracle().ordered().then(DependentCountOracle::default()), bool_extension_ord_then_dependent_count;
+    DependencyCountOracle::default(), dependency_count;
+    InverseDependencyCountOracle::default(), dependency_count_inverse;
+    DependentCountOracle::default(), dependent_count;
+    InverseDependentCountOracle::default(), dependent_count_inverse;
+    StrategicArgumentsOracle::successors(), arguments_s;
+    StrategicArgumentsOracle::successors().and_by(DependencyCountOracle::default(), std::cmp::min), args_s_and_min_dependency_count;
+    StrategicArgumentsOracle::successors().and_by(InverseDependencyCountOracle::default(), std::cmp::min), args_s_and_min_dependency_count_inverse;
+    StrategicArgumentsOracle::successors().and_by(DependentCountOracle::default(), std::cmp::min), args_s_and_min_dependent_count;
+    StrategicArgumentsOracle::successors().and_by(InverseDependentCountOracle::default(), std::cmp::min), args_s_and_min_dependent_count_inverse;
+    StrategicArgumentsOracle::successors().then(StrategicHeightOracle::transitive()), args_s_then_height_transitive;
+    StrategicArgumentsOracle::successors().and_by(StrategicHeightOracle::transitive(), std::cmp::min), args_s_and_height_transitive;
     StrategicHeightOracle::simple(), height_simple;
-    StrategicHeightOracle::simple().and_by(CountOracle::default(), std::cmp::min), height_simple_and_min_count;
-    StrategicHeightOracle::simple().then(CountOracle::default()), height_simple_then_count;
+    StrategicHeightOracle::simple().and_by(DependencyCountOracle::default(), std::cmp::min), height_simple_and_min_dependency_count;
+    StrategicHeightOracle::simple().then(DependencyCountOracle::default()), height_simple_then_dependency_count;
     StrategicHeightOracle::transitive(), height_transitive;
-    StrategicHeightOracle::transitive().and_by(InverseCountOracle::default(), std::cmp::min), height_transitive_and_min_count_inverse;
+    StrategicHeightOracle::transitive().and_by(InverseDependencyCountOracle::default(), std::cmp::min), height_transitive_and_min_dependency_count_inverse;
 }

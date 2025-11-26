@@ -8,8 +8,8 @@ use std::{
 };
 
 use crate::ordered::strategy::{
-    Domain, IntersectBy, Length, Retain, RightSliced, Singleton, SliceRight, Strategy,
-    StrategyItem, StrategyWeight,
+    Domain, IntersectBy, LeftSliced, Length, Retain, RightSliced, Singleton, SliceLeft, SliceRight,
+    Strategy, StrategyItem, StrategyWeight,
 };
 
 /// A strategy that only builds the heap when the minimum item needs to be extracted
