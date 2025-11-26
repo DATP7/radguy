@@ -1,37 +1,37 @@
-use radguy::extension::LocalExtension;
-use radguy::ordered;
-use radguy::ordered::strategy::BinaryHeapStrategy;
-use radguy::ordered::strategy::StrategyWeight;
-use radguy::{Arguments, Bottom, Cartesian, PairUniverse, System, Union, Universe, kleene_local};
-use radguy_ccs::systems::bool::extension::BoolExtension;
-
-use std::fs;
-use std::fs::{File, OpenOptions};
-use std::io::Write;
-use std::path::PathBuf;
-
-use std::collections::HashSet;
-use std::fmt::{Debug, Display};
-use std::hash::Hash;
+use radguy::{
+    Arguments, Bottom, Cartesian, PairUniverse, System, Union, Universe,
+    extension::LocalExtension,
+    kleene_local,
+    oracle::{ArgumentsOracle, LocalMaxR, LocalOracle, SMax},
+    ordered::{
+        self,
+        oracle::{
+            CountOracle, InverseCountOracle, StrategicArgumentsOracle, StrategicHeightOracle,
+            StrategicLocalOracle, ToConstant,
+        },
+        strategy::{BinaryHeapStrategy, StrategyWeight},
+    },
+};
+use std::{
+    collections::HashSet,
+    fmt::{Debug, Display},
+    fs::{self, File, OpenOptions},
+    hash::Hash,
+    io::Write,
+    path::PathBuf,
+};
 
 use slotmap::DefaultKey;
 
-use radguy_ccs::systems::ccs::bisimulation_system::BisimulationSystem;
-use radguy_ccs::systems::ccs::grammar::ProgramParser;
-use radguy_ccs::systems::ccs::transition_system::TransitionSystem;
-use radguy_ccs::systems::ccs::weak_transition_system::WeakTransitionSystem;
-
-use radguy_ccs::systems::wccs;
-use radguy_ccs::systems::wccs::wccs_system::WCCSSystem;
-use radguy_ccs::systems::wctl;
-use radguy_ccs::systems::wctl::wctl_system::WCTLSystem;
-
-use radguy::ordered::oracle::{
-    CountOracle, InverseCountOracle, StrategicArgumentsOracle, StrategicHeightOracle,
-    StrategicLocalOracle, ToConstant,
+use radguy_ccs::systems::{
+    bool::extension::BoolExtension,
+    ccs::{
+        bisimulation_system::BisimulationSystem, grammar::ProgramParser,
+        transition_system::TransitionSystem, weak_transition_system::WeakTransitionSystem,
+    },
+    wccs::{self, wccs_system::WCCSSystem},
+    wctl::{self, wctl_system::WCTLSystem},
 };
-
-use radguy::oracle::{ArgumentsOracle, LocalMaxR, LocalOracle, SMax};
 
 //TODO: Figure out how many iterations is a good amount
 const ITERATIONS: u32 = 10;
