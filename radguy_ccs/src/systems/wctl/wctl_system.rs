@@ -432,13 +432,6 @@ impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key>
 
         Some(hyperedge)
     }
-
-    fn fmap<T, U>(hyperedges: Vec<Vec<T>>, f: fn(T) -> U) -> Vec<Vec<U>> {
-        hyperedges
-            .into_iter()
-            .map(|hyperedge| hyperedge.into_iter().map(&f).collect())
-            .collect()
-    }
 }
 
 impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key>
@@ -446,8 +439,11 @@ impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key>
     for WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
 {
     fn get_hyperedges(&self, key: VarKey) -> Option<Vec<Vec<VarKey>>> {
-        self.get_weighted_hyperedges(key)
-            .map(|some| Self::fmap(some, |(var_key, _)| var_key))
+        self.get_weighted_hyperedges(key).map(|some| {
+            some.into_iter()
+                .map(|hyperedge| hyperedge.into_iter().map(|(var_key, _)| var_key).collect())
+                .collect()
+        })
     }
 }
 
