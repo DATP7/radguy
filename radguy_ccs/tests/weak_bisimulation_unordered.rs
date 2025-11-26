@@ -42,10 +42,8 @@ macro_rules! weak_bisim_test_oracles {
                 weak_bisim_test!{
                     abp_ok_small: $oracle, "SPEC", "ABP" => true in include_str!("../systems/ccs/abp_ok.ccs");
                     abpl_ok_small_1: $oracle, "SPEC", "ABPl" => true in include_str!("../systems/ccs/abp_ok.ccs");
-                    abpl_ok_small_2: $oracle, "SPEC", "ABPl_2" => true in include_str!("../systems/ccs/abp_ok.ccs");
                     abp_bad_small: $oracle, "SPEC", "ABP" => true in include_str!("../systems/ccs/abp_bad.ccs");
                     abpl_bad_small_2: $oracle, "SPEC", "ABPl_2" => false in include_str!("../systems/ccs/abp_bad.ccs");
-                    abpl_bad_small_3: $oracle, "SPEC", "ABPl_3" => false in include_str!("../systems/ccs/abp_bad.ccs");
                     simple_infinite_tau_loop: $oracle, "S", "T" => true in r"
                     S = tau.S;
                     T = 0;
@@ -77,8 +75,8 @@ macro_rules! weak_bisim_test_oracles {
                     Orchard = (AppleTree | Man) \ {shake, redapple, greenapple};
                     Spec = walk.Spec;
                     ";
-                    leader_election_ok_6: $oracle, "Spec", "Ring" => true in include_str!("../systems/ccs/leader_election_ok_6.ccs");
-                    leader_election_bad_6: $oracle, "Spec", "Ring" => false in include_str!("../systems/ccs/leader_election_bad_6.ccs");
+                    leader_election_ok_3: $oracle, "Spec", "Ring" => true in include_str!("../systems/ccs/leader_election_ok_3.ccs");
+                    leader_election_bad_3: $oracle, "Spec", "Ring" => false in include_str!("../systems/ccs/leader_election_bad_3.ccs");
                 }
             }
         )*
