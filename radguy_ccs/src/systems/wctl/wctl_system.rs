@@ -6,7 +6,7 @@ use std::{
 use radguy::DependencyGraphSystem;
 use radguy::extension::TermSystem;
 use radguy::{Arguments, PairUniverse, System, Universe, bislotmap::BiSlotMap};
-use slotmap::Key;
+use slotmap::{Key, SecondaryMap};
 
 use crate::systems::{
     numeric::{
@@ -17,6 +17,8 @@ use crate::systems::{
     wctl::flat_formula::{FlatExpr, FlatFormula},
 };
 
+type HyperedgeMap<VarKey> = SecondaryMap<VarKey, Vec<Vec<(VarKey, Number)>>>;
+
 #[derive(Debug, Clone)]
 pub struct WCTLSystem<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key> {
     pub(crate) wccs_system: WCCSSystem<'a, ProcKey>,
@@ -24,9 +26,8 @@ pub struct WCTLSystem<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key,
     pub(crate) formulas: RefCell<BiSlotMap<FormKey, FlatFormula<'a, FormKey, ExprKey>>>,
     pub(crate) expresions: RefCell<BiSlotMap<ExprKey, FlatExpr<'a, ExprKey>>>,
     locked: bool,
-    hyper_edge_cache: RefCell<HashMap<VarKey, Vec<Vec<(VarKey, Number)>>>>,
+    hyper_edge_cache: RefCell<HyperedgeMap<VarKey>>,
 }
-
 impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
     WCTLSystem<'a, ProcKey, FormKey, ExprKey, VarKey, TermKey>
 {
@@ -406,7 +407,7 @@ impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key>
     }
 
     fn get_weighted_hyperedges(&self, key: VarKey) -> Option<Vec<Vec<(VarKey, Number)>>> {
-        if let Some(hyperedge) = self.hyper_edge_cache.borrow().get(&key) {
+        if let Some(hyperedge) = self.hyper_edge_cache.borrow().get(key) {
             return Some(hyperedge.clone());
         }
 

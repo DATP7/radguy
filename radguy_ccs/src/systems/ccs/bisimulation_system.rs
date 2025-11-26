@@ -7,7 +7,7 @@ use std::{
 
 use radguy::DependencyGraphSystem;
 use radguy::{Arguments, Assignment, PairUniverse, System, Universe, extension::TermSystem};
-use slotmap::Key;
+use slotmap::{Key, SecondaryMap};
 
 use crate::systems::{
     bool::{BoolSystem, BoolSystemImpl, BoolTerm},
@@ -37,6 +37,8 @@ pub enum FlatProcess<'a, K: Key> {
     Compose(K, K),
 }
 
+type HyperedgeMap<VarKey> = SecondaryMap<VarKey, Vec<Vec<VarKey>>>;
+
 #[derive(Default, Debug)]
 pub struct BisimulationSystem<
     'a,
@@ -49,7 +51,7 @@ pub struct BisimulationSystem<
     transition_system: T,
     _lifetime: PhantomData<&'a ()>,
     locked: bool,
-    hyper_edge_cache: RefCell<HashMap<VarKey, Vec<Vec<VarKey>>>>,
+    hyper_edge_cache: RefCell<HyperedgeMap<VarKey>>,
 }
 
 impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKey>>
@@ -290,7 +292,7 @@ impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKe
     DependencyGraphSystem<VarKey, VarKey> for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
 {
     fn get_hyperedges(&self, key: VarKey) -> Option<Vec<Vec<VarKey>>> {
-        if let Some(hyperedge) = self.hyper_edge_cache.borrow().get(&key) {
+        if let Some(hyperedge) = self.hyper_edge_cache.borrow().get(key) {
             return Some(hyperedge.clone());
         }
 

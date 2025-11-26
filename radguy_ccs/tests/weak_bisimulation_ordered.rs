@@ -7,12 +7,9 @@ use slotmap::DefaultKey;
 
 use radguy::{
     extension::LocalExtension,
-    oracle::{IdentityOracle, SMax, TrivialOracle},
+    oracle::SMax,
     ordered::{
-        oracle::{
-            CountOracle, InverseCountOracle, SiblingsOracle, StrategicArgumentsOracle,
-            StrategicLocalOracle, ToConstant,
-        },
+        oracle::{CountOracle, SiblingsOracle, StrategicLocalOracle, ToConstant},
         strategy::StrategyWeight,
     },
 };

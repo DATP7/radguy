@@ -1,6 +1,5 @@
 use radguy::ordered;
 use radguy::{
-    extension::LocalExtension,
     oracle::{IdentityOracle, SMax, TrivialOracle, WCTLOracle},
     ordered::{
         oracle::{
