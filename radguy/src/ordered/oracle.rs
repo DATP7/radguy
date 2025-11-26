@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fmt::Display, hash::Hash, marker::PhantomData};
 
 use crate::{
-    System,
+    Set, System,
     oracle::LocalOracle,
     ordered::{
         Strategy,
@@ -127,6 +127,75 @@ pub trait ToConstant<K: Hash + Eq + Copy, V: PartialOrd, PS, S: System<K, V>>:
 
 impl<K: Hash + Eq + Copy, V: PartialOrd, PS, S: System<K, V>, O: LocalOracle<K, V, PS, S>>
     ToConstant<K, V, PS, S> for O
+{
+}
+
+pub struct Ordered<
+    K: Hash + Eq + Copy,
+    V: PartialOrd,
+    PS,
+    S: System<K, V>,
+    O: LocalOracle<K, V, PS, S>,
+> {
+    oracle: O,
+    _phantom_data: PhantomData<(K, V, PS, S)>,
+}
+
+impl<
+    K: Hash + Eq + Copy,
+    V: PartialOrd,
+    PS: Set<(K, K)>,
+    PairStrategy: Domain<(K, K), PS> + FromIterator<StrategyItem<(K, K)>> + Clone,
+    S: System<K, V>,
+    O: LocalOracle<K, V, PS, S>,
+> StrategicLocalOracle<K, V, PairStrategy, S> for Ordered<K, V, PS, S, O>
+where
+    for<'a> &'a PairStrategy: IntoIterator<Item = StrategyItem<(K, K)>>,
+{
+    fn get_strategy(
+        &self,
+        assignment: &HashMap<K, V>,
+        strategy: &PairStrategy,
+        system: &S,
+    ) -> PairStrategy {
+        let rel = self
+            .oracle
+            .approximate_flow(assignment, &strategy.clone().domain(), system);
+        strategy
+            .into_iter()
+            .filter(|x| rel.contains(&x.1))
+            .collect()
+    }
+}
+
+impl<
+    K: Hash + Eq + Copy,
+    V: PartialOrd,
+    PS: IntoIterator<Item = (K, K)> + FromIterator<(K, K)>,
+    S: System<K, V>,
+    O: LocalOracle<K, V, PS, S> + Display,
+> Display for Ordered<K, V, PS, S, O>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}\u{2191}", self.oracle)
+    }
+}
+
+pub trait ToOrdered<K: Hash + Eq + Copy, V: PartialOrd, PS, S: System<K, V>>:
+    LocalOracle<K, V, PS, S> + Sized
+{
+    /// Convert a classical local oracle to a strategic local oracle, keeping the weights of the
+    /// input strategy
+    fn ordered(self) -> Ordered<K, V, PS, S, Self> {
+        Ordered {
+            oracle: self,
+            _phantom_data: PhantomData,
+        }
+    }
+}
+
+impl<K: Hash + Eq + Copy, V: PartialOrd, PS, S: System<K, V>, O: LocalOracle<K, V, PS, S>>
+    ToOrdered<K, V, PS, S> for O
 {
 }
 
