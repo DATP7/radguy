@@ -1,6 +1,6 @@
 use radguy::ordered;
 use radguy::{
-    oracle::{IdentityOracle, SMax, TrivialOracle, WCTLOracle},
+    oracle::{IdentityOracle, SMax, TrivialOracle, WeightedDepOracle},
     ordered::{
         oracle::{
             CountOracle, InverseCountOracle, SiblingsOracle, StrategicArgumentsOracle,
@@ -119,7 +119,7 @@ wctl_test_oracles! {
     SMax.constant(StrategyWeight::Infinity), smax_const_infinity;
     SMax.constant(StrategyWeight::Num(0)).then(CountOracle::default()), smax_then_count;
     SMax.constant(StrategyWeight::Num(10)).and_by(CountOracle::default(), std::cmp::min), smax_10_and_min_count;
-    WCTLOracle::default().constant(StrategyWeight::Num(1)).then(SiblingsOracle::default()), wctl_1_then_siblings;
+    WeightedDepOracle::default().constant(StrategyWeight::Num(1)).then(SiblingsOracle::default()), wctl_1_then_siblings;
     CountOracle::default(), count;
     InverseCountOracle::default(), count_inverse;
     StrategicArgumentsOracle::default(), arguments_s;

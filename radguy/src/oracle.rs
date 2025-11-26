@@ -434,10 +434,10 @@ impl Display for IdentityOracle {
 }
 
 #[derive(Clone)]
-pub struct WCTLOracle<PS>(PhantomData<PS>);
+pub struct WeightedDepOracle<PS>(PhantomData<PS>);
 
 #[expect(clippy::implicit_hasher)]
-impl<K> Default for WCTLOracle<HashSet<(K, K)>> {
+impl<K> Default for WeightedDepOracle<HashSet<(K, K)>> {
     fn default() -> Self {
         Self(PhantomData)
     }
@@ -448,7 +448,7 @@ impl<
     V: Maximal + Ord + Bottom + Clone,
     PS: FromIterator<(K, K)>,
     S: System<K, V> + DependencyGraphSystem<K, (K, V)> + Universe<HashSet<K>>,
-> LocalOracle<K, V, PS, S> for WCTLOracle<PS>
+> LocalOracle<K, V, PS, S> for WeightedDepOracle<PS>
 where
     for<'a> &'a PS: IntoIterator<Item = &'a (K, K)>,
 {
@@ -456,18 +456,18 @@ where
         possible
             .into_iter()
             .filter(|(x, y)| {
-                if system.universe().into_iter().any(|z| {
-                    possible.into_iter().contains(&(*x, z))
-                        && possible.into_iter().contains(&(z, *y))
-                }) {
-                    return true;
-                }
                 if x == y {
                     return true;
                 }
                 let Some(hyperedges) = system.get_hyperedges(*y) else {
                     return true;
                 };
+                if system.universe().into_iter().any(|z| {
+                    possible.into_iter().contains(&(*x, z))
+                        && possible.into_iter().contains(&(z, *y))
+                }) {
+                    return true;
+                }
 
                 hyperedges.into_iter().any(|targets| {
                     targets.iter().any(|(z, _)| z == x)
@@ -481,7 +481,7 @@ where
     }
 }
 
-impl<PS> Display for WCTLOracle<PS> {
+impl<PS> Display for WeightedDepOracle<PS> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "WCTL")
     }

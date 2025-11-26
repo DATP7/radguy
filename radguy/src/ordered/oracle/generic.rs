@@ -54,7 +54,7 @@ where
                                     .map(|sibling| {
                                         strategy
                                             .get_weight((sibling, y))
-                                            .unwrap_or(StrategyWeight::Infinity)
+                                            .unwrap_or(StrategyWeight::Num(0))
                                     })
                                     .sum()
                             })

@@ -1,7 +1,7 @@
 use radguy::kleene_local;
 
 use radguy::oracle::{
-    ArgumentsOracle, IdentityOracle, LocalMaxR, LocalOracle, SMax, TrivialOracle, WCTLOracle,
+    ArgumentsOracle, IdentityOracle, LocalMaxR, LocalOracle, SMax, TrivialOracle, WeightedDepOracle,
 };
 
 use radguy_ccs::systems::numeric::Number;
@@ -87,7 +87,7 @@ macro_rules! wctl_test_oracles {
 
 wctl_test_oracles! {
     SMax, smax;
-    WCTLOracle::default(), wctl_oracle;
+    WeightedDepOracle::default(), wctl_oracle;
     TrivialOracle, trivialoracle;
     IdentityOracle, identityoracle;
     LocalMaxR::default(), localmaxr;
