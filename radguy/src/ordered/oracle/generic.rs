@@ -17,21 +17,21 @@ use crate::{
     ordered::{
         StrategicLocalOracle,
         strategy::{
-            Length, OrxStrategy, Retain, SliceRight, Strategy, StrategyItem, StrategyWeight,
+            GetWeight, Length, OrxStrategy, Retain, SliceRight, Strategy, StrategyItem,
+            StrategyWeight,
         },
     },
 };
 
 #[derive(Default, Clone, Debug)]
-pub struct SiblingsOracle<VS>(PhantomData<VS>);
+pub struct SiblingsOracle;
 
 impl<
     K: Eq + Copy + Hash + Key,
     V: PartialOrd,
-    VS: Strategy<K> + Length,
-    PS: Strategy<(K, K)> + SliceRight<K, K, VS> + FromIterator<StrategyItem<(K, K)>> + Clone,
+    PS: Strategy<(K, K)> + GetWeight<(K, K)> + FromIterator<StrategyItem<(K, K)>>,
     S: System<K, V> + DependencyGraphSystem<K, K>,
-> StrategicLocalOracle<K, V, PS, S> for SiblingsOracle<VS>
+> StrategicLocalOracle<K, V, PS, S> for SiblingsOracle
 where
     for<'a> &'a PS: IntoIterator<Item = StrategyItem<(K, K)>>,
 {
@@ -66,7 +66,7 @@ where
     }
 }
 
-impl<VS> Display for SiblingsOracle<VS> {
+impl Display for SiblingsOracle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Siblings")
     }

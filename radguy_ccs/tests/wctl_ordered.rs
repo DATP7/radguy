@@ -4,7 +4,7 @@ use radguy::{
     ordered::{
         oracle::{
             CountOracle, InverseCountOracle, SiblingsOracle, StrategicArgumentsOracle,
-            StrategicHeightOracle, StrategicLocalOracle, ToConstant,
+            StrategicLocalOracle, ToConstant,
         },
         strategy::StrategyWeight,
     },
@@ -18,7 +18,7 @@ use radguy_ccs::systems::wctl::wctl_system::WCTLSystem;
 use slotmap::DefaultKey;
 
 macro_rules! wctl_test {
-    ($($(#ignore($reason:literal))? $test_name:ident: $oracle:expr, $strategy:ty, $($process_name:literal, $formula_str:expr => $eq:literal),* $(,)? in $wccs:expr;)*) => {
+    ($($(#ignore($reason:literal))? $test_name:ident: $oracle:expr, $strategy_type:ty, $($process_name:literal, $formula_str:expr => $eq:literal),* $(,)? in $wccs:expr;)*) => {
         $(
             $(#[ignore = $reason])?
             #[test]
@@ -40,7 +40,7 @@ macro_rules! wctl_test {
                     let formula_key = sys.insert_ast_formula(formula.clone());
                     let start = sys.get_var(process_key, formula_key);
 
-                    let result = ordered::kleene_local::<_, _, $strategy, $strategy, _>(&mut sys, start, &$oracle) == Number::Val(0);
+                    let result = ordered::kleene_local::<_, _, $strategy_type, $strategy_type, _>(&mut sys, start, &$oracle) == Number::Val(0);
                     assert_eq!($eq, result, "{} should{} satisfy {} in {}", $process_name, if !$eq { " not" } else {""}, $formula_str, $wccs);
                 )*
             }
@@ -49,12 +49,12 @@ macro_rules! wctl_test {
 }
 
 macro_rules! wctl_test_oracles_strategy {
-    ($($stratagy_type_name:ident: $stratagy_type:ty, $oracle:expr;)*) => {
+    ($($strategy:ident: $strategy_type:ty, $oracle:expr;)*) => {
         $(
-            mod $stratagy_type_name {
+            mod $strategy {
                 use super::*;
                 wctl_test! {
-                    mower_example: $oracle, $stratagy_type,
+                    mower_example: $oracle, $strategy_type,
                         "S0", "A mow U[<=6] dump" => true,
                         "S0", "A mow U[<=4] dump" => false,
                         in r"
@@ -66,20 +66,20 @@ macro_rules! wctl_test_oracles_strategy {
                         S5 := mow:<go,2>.S6;
                         S6 := dump:<go,0>.S6;
                     ";
-                    proposition: $oracle, $stratagy_type, "S", "mow" => true in "S := mow:0;";
-                    proposition_multiple: $oracle, $stratagy_type, "S", "mow && dump" => true in "S := mow:dump:0;";
-                    proposition_multiple_neg: $oracle, $stratagy_type, "S", "mow && dump && dud" => false in "S := mow:dump:0;";
-                    linear_universal_final: $oracle, $stratagy_type, "S", "AF dump" => true in "S := <go>.<go>.<go>.<go>.dump:0;";
-                    recursive: $oracle, $stratagy_type, "S", "AF dump" => true in "S := <go>.dump:S;";
-                    recursive_neg: $oracle, $stratagy_type, "S", "AF mow" => false in "S := <go>.dump:S;";
-                    compare: $oracle, $stratagy_type, "S", "mow == 4" => true in "S := mow:0 + mow:0 + mow:0 + mow:0;";
-                    leader_election: $oracle, $stratagy_type,
+                    proposition: $oracle, $strategy_type, "S", "mow" => true in "S := mow:0;";
+                    proposition_multiple: $oracle, $strategy_type, "S", "mow && dump" => true in "S := mow:dump:0;";
+                    proposition_multiple_neg: $oracle, $strategy_type, "S", "mow && dump && dud" => false in "S := mow:dump:0;";
+                    linear_universal_final: $oracle, $strategy_type, "S", "AF dump" => true in "S := <go>.<go>.<go>.<go>.dump:0;";
+                    recursive: $oracle, $strategy_type, "S", "AF dump" => true in "S := <go>.dump:S;";
+                    recursive_neg: $oracle, $strategy_type, "S", "AF mow" => false in "S := <go>.dump:S;";
+                    compare: $oracle, $strategy_type, "S", "mow == 4" => true in "S := mow:0 + mow:0 + mow:0 + mow:0;";
+                    leader_election: $oracle, $strategy_type,
                     "Ring", "EF leader > 1" => false,
                     "Ring", "EF leader" => true
                     in include_str!("../systems/wccs/LeaderElection2.wccs");
 
-                    #ignore("too slow") bit_protocol: $oracle, $stratagy_type, "System", "EF[<= 35] delivered == 7" => true in include_str!("../systems/wccs/BitProtocol(B5M7).wccs");
-                    #ignore("too slow") client_server: $oracle, $stratagy_type,
+                    #ignore("too slow") bit_protocol: $oracle, $strategy_type, "System", "EF[<= 35] delivered == 7" => true in include_str!("../systems/wccs/BitProtocol(B5M7).wccs");
+                    #ignore("too slow") client_server: $oracle, $strategy_type,
                         "System", "E True U[<=10] (A True U[<=1] failed)" => true,
                         "System", "E True U[<=8] delivered" => true,
                         "System", "E True U[<=5] failed" => true,
@@ -119,17 +119,10 @@ wctl_test_oracles! {
     SMax.constant(StrategyWeight::Infinity), smax_const_infinity;
     SMax.constant(StrategyWeight::Num(0)).then(CountOracle::default()), smax_then_count;
     SMax.constant(StrategyWeight::Num(10)).and_by(CountOracle::default(), std::cmp::min), smax_10_and_min_count;
-    WeightedDepOracle::default().constant(StrategyWeight::Num(1)).then(SiblingsOracle::default()), wctl_1_then_siblings;
+    WeightedDepOracle::default().constant(StrategyWeight::Num(1)).then(SiblingsOracle), wctl_1_then_siblings;
     CountOracle::default(), count;
     InverseCountOracle::default(), count_inverse;
     StrategicArgumentsOracle::default(), arguments_s;
     StrategicArgumentsOracle::default().and_by(CountOracle::default(), std::cmp::min), args_s_and_min_count;
     StrategicArgumentsOracle::default().and_by(InverseCountOracle::default(), std::cmp::min), args_s_and_min_count_inverse;
-    StrategicArgumentsOracle::default().then(StrategicHeightOracle::transitive()), args_s_then_height_transitive;
-    StrategicArgumentsOracle::default().and_by(StrategicHeightOracle::transitive(), std::cmp::min), args_s_and_height_transitive;
-    StrategicHeightOracle::simple(), height_simple;
-    StrategicHeightOracle::simple().and_by(CountOracle::default(), std::cmp::min), height_simple_and_min_count;
-    StrategicHeightOracle::simple().then(CountOracle::default()), height_simple_then_count;
-    StrategicHeightOracle::transitive(), height_transitive;
-    StrategicHeightOracle::transitive().and_by(InverseCountOracle::default(), std::cmp::min), height_transitive_and_min_count_inverse;
 }

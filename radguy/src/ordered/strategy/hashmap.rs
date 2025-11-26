@@ -6,8 +6,8 @@ use std::{
 };
 
 use crate::ordered::strategy::{
-    Domain, IntersectBy, LeftSliced, Length, Retain, RightSliced, Singleton, SliceLeft, SliceRight,
-    Strategy, StrategyItem, StrategyWeight,
+    Domain, GetWeight, IntersectBy, LeftSliced, Length, Retain, RightSliced, Singleton, SliceLeft,
+    SliceRight, Strategy, StrategyItem, StrategyWeight,
 };
 
 #[derive(Default, Clone, Debug)]
@@ -68,7 +68,9 @@ impl<T: Copy + Eq + Hash> Strategy<T> for HashMapStrategy<T> {
         }
         key
     }
+}
 
+impl<T: Eq + Hash> GetWeight<T> for HashMapStrategy<T> {
     fn get_weight(&self, item: T) -> Option<StrategyWeight> {
         self.get(&item).copied()
     }

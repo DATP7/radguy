@@ -7,16 +7,18 @@ use slotmap::DefaultKey;
 
 use radguy::{
     extension::LocalExtension,
-    oracle::SMax,
+    oracle::{IdentityOracle, SMax, TrivialOracle},
     ordered::{
-        oracle::{CountOracle, SiblingsOracle, StrategicLocalOracle, ToConstant},
+        oracle::{
+            CountOracle, SiblingsOracle, StrategicArgumentsOracle, StrategicLocalOracle, ToConstant,
+        },
         strategy::StrategyWeight,
     },
 };
 use radguy_ccs::systems::bool::extension::BoolExtension;
 
 macro_rules! weak_bisim_test {
-        ($oracle:expr, $strategy:ty, $($name:ident: $left:expr, $right:expr => $eq:literal in $ccs:expr;)*) => {
+        ($oracle:expr, $strategy_type:ty, $($name:ident: $left:expr, $right:expr => $eq:literal in $ccs:expr;)*) => {
             $(
                 #[test]
                 fn $name()
@@ -31,7 +33,7 @@ macro_rules! weak_bisim_test {
                     let mut sys = BisimulationSystem::<DefaultKey, DefaultKey, DefaultKey, WeakTransitionSystem<DefaultKey>>::new(weak_transition_system);
                     let start = sys.specify_comparison($left, $right);
 
-                    let result = !kleene_local::<_, _, $strategy, $strategy, _>(&mut sys, start, &$oracle);
+                    let result = !kleene_local::<_, _, $strategy_type, $strategy_type, _>(&mut sys, start, &$oracle);
                     assert_eq!($eq, result, "{} and {} should{} be bisimilar in{}", $left, $right, if !$eq { " not" } else {""}, $ccs);
                 }
             )*
@@ -39,16 +41,16 @@ macro_rules! weak_bisim_test {
     }
 
 macro_rules! weak_bisim_test_strategies {
-    ($oracle:expr, $($stratagy_type_name:ident: $stratagy_type:ty;)*) => {
+    ($oracle:expr, $($stratagy:ident: $stratagy_type:ty;)*) => {
         $(
-            mod $stratagy_type_name {
+            mod $stratagy {
                 use super::*;
                 weak_bisim_test!{
                     $oracle, $stratagy_type,
-                    abp_ok_small: "SPEC", "ABP" => true in include_str!("../systems/ccs/abp_ok.ccs");
-                    abpl_ok_small_1: "SPEC", "ABPl" => true in include_str!("../systems/ccs/abp_ok.ccs");
-                    abp_bad_small: "SPEC", "ABP" => true in include_str!("../systems/ccs/abp_bad.ccs");
-                    abpl_bad_small_2: "SPEC", "ABPl_2" => false in include_str!("../systems/ccs/abp_bad.ccs");
+                    abp_ok_1: "SPEC", "ABP" => true in include_str!("../systems/ccs/abp_ok.ccs");
+                    abp_bad_1: "SPEC", "ABP" => true in include_str!("../systems/ccs/abp_bad.ccs");
+                    abpl_ok_1: "SPEC", "ABPl" => true in include_str!("../systems/ccs/abp_ok.ccs");
+                    abpl_bad_2: "SPEC", "ABPl_2" => false in include_str!("../systems/ccs/abp_bad.ccs");
                     simple_infinite_tau_loop: "S", "T" => true in r"
                         S = tau.S;
                         T = 0;
@@ -110,12 +112,13 @@ macro_rules! weak_bisim_test_oracles {
 }
 
 weak_bisim_test_oracles! {
-    BoolExtension::oracle().constant(StrategyWeight::Num(1)).then(SiblingsOracle::default()), bool_extension_1_then_siblings;
+    BoolExtension::oracle().constant(StrategyWeight::Num(1)).then(SiblingsOracle), bool_extension_1_then_siblings;
     SMax.constant(StrategyWeight::Num(0)), smax_const_0;
     SMax.constant(StrategyWeight::Num(0)).then(CountOracle::default()), smax_then_count;
-    // These are commented out due to perfromance
-    // TrivialOracle.constant(StrategyWeight::Infinity), trivial_oracle_inf;
-    // IdentityOracle.constant(StrategyWeight::Infinity), identity_oracle_inf;
+    TrivialOracle.constant(StrategyWeight::Infinity), trivial_oracle_inf;
+    IdentityOracle.constant(StrategyWeight::Infinity), identity_oracle_inf;
+    StrategicArgumentsOracle::default(), arguments_s;
+    // These are commented out due to perfromance issues
     // SMax.constant(StrategyWeight::Infinity), smax_const_infinity;
     // SMax.constant(StrategyWeight::Num(1)), smax_const_1;
     // SMax.constant(StrategyWeight::Num(1)).then(SiblingsOracle::default()), smax_const_1_siblings;
@@ -126,7 +129,6 @@ weak_bisim_test_oracles! {
     // BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(InverseCountOracle::default(), std::cmp::min), bool_extension_inf_and_min_count_inverse;
     // CountOracle::default(), count;
     // InverseCountOracle::default(), count_inverse;
-    // StrategicArgumentsOracle::default(), arguments_s;
     // StrategicArgumentsOracle::default().and_by(CountOracle::default(), std::cmp::min), args_s_and_min_count;
     // StrategicArgumentsOracle::default().and_by(InverseCountOracle::default(), std::cmp::min), args_s_and_min_count_inverse;
 }

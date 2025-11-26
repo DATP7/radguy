@@ -62,11 +62,7 @@ impl Add for StrategyWeight {
 
 impl Sum for StrategyWeight {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        let mut sum = Self::Num(0);
-        for item in iter {
-            sum = sum + item;
-        }
-        sum
+        iter.fold(Self::Num(0), |acc, e| acc + e)
     }
 }
 
@@ -109,7 +105,6 @@ pub trait Strategy<T> {
     /// Returns `None` if there are no more elements in the strategy
     // TODO: should we just have an iterator instead?
     fn extract_min(&mut self) -> Option<T>;
-    fn get_weight(&self, item: T) -> Option<StrategyWeight>;
 }
 
 // We have `LeftSliced` and `RightSliced` so we can easily have the same implementation of
@@ -190,4 +185,8 @@ pub trait Retain<T> {
 pub trait ResetWeights {
     /// Set the weights of all items in the strategy to infinity
     fn reset_weights(&mut self);
+}
+
+pub trait GetWeight<T> {
+    fn get_weight(&self, element: T) -> Option<StrategyWeight>;
 }

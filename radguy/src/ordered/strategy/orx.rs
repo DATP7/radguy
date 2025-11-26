@@ -11,8 +11,8 @@ use std::{
 use orx_priority_queue::{DaryHeapWithMap, NodeKeyRef, PriorityQueueDecKey};
 
 use crate::ordered::strategy::{
-    Domain, IntersectBy, LeftSliced, Length, ResetWeights, RightSliced, Singleton, SliceLeft,
-    SliceRight, Strategy, StrategyItem, StrategyWeight,
+    Domain, GetWeight, IntersectBy, LeftSliced, Length, ResetWeights, RightSliced, Singleton,
+    SliceLeft, SliceRight, Strategy, StrategyItem, StrategyWeight,
 };
 
 #[derive(Clone, Debug)]
@@ -48,11 +48,10 @@ impl<T: Copy + Eq, H: PriorityQueueDecKey<T, StrategyWeight>> Strategy<T> for Or
     fn extract_min(&mut self) -> Option<T> {
         self.0.pop().map(|(v, _)| v)
     }
-
+}
+impl<T: Clone, H: PriorityQueueDecKey<T, StrategyWeight>> GetWeight<T> for OrxStrategy<T, H> {
     fn get_weight(&self, item: T) -> Option<StrategyWeight> {
-        self.iter()
-            .find(|StrategyItem(_, v)| *v == item)
-            .map(|StrategyItem(weight, _)| weight)
+        self.0.key_of(&item)
     }
 }
 

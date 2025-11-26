@@ -375,34 +375,46 @@ impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key>
 impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key>
     WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
 {
-    fn find_var_key(&self, term_key: TermKey) -> VarKey {
+    fn get_var_key_of_sum(&self, term_key: TermKey) -> Option<VarKey> {
         match self.get_term(term_key) {
-            NumericTerm::Var(var_key) => var_key,
-            NumericTerm::Add(_, right) => self.find_var_key(right),
-            _ => unreachable!(),
+            NumericTerm::Var(var_key) => Some(var_key),
+            NumericTerm::Add(left_term, right_term) => self
+                .get_var_key_of_sum(right_term)
+                .or_else(|| self.get_var_key_of_sum(left_term)),
+            _ => None,
         }
     }
 
-    fn find_weight(&self, term_key: TermKey) -> Number {
+    fn get_weight_of_sum(&self, term_key: TermKey) -> Option<Number> {
         match self.get_term(term_key) {
-            NumericTerm::Const(weight) => weight,
-            NumericTerm::Add(weight_term, _) => self.find_weight(weight_term),
-            NumericTerm::Var(_) => Number::Val(0),
-            _ => unreachable!(),
+            NumericTerm::Const(weight) => Some(weight),
+            NumericTerm::Add(left_term, right_term) => self
+                .get_weight_of_sum(left_term)
+                .or_else(|| self.get_weight_of_sum(right_term)),
+            NumericTerm::Var(_) => None,
+            _ => unreachable!("Hyper edge targets should always be a var or an add"),
         }
     }
 
-    fn get_hyperedge(&self, term_key: TermKey) -> Vec<(VarKey, Number)> {
+    fn get_weighted_hyperedge(&self, term_key: TermKey) -> Vec<(VarKey, Number)> {
         match self.get_term(term_key) {
             NumericTerm::Var(var_key) => Vec::from([(var_key, Number::Val(0))]),
-            NumericTerm::Add(_, _) => {
-                Vec::from([(self.find_var_key(term_key), self.find_weight(term_key))])
-            }
+            NumericTerm::Add(_, _) => Vec::from([(
+                self.get_var_key_of_sum(term_key)
+                    .expect("target should contain a variable"),
+                self.get_weight_of_sum(term_key).unwrap_or(Number::Val(0)),
+            )]),
             NumericTerm::Max(elements) => elements
                 .into_iter()
-                .map(|term_key| (self.find_var_key(term_key), self.find_weight(term_key)))
+                .map(|term_key| {
+                    (
+                        self.get_var_key_of_sum(term_key)
+                            .expect("target should contain a variable"),
+                        self.get_weight_of_sum(term_key).unwrap_or(Number::Val(0)),
+                    )
+                })
                 .collect(),
-            _ => unreachable!(),
+            _ => unreachable!("A hyper edge is either a max of targets or a target (var or add)"),
         }
     }
 
@@ -419,11 +431,13 @@ impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key>
             NumericTerm::Const(_) => Vec::new(),
             NumericTerm::Min(elements) => elements
                 .into_iter()
-                .map(|term_key| self.get_hyperedge(term_key))
+                .map(|term_key| self.get_weighted_hyperedge(term_key))
                 .collect(),
-            NumericTerm::Max(_) => Vec::from([self.get_hyperedge(term_key)]),
-            NumericTerm::Bound { term: term_key, .. } => Vec::from([self.get_hyperedge(term_key)]),
-            _ => unreachable!(),
+            NumericTerm::Max(_) => Vec::from([self.get_weighted_hyperedge(term_key)]),
+            NumericTerm::Bound { term: term_key, .. } => {
+                Vec::from([self.get_weighted_hyperedge(term_key)])
+            }
+            _ => unreachable!("A hyperedge collection can only be a Const, Min, Max or Bound"),
         };
 
         self.hyper_edge_cache
