@@ -483,7 +483,7 @@ where
 
 impl<PS> Display for WeightedDepOracle<PS> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "WCTL")
+        write!(f, "WeightedDep")
     }
 }
 

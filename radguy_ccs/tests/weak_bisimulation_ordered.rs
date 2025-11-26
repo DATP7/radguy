@@ -33,8 +33,8 @@ macro_rules! weak_bisim_test {
                     let mut sys = BisimulationSystem::<DefaultKey, DefaultKey, DefaultKey, WeakTransitionSystem<DefaultKey>>::new(weak_transition_system);
                     let start = sys.specify_comparison($left, $right);
 
-                    let result = !kleene_local::<_, _, $strategy_type, $strategy_type, _>(&mut sys, start, &$oracle);
-                    assert_eq!($eq, result, "{} and {} should{} be bisimilar in{}", $left, $right, if !$eq { " not" } else {""}, $ccs);
+                    let (result, _) = kleene_local::<_, _, $strategy_type, $strategy_type, _>(&mut sys, start, &$oracle);
+                    assert_eq!($eq, !result, "{} and {} should{} be bisimilar in{}", $left, $right, if !$eq { " not" } else {""}, $ccs);
                 }
             )*
         };

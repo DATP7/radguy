@@ -548,6 +548,7 @@ dependencies = [
  "lalrpop-util",
  "orx-priority-queue",
  "radguy",
+ "rayon",
  "slotmap",
 ]
 
