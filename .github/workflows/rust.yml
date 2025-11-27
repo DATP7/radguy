@@ -18,4 +18,4 @@ jobs:
     - name: Run Clippy
       run: cargo clippy --all-targets --all-features
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo test --verbose --features slow

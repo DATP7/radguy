@@ -11,7 +11,7 @@ use radguy::{
 };
 
 pub mod systems;
-macro_rules! test_oracle_system_strategy_numerical {
+macro_rules! test_oracle_system_strategy_numerical_fast {
     ($name:ident: test $oracle:expr, with $strategy:ty, on: $spec:ident) => {
         mod $name {
             use super::*;
@@ -60,6 +60,59 @@ macro_rules! test_oracle_system_strategy_numerical {
         }
     };
 }
+
+macro_rules! test_oracle_system_strategy_numerical_slow {
+    ($name:ident: test $oracle:expr, with $strategy:ty, on: $spec:ident) => {
+        mod $name {
+            use super::*;
+
+            #[test]
+            #[cfg_attr(not(feature = "slow"), ignore = "Not running slow tests")]
+            fn eager() {
+                let $crate::systems::numeric::NumericSystemSpec {
+                    mut system,
+                    variables,
+                    goal,
+                } = $crate::systems::numeric::$spec();
+                for (var, goal) in variables.into_iter().zip(goal.into_iter()) {
+                    let start = system.names.get_or_insert_key(var);
+                    let (result, _) =
+                        ::radguy::ordered::kleene_local::<_, _, $strategy, $strategy, _>(
+                            &mut system,
+                            start,
+                            &$oracle,
+                        );
+                    assert_eq!(result, goal, "{var} did not have the expected value");
+                }
+            }
+            #[test]
+            #[cfg_attr(not(feature = "slow"), ignore = "Not running slow tests")]
+            fn lazy() {
+                let $crate::systems::numeric::NumericSystemSpec {
+                    system,
+                    variables,
+                    goal,
+                } = $crate::systems::numeric::$spec();
+                let mut system: radguy_ccs::systems::numeric::numeric_system::LazyNumericSystem<
+                    _,
+                    _,
+                    _,
+                > = system.into();
+                for (var, goal) in variables.into_iter().zip(goal.into_iter()) {
+                    let start = system.init_target(var);
+                    let (result, _) =
+                        ::radguy::ordered::kleene_local::<_, _, $strategy, $strategy, _>(
+                            &mut system,
+                            start,
+                            &$oracle,
+                        );
+                    assert_eq!(result, goal, "{var} did not have the expected value");
+                }
+            }
+        }
+    };
+}
+
 macro_rules! test_oracle_system_ordered_numerical {
     (test $oracle:expr, on: $($spec:ident),* $(,)?) => {
         $(
@@ -69,19 +122,19 @@ macro_rules! test_oracle_system_ordered_numerical {
             use radguy::ordered::strategy::{BinaryHeapStrategy, HashMapStrategy, OrxStrategy, LazyHeap};
             use orx_priority_queue::DaryHeapWithMap;
 
-            test_oracle_system_strategy_numerical! {
+            test_oracle_system_strategy_numerical_fast! {
                 std_binary: test $oracle, with BinaryHeapStrategy<_>, on: $spec
             }
-            test_oracle_system_strategy_numerical! {
+            test_oracle_system_strategy_numerical_slow! {
                 std_hashmap: test $oracle, with HashMapStrategy<_>, on: $spec
             }
-            test_oracle_system_strategy_numerical! {
+            test_oracle_system_strategy_numerical_slow! {
                 orx_quad: test $oracle, with OrxStrategy<_, DaryHeapWithMap<_, StrategyWeight, 4>>, on: $spec
             }
-            test_oracle_system_strategy_numerical! {
+            test_oracle_system_strategy_numerical_slow! {
                 std_binary_lazy: test $oracle, with LazyHeap<_, BinaryHeapStrategy<_>>, on: $spec
             }
-            test_oracle_system_strategy_numerical! {
+            test_oracle_system_strategy_numerical_slow! {
                 orx_quad_lazy: test $oracle, with LazyHeap<_, OrxStrategy<_, DaryHeapWithMap<_, StrategyWeight, 4>>>, on: $spec
             }
         }

@@ -128,6 +128,7 @@ fn restriction_preserved() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "slow"), ignore = "Not running slow tests")]
 fn strong_bisimulation_large_protocol() {
     strong_bisim_test! {
         // Big

@@ -15,40 +15,60 @@ use radguy::{
 };
 use radguy_ccs::systems::bool::extension::BoolExtension;
 
-macro_rules! weak_bisim_test {
-        ($oracle:expr, $strategy_type:ty, $($name:ident: $left:expr, $right:expr => $eq:literal in $ccs:expr;)*) => {
-            $(
-                #[test]
-                fn $name()
-                {
-                    let parser = ProgramParser::new();
-                    let program_ast = parser
-                        .parse(&$ccs)
-                        .expect("Failed to parse CCS program content.");
-                    let mut weak_transition_system = WeakTransitionSystem::<DefaultKey>::default();
-                    weak_transition_system.load_ast(program_ast);
+macro_rules! weak_bisim_test_fast {
+    ($oracle:expr, $strategy_type:ty, $($name:ident: $left:expr, $right:expr => $eq:literal in $ccs:expr;)*) => {
+        $(
+            #[test]
+            fn $name()
+            {
+                let parser = ProgramParser::new();
+                let program_ast = parser
+                    .parse(&$ccs)
+                    .expect("Failed to parse CCS program content.");
+                let mut weak_transition_system = WeakTransitionSystem::<DefaultKey>::default();
+                weak_transition_system.load_ast(program_ast);
 
-                    let mut sys = BisimulationSystem::<DefaultKey, DefaultKey, DefaultKey, WeakTransitionSystem<DefaultKey>>::new(weak_transition_system);
-                    let start = sys.specify_comparison($left, $right);
+                let mut sys = BisimulationSystem::<DefaultKey, DefaultKey, DefaultKey, WeakTransitionSystem<DefaultKey>>::new(weak_transition_system);
+                let start = sys.specify_comparison($left, $right);
 
-                    let (result, _) = kleene_local::<_, _, $strategy_type, $strategy_type, _>(&mut sys, start, &$oracle);
-                    assert_eq!($eq, !result, "{} and {} should{} be bisimilar in{}", $left, $right, if !$eq { " not" } else {""}, $ccs);
-                }
-            )*
-        };
-    }
+                let (result, _) = kleene_local::<_, _, $strategy_type, $strategy_type, _>(&mut sys, start, &$oracle);
+                assert_eq!($eq, !result, "{} and {} should{} be bisimilar in{}", $left, $right, if !$eq { " not" } else {""}, $ccs);
+            }
+        )*
+    };
+}
+
+macro_rules! weak_bisim_test_slow {
+    ($oracle:expr, $strategy_type:ty, $($name:ident: $left:expr, $right:expr => $eq:literal in $ccs:expr;)*) => {
+        $(
+            #[test]
+            #[cfg_attr(not(feature = "slow"), ignore = "Not running slow tests")]
+            fn $name()
+            {
+                let parser = ProgramParser::new();
+                let program_ast = parser
+                    .parse(&$ccs)
+                    .expect("Failed to parse CCS program content.");
+                let mut weak_transition_system = WeakTransitionSystem::<DefaultKey>::default();
+                weak_transition_system.load_ast(program_ast);
+
+                let mut sys = BisimulationSystem::<DefaultKey, DefaultKey, DefaultKey, WeakTransitionSystem<DefaultKey>>::new(weak_transition_system);
+                let start = sys.specify_comparison($left, $right);
+
+                let (result, _) = kleene_local::<_, _, $strategy_type, $strategy_type, _>(&mut sys, start, &$oracle);
+                assert_eq!($eq, !result, "{} and {} should{} be bisimilar in{}", $left, $right, if !$eq { " not" } else {""}, $ccs);
+            }
+        )*
+    };
+}
 
 macro_rules! weak_bisim_test_strategies {
-    ($oracle:expr, $($stratagy:ident: $stratagy_type:ty;)*) => {
+    ($oracle:expr, $($strategy:ident: $strategy_type:ty;)*) => {
         $(
-            mod $stratagy {
+            mod $strategy {
                 use super::*;
-                weak_bisim_test!{
-                    $oracle, $stratagy_type,
-                    abp_ok_1: "SPEC", "ABP" => true in include_str!("../systems/ccs/abp_ok.ccs");
-                    abp_bad_1: "SPEC", "ABP" => true in include_str!("../systems/ccs/abp_bad.ccs");
-                    abpl_ok_1: "SPEC", "ABPl" => true in include_str!("../systems/ccs/abp_ok.ccs");
-                    abpl_bad_2: "SPEC", "ABPl_2" => false in include_str!("../systems/ccs/abp_bad.ccs");
+                weak_bisim_test_fast!{
+                    $oracle, $strategy_type,
                     simple_infinite_tau_loop: "S", "T" => true in r"
                         S = tau.S;
                         T = 0;
@@ -73,13 +93,20 @@ macro_rules! weak_bisim_test_strategies {
                         Spec' = 'b.Spec + a.Spec'';
                         Spec'' = 'b.Spec' + a.'b.Spec'';
                     ";
-                    dekkers_mutual_exclusion: "Dekker-2", "Spec" => true in include_str!("../systems/ccs/dekkers_mutual_exclusion.ccs");
                     orchard: "Spec", "Orchard" => true in r"
                         Man = 'shake.(redapple.walk.Man + greenapple.walk.Man);
                         AppleTree = shake.('greenapple.AppleTree + 'redapple.AppleTree);
                         Orchard = (AppleTree | Man) \ {shake, redapple, greenapple};
                         Spec = walk.Spec;
                     ";
+                }
+                weak_bisim_test_slow!{
+                    $oracle, $strategy_type,
+                    abp_ok_1: "SPEC", "ABP" => true in include_str!("../systems/ccs/abp_ok.ccs");
+                    abp_bad_1: "SPEC", "ABP" => true in include_str!("../systems/ccs/abp_bad.ccs");
+                    abpl_ok_1: "SPEC", "ABPl" => true in include_str!("../systems/ccs/abp_ok.ccs");
+                    abpl_bad_2: "SPEC", "ABPl_2" => false in include_str!("../systems/ccs/abp_bad.ccs");
+                    dekkers_mutual_exclusion: "Dekker-2", "Spec" => true in include_str!("../systems/ccs/dekkers_mutual_exclusion.ccs");
                     leader_election_ok_3: "Spec", "Ring" => true in include_str!("../systems/ccs/leader_election_ok_3.ccs");
                     leader_election_bad_3: "Spec", "Ring" => false in include_str!("../systems/ccs/leader_election_bad_3.ccs");
                 }
