@@ -9,9 +9,7 @@ use radguy::{
     extension::LocalExtension,
     oracle::{IdentityOracle, SMax, TrivialOracle},
     ordered::{
-        oracle::{
-            CountOracle, SiblingsOracle, StrategicArgumentsOracle, StrategicLocalOracle, ToConstant,
-        },
+        oracle::{SiblingsOracle, StrategicArgumentsOracle, StrategicLocalOracle, ToConstant},
         strategy::StrategyWeight,
     },
 };
@@ -114,7 +112,6 @@ macro_rules! weak_bisim_test_oracles {
 weak_bisim_test_oracles! {
     BoolExtension::oracle().constant(StrategyWeight::Num(1)).then(SiblingsOracle), bool_extension_1_then_siblings;
     SMax.constant(StrategyWeight::Num(0)), smax_const_0;
-    SMax.constant(StrategyWeight::Num(0)).then(CountOracle::default()), smax_then_count;
     TrivialOracle.constant(StrategyWeight::Infinity), trivial_oracle_inf;
     IdentityOracle.constant(StrategyWeight::Infinity), identity_oracle_inf;
     StrategicArgumentsOracle::successors(), arguments_s_s;

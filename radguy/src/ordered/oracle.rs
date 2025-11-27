@@ -9,7 +9,9 @@ use crate::{
     },
 };
 
+mod dependency;
 mod generic;
+pub use dependency::*;
 pub use generic::*;
 
 pub trait StrategicLocalOracle<
@@ -63,13 +65,7 @@ pub trait StrategicLocalOracle<
     }
 }
 
-pub struct Constant<
-    K: Hash + Eq + Copy,
-    V: PartialOrd,
-    PS,
-    S: System<K, V>,
-    O: LocalOracle<K, V, PS, S>,
-> {
+pub struct Constant<K, V: PartialOrd, PS, S: System<K, V>, O: LocalOracle<K, V, PS, S>> {
     oracle: O,
     value: StrategyWeight,
     _phantom_data: PhantomData<(K, V, PS, S)>,
@@ -95,6 +91,17 @@ impl<
             .into_iter()
             .map(|v| StrategyItem(self.value, v))
             .collect()
+    }
+}
+impl<K, V: PartialOrd, PS, S: System<K, V>, O: LocalOracle<K, V, PS, S> + Clone> Clone
+    for Constant<K, V, PS, S, O>
+{
+    fn clone(&self) -> Self {
+        Self {
+            oracle: self.oracle.clone(),
+            value: self.value,
+            _phantom_data: self._phantom_data,
+        }
     }
 }
 
@@ -130,19 +137,13 @@ impl<K: Hash + Eq + Copy, V: PartialOrd, PS, S: System<K, V>, O: LocalOracle<K, 
 {
 }
 
-pub struct Ordered<
-    K: Hash + Eq + Copy,
-    V: PartialOrd,
-    PS,
-    S: System<K, V>,
-    O: LocalOracle<K, V, PS, S>,
-> {
+pub struct Ordered<K, V: PartialOrd, PS, S: System<K, V>, O: LocalOracle<K, V, PS, S>> {
     oracle: O,
     _phantom_data: PhantomData<(K, V, PS, S)>,
 }
 
 impl<
-    K: Hash + Eq + Copy,
+    K: Copy + Eq,
     V: PartialOrd,
     PS: Set<(K, K)>,
     PairStrategy: Domain<(K, K), PS> + FromIterator<StrategyItem<(K, K)>> + Clone,
@@ -168,8 +169,19 @@ where
     }
 }
 
+impl<K, V: PartialOrd, PS, S: System<K, V>, O: LocalOracle<K, V, PS, S> + Clone> Clone
+    for Ordered<K, V, PS, S, O>
+{
+    fn clone(&self) -> Self {
+        Self {
+            oracle: self.oracle.clone(),
+            _phantom_data: PhantomData,
+        }
+    }
+}
+
 impl<
-    K: Hash + Eq + Copy,
+    K,
     V: PartialOrd,
     PS: IntoIterator<Item = (K, K)> + FromIterator<(K, K)>,
     S: System<K, V>,
@@ -342,18 +354,6 @@ impl<
         Self {
             outer: self.outer.clone(),
             inner: self.inner.clone(),
-            _phantom_data: self._phantom_data,
-        }
-    }
-}
-
-impl<K: Hash + Eq + Copy, V: PartialOrd, PS, S: System<K, V>, O: LocalOracle<K, V, PS, S> + Clone>
-    Clone for Constant<K, V, PS, S, O>
-{
-    fn clone(&self) -> Self {
-        Self {
-            oracle: self.oracle.clone(),
-            value: self.value,
             _phantom_data: self._phantom_data,
         }
     }

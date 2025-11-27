@@ -8,8 +8,8 @@ use std::{
 };
 
 use crate::ordered::strategy::{
-    Domain, IntersectBy, Length, Retain, RightSliced, Singleton, SliceRight, Strategy,
-    StrategyItem, StrategyWeight,
+    Domain, IntersectBy, LeftSliced, Length, Retain, RightSliced, Singleton, SliceLeft, SliceRight,
+    Strategy, StrategyItem, StrategyWeight,
 };
 
 /// A strategy that only builds the heap when the minimum item needs to be extracted
@@ -135,6 +135,33 @@ impl<
             .items
             .into_iter()
             .filter_map(|((t, u), w)| if u == right { Some((t, w)) } else { None })
+            .collect();
+        LazyHeap { items, heap: None }
+    }
+}
+
+impl<
+    T: Hash + Eq + Copy,
+    U: Eq + Copy,
+    UH: FromIterator<StrategyItem<U>> + Strategy<U>,
+    PH: FromIterator<StrategyItem<(T, U)>> + Strategy<(T, U)> + LeftSliced<T, U, SlicedLeft = UH>,
+> LeftSliced<T, U> for LazyHeap<(T, U), PH>
+{
+    type SlicedLeft = LazyHeap<U, UH>;
+}
+
+impl<
+    T: Hash + Eq + Copy,
+    U: Hash + Eq + Copy,
+    UH: FromIterator<StrategyItem<U>> + Strategy<U>,
+    PH: FromIterator<StrategyItem<(T, U)>> + Strategy<(T, U)> + LeftSliced<T, U, SlicedLeft = UH>,
+> SliceLeft<T, U, LazyHeap<U, UH>> for LazyHeap<(T, U), PH>
+{
+    fn slice_left(self, left: T) -> LazyHeap<U, UH> {
+        let items = self
+            .items
+            .into_iter()
+            .filter_map(|((t, u), w)| if t == left { Some((u, w)) } else { None })
             .collect();
         LazyHeap { items, heap: None }
     }

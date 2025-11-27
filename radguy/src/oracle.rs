@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Display};
 use std::{collections::HashSet, hash::Hash, marker::PhantomData};
 
-pub trait LocalOracle<K: Hash + Eq + Copy, V: PartialOrd, PS, S: System<K, V>> {
+pub trait LocalOracle<K, V: PartialOrd, PS, S: System<K, V>> {
     fn approximate_flow(&self, assignment: &HashMap<K, V>, possible: &PS, system: &S) -> PS;
 
     #[must_use]
@@ -118,7 +118,7 @@ impl<
 }
 
 pub struct ComposeLocal<
-    K: Hash + Eq + Copy,
+    K,
     V: PartialOrd,
     PairSet,
     S: System<K, V>,
@@ -131,7 +131,7 @@ pub struct ComposeLocal<
 }
 
 impl<
-    K: Hash + Eq + Copy,
+    K,
     V: PartialOrd,
     PairSet,
     S: System<K, V>,
@@ -155,7 +155,7 @@ impl<
 }
 
 impl<
-    K: Hash + Eq + Copy,
+    K,
     V: PartialOrd,
     PairSet,
     S: System<K, V>,
@@ -169,7 +169,7 @@ impl<
 }
 
 pub struct IntersectLocal<
-    K: Hash + Eq + Copy,
+    K,
     V: PartialOrd,
     PairSet,
     S: System<K, V>,
@@ -182,7 +182,7 @@ pub struct IntersectLocal<
 }
 
 impl<
-    K: Hash + Eq + Copy,
+    K,
     V: PartialOrd,
     PairSet: Intersect,
     S: System<K, V>,
@@ -204,7 +204,7 @@ impl<
 }
 
 impl<
-    K: Hash + Eq + Copy,
+    K,
     V: PartialOrd,
     PairSet,
     S: System<K, V>,
@@ -221,7 +221,7 @@ impl<
 // all type parameters of the type implement `Clone`, meaning that `S` needs to implement clone,
 // even though it isn't part of the actual struct
 impl<
-    K: Hash + Eq + Copy,
+    K,
     V: PartialOrd,
     PairSet,
     S: System<K, V>,
@@ -239,7 +239,7 @@ impl<
 }
 
 impl<
-    K: Hash + Eq + Copy,
+    K,
     V: PartialOrd,
     PairSet,
     S: System<K, V>,
@@ -259,8 +259,8 @@ impl<
 #[derive(Clone, Default)]
 pub struct TrivialOracle;
 
-impl<K: Hash + Eq + Copy, V: Maximal, PairSet, S: System<K, V> + PairUniverse<PairSet>>
-    LocalOracle<K, V, PairSet, S> for TrivialOracle
+impl<K, V: Maximal, PairSet, S: System<K, V> + PairUniverse<PairSet>> LocalOracle<K, V, PairSet, S>
+    for TrivialOracle
 {
     fn approximate_flow(
         &self,
@@ -279,7 +279,7 @@ impl Display for TrivialOracle {
 }
 
 #[derive(Default, Clone, Debug)]
-pub struct ArgumentsOracle<VarKey: Eq + Copy + Hash> {
+pub struct ArgumentsOracle<VarKey> {
     successors: RefCell<HashMap<VarKey, HashSet<VarKey>>>,
     ancestors: RefCell<HashMap<VarKey, HashSet<VarKey>>>,
     previous_visited: RefCell<HashSet<VarKey>>,

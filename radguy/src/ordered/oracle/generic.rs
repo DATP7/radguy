@@ -6,7 +6,6 @@ use std::{
     collections::{HashMap, HashSet},
     fmt::{Debug, Display},
     hash::Hash,
-    marker::PhantomData,
 };
 
 use orx_priority_queue::PriorityQueueDecKey;
@@ -16,10 +15,7 @@ use crate::{
     Arguments, DependencyGraphSystem, System, Universe,
     ordered::{
         StrategicLocalOracle,
-        strategy::{
-            GetWeight, Length, OrxStrategy, Retain, SliceRight, Strategy, StrategyItem,
-            StrategyWeight,
-        },
+        strategy::{GetWeight, OrxStrategy, Retain, Strategy, StrategyItem, StrategyWeight},
     },
 };
 
@@ -69,78 +65,6 @@ where
 impl Display for SiblingsOracle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Siblings")
-    }
-}
-
-#[derive(Default, Clone, Debug)]
-pub struct CountOracle<VS>(PhantomData<VS>);
-
-impl<
-    K: Eq + Copy + Hash,
-    V: PartialOrd,
-    VS: Strategy<K> + Length,
-    PS: Strategy<(K, K)> + SliceRight<K, K, VS> + FromIterator<StrategyItem<(K, K)>> + Clone + Debug,
-    S: System<K, V>,
-> StrategicLocalOracle<K, V, PS, S> for CountOracle<VS>
-where
-    for<'a> &'a PS: IntoIterator<Item = StrategyItem<(K, K)>>,
-{
-    fn get_strategy(&self, _assignment: &HashMap<K, V>, strategy: &PS, _system: &S) -> PS {
-        let mut lens = HashMap::<K, u64>::new();
-        strategy
-            .into_iter()
-            .map(|StrategyItem(_, (x, y))| {
-                StrategyItem(
-                    StrategyWeight::Num(
-                        *lens
-                            .entry(x)
-                            .or_insert_with(|| strategy.clone().slice_right(x).length() as u64),
-                    ),
-                    (x, y),
-                )
-            })
-            .collect()
-    }
-}
-
-impl<VS> Display for CountOracle<VS> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Count")
-    }
-}
-
-#[derive(Clone, Default)]
-pub struct InverseCountOracle<VS>(PhantomData<VS>);
-
-impl<
-    K: Eq + Copy + Hash,
-    V: PartialOrd,
-    VS: Strategy<K> + Length,
-    PS: Strategy<(K, K)> + SliceRight<K, K, VS> + FromIterator<StrategyItem<(K, K)>> + Clone,
-    S: System<K, V>,
-> StrategicLocalOracle<K, V, PS, S> for InverseCountOracle<VS>
-where
-    for<'a> &'a PS: IntoIterator<Item = StrategyItem<(K, K)>>,
-{
-    fn get_strategy(&self, _assignment: &HashMap<K, V>, strategy: &PS, _system: &S) -> PS {
-        let mut lens = HashMap::<K, u64>::new();
-        strategy
-            .into_iter()
-            .map(|StrategyItem(_, (x, y))| {
-                StrategyItem(
-                    StrategyWeight::Num(*lens.entry(x).or_insert_with(|| {
-                        u64::MAX - (strategy.clone().slice_right(x).length() as u64)
-                    })),
-                    (x, y),
-                )
-            })
-            .collect()
-    }
-}
-
-impl<VS> Display for InverseCountOracle<VS> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Count⁻¹")
     }
 }
 
