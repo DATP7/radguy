@@ -144,12 +144,53 @@ impl<VS> Display for InverseCountOracle<VS> {
     }
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Clone, Debug)]
+pub enum ArgumentsStrategy {
+    Ancestors,
+    Successors,
+}
+
+#[derive(Clone, Debug)]
 pub struct StrategicArgumentsOracle<VarKey: Eq + Copy + Hash, PS: Strategy<(VarKey, VarKey)>> {
     successors: RefCell<HashMap<VarKey, HashSet<VarKey>>>,
     ancestors: RefCell<HashMap<VarKey, HashSet<VarKey>>>,
     previous_visited: RefCell<HashSet<VarKey>>,
     strategy_cache: RefCell<PS>,
+    strategy: ArgumentsStrategy,
+}
+
+impl<K: Eq + Copy + Hash + Default, PS: Strategy<(K, K)> + Default>
+    StrategicArgumentsOracle<K, PS>
+{
+    #[must_use]
+    pub fn ancestors() -> Self {
+        Self {
+            successors: RefCell::default(),
+            ancestors: RefCell::default(),
+            previous_visited: RefCell::default(),
+            strategy_cache: RefCell::default(),
+            strategy: ArgumentsStrategy::Ancestors,
+        }
+    }
+
+    #[must_use]
+    pub fn successors() -> Self {
+        Self {
+            successors: RefCell::default(),
+            ancestors: RefCell::default(),
+            previous_visited: RefCell::default(),
+            strategy_cache: RefCell::default(),
+            strategy: ArgumentsStrategy::Successors,
+        }
+    }
+}
+
+impl<K: Eq + Copy + Hash + Default, PS: Strategy<(K, K)> + Default> Default
+    for StrategicArgumentsOracle<K, PS>
+{
+    fn default() -> Self {
+        Self::successors()
+    }
 }
 
 impl<
@@ -251,9 +292,15 @@ impl<
                 true
             }
         });
+
+        let lookup = match self.strategy {
+            ArgumentsStrategy::Ancestors => ancestors,
+            ArgumentsStrategy::Successors => successors,
+        };
+
         strategy.extend(to_add.into_iter().map(|(x, y)| {
             StrategyItem(
-                StrategyWeight::Num(successors.get(&x).map_or(1, HashSet::len) as u64),
+                StrategyWeight::Num(lookup.get(&x).map_or(1, HashSet::len) as u64),
                 (x, y),
             )
         }));
@@ -356,10 +403,15 @@ impl<K: Eq + Copy + Hash + Debug, H: PriorityQueueDecKey<(K, K), StrategyWeight>
                 .filter(|(x, _)| updated_ancestors.contains(x)),
         );
 
+        let lookup = match self.strategy {
+            ArgumentsStrategy::Ancestors => ancestors,
+            ArgumentsStrategy::Successors => successors,
+        };
+
         for (x, y) in to_update {
             strategy.update_key_or_push(
                 &(x, y),
-                StrategyWeight::Num(successors.get(&x).map_or(1, HashSet::len) as u64),
+                StrategyWeight::Num(lookup.get(&x).map_or(1, HashSet::len) as u64),
             );
         }
 

@@ -117,7 +117,8 @@ weak_bisim_test_oracles! {
     SMax.constant(StrategyWeight::Num(0)).then(CountOracle::default()), smax_then_count;
     TrivialOracle.constant(StrategyWeight::Infinity), trivial_oracle_inf;
     IdentityOracle.constant(StrategyWeight::Infinity), identity_oracle_inf;
-    StrategicArgumentsOracle::default(), arguments_s;
+    StrategicArgumentsOracle::successors(), arguments_s_s;
+    StrategicArgumentsOracle::ancestors(), arguments_s_a;
     // These are commented out due to perfromance issues
     // SMax.constant(StrategyWeight::Infinity), smax_const_infinity;
     // SMax.constant(StrategyWeight::Num(1)), smax_const_1;

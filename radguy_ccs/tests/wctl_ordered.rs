@@ -122,7 +122,10 @@ wctl_test_oracles! {
     WeightedDepOracle::default().constant(StrategyWeight::Num(1)).then(SiblingsOracle), wctl_1_then_siblings;
     CountOracle::default(), count;
     InverseCountOracle::default(), count_inverse;
-    StrategicArgumentsOracle::default(), arguments_s;
-    StrategicArgumentsOracle::default().and_by(CountOracle::default(), std::cmp::min), args_s_and_min_count;
-    StrategicArgumentsOracle::default().and_by(InverseCountOracle::default(), std::cmp::min), args_s_and_min_count_inverse;
+    StrategicArgumentsOracle::successors(), arguments_s_s;
+    StrategicArgumentsOracle::successors().and_by(CountOracle::default(), std::cmp::min), args_s_s_and_min_count;
+    StrategicArgumentsOracle::successors().and_by(InverseCountOracle::default(), std::cmp::min), args_s_s_and_min_count_inverse;
+    StrategicArgumentsOracle::ancestors(), arguments_s_a;
+    StrategicArgumentsOracle::ancestors().and_by(CountOracle::default(), std::cmp::min), args_s_a_and_min_count;
+    StrategicArgumentsOracle::ancestors().and_by(InverseCountOracle::default(), std::cmp::min), args_s_a_and_min_count_inverse;
 }
