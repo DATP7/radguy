@@ -17,9 +17,41 @@ use radguy_ccs::systems::wctl;
 use radguy_ccs::systems::wctl::wctl_system::WCTLSystem;
 use slotmap::DefaultKey;
 
-macro_rules! wctl_test {
+macro_rules! wctl_test_fast {
+    ($($test_name:ident: $oracle:expr, $strategy_type:ty, $($process_name:literal, $formula_str:expr => $eq:literal),* $(,)? in $wccs:expr;)*) => {
+        $(
+            #[test]
+            fn $test_name()
+            {
+                $(
+                    let wccs_parser = wccs::ProgramParser::new();
+                    let wccs_ast = wccs_parser
+                        .parse(&$wccs)
+                        .expect("Failed to parse WCCS program content.");
+                    let mut wccs_system = WCCSSystem::<DefaultKey>::default();
+                    wccs_system.insert_ast_bindings(wccs_ast);
+
+                    let formula_parser = wctl::grammar::FormulaParser::new();
+                    let formula = formula_parser.parse($formula_str).expect("Formula should parse");
+
+                    let mut sys = WCTLSystem::<DefaultKey, DefaultKey, DefaultKey, DefaultKey, DefaultKey>::new(wccs_system);
+                    let process_key = sys.get_process_definition($process_name).expect("Process name should be bound");
+                    let formula_key = sys.insert_ast_formula(formula.clone());
+                    let start = sys.get_var(process_key, formula_key);
+
+                    let (result, _) = ordered::kleene_local::<_, _, $strategy_type, $strategy_type, _>(&mut sys, start, &$oracle);
+                    assert_eq!($eq, result == Number::Val(0), "{} should{} satisfy {} in {}", $process_name, if !$eq { " not" } else {""}, $formula_str, $wccs);
+                )*
+            }
+        )*
+    };
+}
+
+macro_rules! wctl_test_slow {
     ($($(#ignore($reason:literal))? $test_name:ident: $oracle:expr, $strategy_type:ty, $($process_name:literal, $formula_str:expr => $eq:literal),* $(,)? in $wccs:expr;)*) => {
         $(
+            #[cfg_attr(not(feature = "slow"), ignore = "Not running slow tests")]
+            #[allow(unused_attributes)]
             $(#[ignore = $reason])?
             #[test]
             fn $test_name()
@@ -53,7 +85,7 @@ macro_rules! wctl_test_oracles_strategy {
         $(
             mod $strategy {
                 use super::*;
-                wctl_test! {
+                wctl_test_fast! {
                     mower_example: $oracle, $strategy_type,
                         "S0", "A mow U[<=6] dump" => true,
                         "S0", "A mow U[<=4] dump" => false,
@@ -73,6 +105,8 @@ macro_rules! wctl_test_oracles_strategy {
                     recursive: $oracle, $strategy_type, "S", "AF dump" => true in "S := <go>.dump:S;";
                     recursive_neg: $oracle, $strategy_type, "S", "AF mow" => false in "S := <go>.dump:S;";
                     compare: $oracle, $strategy_type, "S", "mow == 4" => true in "S := mow:0 + mow:0 + mow:0 + mow:0;";
+                }
+                wctl_test_slow! {
                     leader_election: $oracle, $strategy_type,
                     "Ring", "EF leader > 1" => false,
                     "Ring", "EF leader" => true
