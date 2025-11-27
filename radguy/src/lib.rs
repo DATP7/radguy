@@ -86,6 +86,11 @@ pub trait PairUniverse<S> {
     fn pair_universe(&self) -> S;
 }
 
+pub trait DependencyGraphSystem<VarKey, ReturnType> {
+    /// Get hyperedges of a variable if expanded, otherwise None
+    fn get_hyperedges(&self, key: VarKey) -> Option<Vec<Vec<ReturnType>>>;
+}
+
 pub trait Assignment<K, V> {
     fn get_assignment(&self, key: &K) -> V;
     fn update_assignment(&mut self, key: K, value: V);

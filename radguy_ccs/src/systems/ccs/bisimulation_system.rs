@@ -5,8 +5,9 @@ use std::{
     marker::PhantomData,
 };
 
+use radguy::DependencyGraphSystem;
 use radguy::{Arguments, Assignment, PairUniverse, System, Universe, extension::TermSystem};
-use slotmap::Key;
+use slotmap::{Key, SecondaryMap};
 
 use crate::systems::{
     bool::{BoolSystem, BoolSystemImpl, BoolTerm},
@@ -36,6 +37,8 @@ pub enum FlatProcess<'a, K: Key> {
     Compose(K, K),
 }
 
+type HyperedgeMap<VarKey> = SecondaryMap<VarKey, Vec<Vec<VarKey>>>;
+
 #[derive(Default, Debug)]
 pub struct BisimulationSystem<
     'a,
@@ -48,6 +51,7 @@ pub struct BisimulationSystem<
     transition_system: T,
     _lifetime: PhantomData<&'a ()>,
     locked: bool,
+    hyper_edge_cache: RefCell<HyperedgeMap<VarKey>>,
 }
 
 impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKey>>
@@ -59,6 +63,7 @@ impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKe
             transition_system: transition_generator,
             _lifetime: PhantomData,
             locked: false,
+            hyper_edge_cache: RefCell::default(),
         }
     }
 
@@ -280,5 +285,50 @@ impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKe
         self.bool_system
             .borrow()
             .evaluate_term(term_key, assignment)
+    }
+}
+
+impl<'a, ProcKey: Key, VarKey: Key, TermKey: Key, T: TransitionSystem<'a, ProcKey>>
+    DependencyGraphSystem<VarKey, VarKey> for BisimulationSystem<'a, ProcKey, VarKey, TermKey, T>
+{
+    fn get_hyperedges(&self, key: VarKey) -> Option<Vec<Vec<VarKey>>> {
+        if let Some(hyperedge) = self.hyper_edge_cache.borrow().get(key) {
+            return Some(hyperedge.clone());
+        }
+
+        let term_key = *self.bool_system.borrow().definitions.get(key)?;
+
+        let term = self.get_term(term_key);
+
+        let hyperedge: Vec<Vec<VarKey>> = match term {
+            BoolTerm::Or(items) => items
+                .into_iter()
+                .flat_map(|item| match self.get_term(item) {
+                    BoolTerm::Or(items) => {
+                        items.into_iter().map(|item| match self.get_term(item) {
+                            BoolTerm::And(items) => items
+                                .into_iter()
+                                .map(|item| match self.get_term(item) {
+                                    BoolTerm::Variable(var_key) => var_key,
+                                    _ => unreachable!(
+                                        "Variable not defined as a collection of hyperedge!"
+                                    ),
+                                })
+                                .collect(),
+                            _ => unreachable!("Variable not defined as a collection of hyperedge!"),
+                        })
+                    }
+                    _ => unreachable!("Variable not defined as a collection of hyperedge!"),
+                })
+                .collect(),
+            BoolTerm::True | BoolTerm::False => Vec::new(),
+            _ => unreachable!("Variable not defined as a collection of hyperedge!"),
+        };
+
+        self.hyper_edge_cache
+            .borrow_mut()
+            .insert(key, hyperedge.clone());
+
+        Some(hyperedge)
     }
 }

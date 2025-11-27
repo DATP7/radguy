@@ -1,4 +1,7 @@
+use itertools::Itertools;
+
 use crate::Assignment;
+use crate::DependencyGraphSystem;
 use crate::{
     Arguments, Bottom, Cartesian, Diagonal, Intersect, Maximal, PairUniverse, System, Union,
     Universe, Without,
@@ -427,6 +430,60 @@ impl<K: Hash + Eq + Copy, V: Maximal, PairSet: Clone, S: System<K, V> + PairUniv
 impl Display for IdentityOracle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Identity")
+    }
+}
+
+#[derive(Clone)]
+pub struct WeightedDepOracle<PS>(PhantomData<PS>);
+
+#[expect(clippy::implicit_hasher)]
+impl<K> Default for WeightedDepOracle<HashSet<(K, K)>> {
+    fn default() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<
+    K: Hash + Eq + Copy,
+    V: Maximal + Ord + Bottom + Clone,
+    PS: FromIterator<(K, K)>,
+    S: System<K, V> + DependencyGraphSystem<K, (K, V)> + Universe<HashSet<K>>,
+> LocalOracle<K, V, PS, S> for WeightedDepOracle<PS>
+where
+    for<'a> &'a PS: IntoIterator<Item = &'a (K, K)>,
+{
+    fn approximate_flow(&self, assignment: &HashMap<K, V>, possible: &PS, system: &S) -> PS {
+        possible
+            .into_iter()
+            .filter(|(x, y)| {
+                if x == y {
+                    return true;
+                }
+                let Some(hyperedges) = system.get_hyperedges(*y) else {
+                    return true;
+                };
+                if system.universe().into_iter().any(|z| {
+                    possible.into_iter().contains(&(*x, z))
+                        && possible.into_iter().contains(&(z, *y))
+                }) {
+                    return true;
+                }
+
+                hyperedges.into_iter().any(|targets| {
+                    targets.iter().any(|(z, _)| z == x)
+                        && targets
+                            .into_iter()
+                            .all(|(_, w)| w < assignment.get_assignment(y))
+                })
+            })
+            .copied()
+            .collect()
+    }
+}
+
+impl<PS> Display for WeightedDepOracle<PS> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WCTL")
     }
 }
 

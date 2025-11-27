@@ -7,8 +7,8 @@ use radguy::{
     ordered::{
         self,
         oracle::{
-            CountOracle, InverseCountOracle, StrategicArgumentsOracle, StrategicHeightOracle,
-            StrategicLocalOracle, ToConstant,
+            CountOracle, InverseCountOracle, SiblingsOracle, StrategicArgumentsOracle,
+            StrategicHeightOracle, StrategicLocalOracle, ToConstant,
         },
         strategy::{BinaryHeapStrategy, HashMapStrategy, LazyHeap, OrxStrategy, StrategyWeight},
     },
@@ -103,12 +103,14 @@ macro_rules! bisim_bench_problem_ordered {
         bisim_bench_oracles_ordered! {
             $name: using $c, strategy $s; $sname; bench $left, $right => $eq in ccs, with
             SMax::default().constant(StrategyWeight::Infinity),
+            SMax::default().constant(StrategyWeight::Num(1)).then(SiblingsOracle::default()),
             LocalMaxR::default().constant(StrategyWeight::Infinity),
             LocalMaxR::default().constant(StrategyWeight::Infinity).then(CountOracle::default()),
             LocalMaxR::default().constant(StrategyWeight::Infinity).then(InverseCountOracle::default()),
             BoolExtension::oracle().constant(StrategyWeight::Infinity),
             BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(InverseCountOracle::default(), std::cmp::min),
             BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(CountOracle::default(), std::cmp::min),
+            BoolExtension::oracle().constant(StrategyWeight::Num(1)).then(SiblingsOracle::default()),
             StrategicArgumentsOracle::default(),
             StrategicArgumentsOracle::default().and_by(CountOracle::default(), std::cmp::min),
             StrategicArgumentsOracle::default().and_by(InverseCountOracle::default(), std::cmp::min),

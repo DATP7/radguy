@@ -1,4 +1,7 @@
-use crate::{Intersect, ordered::strategy::ResetWeights};
+use crate::{
+    Intersect,
+    ordered::strategy::{GetWeight, ResetWeights},
+};
 use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
@@ -29,7 +32,7 @@ impl<T, H> LazyHeap<T, H> {
     }
 }
 
-impl<T: Copy, H: FromIterator<StrategyItem<T>> + Strategy<T>> Strategy<T> for LazyHeap<T, H> {
+impl<T: Copy + Eq, H: FromIterator<StrategyItem<T>> + Strategy<T>> Strategy<T> for LazyHeap<T, H> {
     fn extract_min(&mut self) -> Option<T> {
         self.heap
             .get_or_insert_with(|| {
@@ -39,6 +42,12 @@ impl<T: Copy, H: FromIterator<StrategyItem<T>> + Strategy<T>> Strategy<T> for La
                     .collect()
             })
             .extract_min()
+    }
+}
+
+impl<T: Eq + Hash, H> GetWeight<T> for LazyHeap<T, H> {
+    fn get_weight(&self, item: T) -> Option<StrategyWeight> {
+        self.items.get(&item).copied()
     }
 }
 

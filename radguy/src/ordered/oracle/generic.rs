@@ -13,14 +13,64 @@ use orx_priority_queue::PriorityQueueDecKey;
 use slotmap::{Key, SecondaryMap};
 
 use crate::{
-    Arguments, System, Universe,
+    Arguments, DependencyGraphSystem, System, Universe,
     ordered::{
         StrategicLocalOracle,
         strategy::{
-            Length, OrxStrategy, Retain, SliceRight, Strategy, StrategyItem, StrategyWeight,
+            GetWeight, Length, OrxStrategy, Retain, SliceRight, Strategy, StrategyItem,
+            StrategyWeight,
         },
     },
 };
+
+#[derive(Default, Clone, Debug)]
+pub struct SiblingsOracle;
+
+impl<
+    K: Eq + Copy + Hash + Key,
+    V: PartialOrd,
+    PS: Strategy<(K, K)> + GetWeight<(K, K)> + FromIterator<StrategyItem<(K, K)>>,
+    S: System<K, V> + DependencyGraphSystem<K, K>,
+> StrategicLocalOracle<K, V, PS, S> for SiblingsOracle
+where
+    for<'a> &'a PS: IntoIterator<Item = StrategyItem<(K, K)>>,
+{
+    fn get_strategy(&self, _assignment: &HashMap<K, V>, strategy: &PS, system: &S) -> PS {
+        strategy
+            .into_iter()
+            .map(|StrategyItem(weight, (x, y))| {
+                let Some(hyper_edges) = system.get_hyperedges(y) else {
+                    return StrategyItem(weight, (x, y));
+                };
+
+                let out_weight = weight
+                    + hyper_edges
+                        .into_iter()
+                        .filter(|siblings| siblings.contains(&x))
+                        .map(|siblings| {
+                            siblings
+                                .into_iter()
+                                .map(|sibling| {
+                                    strategy
+                                        .get_weight((sibling, y))
+                                        .unwrap_or(StrategyWeight::Num(0))
+                                })
+                                .sum()
+                        })
+                        .min()
+                        .unwrap_or(StrategyWeight::Infinity);
+
+                StrategyItem(out_weight, (x, y))
+            })
+            .collect()
+    }
+}
+
+impl Display for SiblingsOracle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Siblings")
+    }
+}
 
 #[derive(Default, Clone, Debug)]
 pub struct CountOracle<VS>(PhantomData<VS>);

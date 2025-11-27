@@ -2,6 +2,7 @@ use std::{
     cmp::{Ordering, Reverse},
     fmt::Display,
     hash::Hash,
+    iter::Sum,
     ops::Add,
 };
 
@@ -53,9 +54,15 @@ impl Add for StrategyWeight {
     #[track_caller]
     fn add(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
-            (Self::Num(r), Self::Num(l)) => Self::Num(l + r),
+            (Self::Num(l), Self::Num(r)) => Self::Num(l + r),
             _ => Self::Infinity,
         }
+    }
+}
+
+impl Sum for StrategyWeight {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.fold(Self::Num(0), |acc, e| acc + e)
     }
 }
 
@@ -178,4 +185,8 @@ pub trait Retain<T> {
 pub trait ResetWeights {
     /// Set the weights of all items in the strategy to infinity
     fn reset_weights(&mut self);
+}
+
+pub trait GetWeight<T> {
+    fn get_weight(&self, element: T) -> Option<StrategyWeight>;
 }

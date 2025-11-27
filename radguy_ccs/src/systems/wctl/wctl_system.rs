@@ -3,9 +3,10 @@ use std::{
     collections::{BTreeSet, HashMap, HashSet},
 };
 
+use radguy::DependencyGraphSystem;
 use radguy::extension::TermSystem;
 use radguy::{Arguments, PairUniverse, System, Universe, bislotmap::BiSlotMap};
-use slotmap::Key;
+use slotmap::{Key, SecondaryMap};
 
 use crate::systems::{
     numeric::{
@@ -16,6 +17,8 @@ use crate::systems::{
     wctl::flat_formula::{FlatExpr, FlatFormula},
 };
 
+type HyperedgeMap<VarKey> = SecondaryMap<VarKey, Vec<Vec<(VarKey, Number)>>>;
+
 #[derive(Debug, Clone)]
 pub struct WCTLSystem<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key> {
     pub(crate) wccs_system: WCCSSystem<'a, ProcKey>,
@@ -23,8 +26,8 @@ pub struct WCTLSystem<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key,
     pub(crate) formulas: RefCell<BiSlotMap<FormKey, FlatFormula<'a, FormKey, ExprKey>>>,
     pub(crate) expresions: RefCell<BiSlotMap<ExprKey, FlatExpr<'a, ExprKey>>>,
     locked: bool,
+    hyper_edge_cache: RefCell<HyperedgeMap<VarKey>>,
 }
-
 impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
     WCTLSystem<'a, ProcKey, FormKey, ExprKey, VarKey, TermKey>
 {
@@ -39,6 +42,7 @@ impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
             formulas: RefCell::new(BiSlotMap::default()),
             expresions: RefCell::new(BiSlotMap::default()),
             locked: false,
+            hyper_edge_cache: RefCell::default(),
         }
     }
     fn insert_term(&self, term: NumericTerm<VarKey, TermKey>) -> TermKey {
@@ -365,5 +369,103 @@ impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key>
         self.numeric_system
             .borrow()
             .evaluate_term(term_key, assignment)
+    }
+}
+
+impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key>
+    WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
+{
+    fn get_var_key_of_sum(&self, term_key: TermKey) -> Option<VarKey> {
+        match self.get_term(term_key) {
+            NumericTerm::Var(var_key) => Some(var_key),
+            NumericTerm::Add(left_term, right_term) => self
+                .get_var_key_of_sum(right_term)
+                .or_else(|| self.get_var_key_of_sum(left_term)),
+            _ => None,
+        }
+    }
+
+    fn get_weight_of_sum(&self, term_key: TermKey) -> Option<Number> {
+        match self.get_term(term_key) {
+            NumericTerm::Const(weight) => Some(weight),
+            NumericTerm::Add(left_term, right_term) => self
+                .get_weight_of_sum(left_term)
+                .or_else(|| self.get_weight_of_sum(right_term)),
+            NumericTerm::Var(_) => None,
+            _ => unreachable!("Hyper edge targets should always be a var or an add"),
+        }
+    }
+
+    fn get_weighted_hyperedge(&self, term_key: TermKey) -> Vec<(VarKey, Number)> {
+        match self.get_term(term_key) {
+            NumericTerm::Var(var_key) => Vec::from([(var_key, Number::Val(0))]),
+            NumericTerm::Add(_, _) => Vec::from([(
+                self.get_var_key_of_sum(term_key)
+                    .expect("target should contain a variable"),
+                self.get_weight_of_sum(term_key).unwrap_or(Number::Val(0)),
+            )]),
+            NumericTerm::Max(elements) => elements
+                .into_iter()
+                .map(|term_key| {
+                    (
+                        self.get_var_key_of_sum(term_key)
+                            .expect("target should contain a variable"),
+                        self.get_weight_of_sum(term_key).unwrap_or(Number::Val(0)),
+                    )
+                })
+                .collect(),
+            _ => unreachable!("A hyper edge is either a max of targets or a target (var or add)"),
+        }
+    }
+
+    fn get_weighted_hyperedges(&self, key: VarKey) -> Option<Vec<Vec<(VarKey, Number)>>> {
+        if let Some(hyperedge) = self.hyper_edge_cache.borrow().get(key) {
+            return Some(hyperedge.clone());
+        }
+
+        let term_key = *self.numeric_system.borrow().definitions.get(key)?;
+
+        let term = self.get_term(term_key);
+
+        let hyperedge: Vec<Vec<(VarKey, Number)>> = match term {
+            NumericTerm::Const(_) => Vec::new(),
+            NumericTerm::Min(elements) => elements
+                .into_iter()
+                .map(|term_key| self.get_weighted_hyperedge(term_key))
+                .collect(),
+            NumericTerm::Max(_) => Vec::from([self.get_weighted_hyperedge(term_key)]),
+            NumericTerm::Bound { term: term_key, .. } => {
+                Vec::from([self.get_weighted_hyperedge(term_key)])
+            }
+            _ => unreachable!("A hyperedge collection can only be a Const, Min, Max or Bound"),
+        };
+
+        self.hyper_edge_cache
+            .borrow_mut()
+            .insert(key, hyperedge.clone());
+
+        Some(hyperedge)
+    }
+}
+
+impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key>
+    DependencyGraphSystem<VarKey, VarKey>
+    for WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
+{
+    fn get_hyperedges(&self, key: VarKey) -> Option<Vec<Vec<VarKey>>> {
+        self.get_weighted_hyperedges(key).map(|some| {
+            some.into_iter()
+                .map(|hyperedge| hyperedge.into_iter().map(|(var_key, _)| var_key).collect())
+                .collect()
+        })
+    }
+}
+
+impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key>
+    DependencyGraphSystem<VarKey, (VarKey, Number)>
+    for WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
+{
+    fn get_hyperedges(&self, key: VarKey) -> Option<Vec<Vec<(VarKey, Number)>>> {
+        self.get_weighted_hyperedges(key)
     }
 }

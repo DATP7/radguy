@@ -11,8 +11,8 @@ use std::{
 use orx_priority_queue::{DaryHeapWithMap, NodeKeyRef, PriorityQueueDecKey};
 
 use crate::ordered::strategy::{
-    Domain, IntersectBy, LeftSliced, Length, ResetWeights, RightSliced, Singleton, SliceLeft,
-    SliceRight, Strategy, StrategyItem, StrategyWeight,
+    Domain, GetWeight, IntersectBy, LeftSliced, Length, ResetWeights, RightSliced, Singleton,
+    SliceLeft, SliceRight, Strategy, StrategyItem, StrategyWeight,
 };
 
 #[derive(Clone, Debug)]
@@ -44,9 +44,14 @@ impl<T: Clone, H: PriorityQueueDecKey<T, StrategyWeight>> DerefMut for OrxStrate
     }
 }
 
-impl<T: Copy, H: PriorityQueueDecKey<T, StrategyWeight>> Strategy<T> for OrxStrategy<T, H> {
+impl<T: Copy + Eq, H: PriorityQueueDecKey<T, StrategyWeight>> Strategy<T> for OrxStrategy<T, H> {
     fn extract_min(&mut self) -> Option<T> {
         self.0.pop().map(|(v, _)| v)
+    }
+}
+impl<T: Clone, H: PriorityQueueDecKey<T, StrategyWeight>> GetWeight<T> for OrxStrategy<T, H> {
+    fn get_weight(&self, item: T) -> Option<StrategyWeight> {
+        self.0.key_of(&item)
     }
 }
 
@@ -154,7 +159,7 @@ where
     }
 }
 
-impl<T: Copy, S: FromIterator<T>, H: PriorityQueueDecKey<T, StrategyWeight>> Domain<T, S>
+impl<T: Copy + Eq, S: FromIterator<T>, H: PriorityQueueDecKey<T, StrategyWeight>> Domain<T, S>
     for OrxStrategy<T, H>
 {
     fn domain(self) -> S {
