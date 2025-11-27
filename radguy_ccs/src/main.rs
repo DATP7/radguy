@@ -114,7 +114,7 @@ macro_rules! weak_bisim_system {
         let target = sys.specify_comparison($left, $right);
 
         $({
-            run_kleene($file_path, "weak_bisimulation",stringify!($name), &sys, target, &$oracle)
+            run_unordered_kleene($file_path, "weak_bisimulation",stringify!($name), &sys, target, &$oracle)
         })*
     };
 }
@@ -197,7 +197,7 @@ macro_rules! wctl_system {
         let target = sys.get_var(process_key, formula_key);
 
         $({
-            run_kleene($file_path, "wctl",stringify!($name), &sys, target, &$oracle)
+            run_unordered_kleene($file_path, "wctl",stringify!($name), &sys, target, &$oracle)
         })*
     };
 }
@@ -232,7 +232,7 @@ fn generate_wctl_system(
     WCTLSystem::<DefaultKey, DefaultKey, DefaultKey, DefaultKey, DefaultKey>::new(wccs_system)
 }
 
-fn run_kleene<
+fn run_unordered_kleene<
     K: Copy + Hash + Eq + Debug + Sync,
     V: Eq + PartialOrd + Bottom + Clone,
     PS: Debug + Union,
@@ -328,10 +328,9 @@ fn main() {
         abpl_bad_2: "SPEC", "ABPl_2" => include_str!("../systems/ccs/abp_bad.ccs");
         abpl_ok_3: "SPEC", "ABPl_3" => include_str!("../systems/ccs/abp_ok.ccs");
         abpl_bad_3: "SPEC", "ABPl_3" => include_str!("../systems/ccs/abp_bad.ccs");
-        // TODO: un-comment these when files are added
-        //leader_election_ok_6: "Spec", "Ring" => include_str!("radguy_ccs/systems/ccs/leader_election_ok_6.ccs");
-        //leader_election_bad_6: "Spec", "Ring" => include_str!("radguy_ccs/systems/ccs/leader_election_bad_6.ccs");
-        //dekker_mutual_exclusion: "Dekker-2", "Spec" => include_str!("radguy_ccs/systems/ccs/dekkers_mutual_exclusion.ccs");
+        leader_election_ok_6: "Spec", "Ring" => include_str!("../systems/ccs/leader_election_ok_6.ccs");
+        leader_election_bad_6: "Spec", "Ring" => include_str!("../systems/ccs/leader_election_bad_6.ccs");
+        dekker_mutual_exclusion: "Dekker-2", "Spec" => include_str!("../systems/ccs/dekkers_mutual_exclusion.ccs");
 
         // NOTE: these two actually *are* weakly bisimilar, so should not be used
         // abp_bad: "SPEC", "ABP" => include_str!("../systems/ccs/abp_bad.ccs");
