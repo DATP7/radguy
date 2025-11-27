@@ -5,3 +5,4 @@ ccs_examples
 .vscode
 profile.json.gz
 .DS_Store
+iteration_results

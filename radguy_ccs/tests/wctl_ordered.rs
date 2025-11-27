@@ -40,8 +40,8 @@ macro_rules! wctl_test {
                     let formula_key = sys.insert_ast_formula(formula.clone());
                     let start = sys.get_var(process_key, formula_key);
 
-                    let result = ordered::kleene_local::<_, _, $strategy_type, $strategy_type, _>(&mut sys, start, &$oracle) == Number::Val(0);
-                    assert_eq!($eq, result, "{} should{} satisfy {} in {}", $process_name, if !$eq { " not" } else {""}, $formula_str, $wccs);
+                    let (result, _) = ordered::kleene_local::<_, _, $strategy_type, $strategy_type, _>(&mut sys, start, &$oracle);
+                    assert_eq!($eq, result == Number::Val(0), "{} should{} satisfy {} in {}", $process_name, if !$eq { " not" } else {""}, $formula_str, $wccs);
                 )*
             }
         )*

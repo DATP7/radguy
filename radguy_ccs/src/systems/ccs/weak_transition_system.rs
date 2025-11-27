@@ -8,7 +8,7 @@ use crate::systems::ccs::{
     transition_system::{TransitionMap, TransitionSystem},
 };
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct WeakTransitionSystem<'a, ProcKey: Key> {
     pub(crate) strong_transition_system: StrongTransitionSystem<'a, ProcKey>,
     transition_cache: RefCell<SecondaryMap<ProcKey, TransitionMap<'a, ProcKey>>>, // Benchmark if this increases performance or if strong LTS cache is enough

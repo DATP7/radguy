@@ -39,7 +39,7 @@ pub enum FlatProcess<'a, K: Key> {
 
 type HyperedgeMap<VarKey> = SecondaryMap<VarKey, Vec<Vec<VarKey>>>;
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct BisimulationSystem<
     'a,
     ProcKey: Key,
