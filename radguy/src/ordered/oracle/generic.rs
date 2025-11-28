@@ -76,6 +76,17 @@ pub enum ArgumentsStrategy {
     SuccessorsInverted,
 }
 
+impl Display for ArgumentsStrategy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Ancestors => write!(f, "anc"),
+            Self::Successors => write!(f, "succ"),
+            Self::AncestorsInverted => write!(f, "anc⁻¹"),
+            Self::SuccessorsInverted => write!(f, "succ⁻¹"),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct StrategicArgumentsOracle<VarKey: Eq + Copy + Hash, PS: Strategy<(VarKey, VarKey)>> {
     successors: RefCell<HashMap<VarKey, HashSet<VarKey>>>,
@@ -384,7 +395,7 @@ impl<VarKey: Eq + Copy + Hash, PS: Strategy<(VarKey, VarKey)>> Display
     for StrategicArgumentsOracle<VarKey, PS>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Args_c")
+        write!(f, "Args_c-{}", self.strategy)
     }
 }
 
