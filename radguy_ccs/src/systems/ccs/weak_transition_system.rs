@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashSet};
 
-use slotmap::{Key, SecondaryMap};
+use radguy::arena::{Key, SecondaryArena};
 
 use crate::systems::ccs::{
     ast::{Action, Binding},
@@ -11,8 +11,8 @@ use crate::systems::ccs::{
 #[derive(Default, Debug, Clone)]
 pub struct WeakTransitionSystem<'a, ProcKey: Key> {
     pub(crate) strong_transition_system: StrongTransitionSystem<'a, ProcKey>,
-    transition_cache: RefCell<SecondaryMap<ProcKey, TransitionMap<'a, ProcKey>>>, // Benchmark if this increases performance or if strong LTS cache is enough
-    tau_cache: RefCell<SecondaryMap<ProcKey, HashSet<ProcKey>>>,
+    transition_cache: RefCell<SecondaryArena<ProcKey, TransitionMap<'a, ProcKey>>>, // Benchmark if this increases performance or if strong LTS cache is enough
+    tau_cache: RefCell<SecondaryArena<ProcKey, HashSet<ProcKey>>>,
 }
 
 impl<ProcKey: Key> WeakTransitionSystem<'_, ProcKey> {
@@ -105,7 +105,6 @@ mod tests {
         transition_system::TransitionSystem,
         weak_transition_system::WeakTransitionSystem,
     };
-    use slotmap::DefaultKey;
 
     macro_rules! transition_set {
         ($lts:expr;) => {HashMap::new()};
@@ -126,7 +125,7 @@ mod tests {
             #[test]
             fn $name() {
                 #[allow(unused_mut)]
-                let mut lts = WeakTransitionSystem::<DefaultKey>::default();
+                let mut lts = WeakTransitionSystem::<usize>::default();
                 $(
                     let parser = ProgramParser::new();
                     let ast = parser

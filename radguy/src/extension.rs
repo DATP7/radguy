@@ -1,11 +1,14 @@
 use std::{
     collections::{HashMap, HashSet},
-    fmt::Display,
+    fmt::{Debug, Display},
     hash::Hash,
     marker::PhantomData,
 };
 
-use crate::{Cartesian, System, Union, Universe, Without, oracle::LocalOracle};
+use crate::{
+    Cartesian, CopiedIter, Diagonal, FromRights, System, Union, Universe, Visited, Without,
+    oracle::LocalOracle,
+};
 
 pub trait TermSystem<VarKey: Copy, VarValue: PartialOrd, TermKey: Copy>:
     System<VarKey, VarValue>
@@ -17,6 +20,7 @@ pub trait LocalExtension<
     VarKey: Hash + Copy,
     VarValue: PartialOrd,
     TermKey: Copy,
+    VarSet,
     PairSet,
     System: TermSystem<VarKey, VarValue, TermKey>,
 >
@@ -27,15 +31,19 @@ pub trait LocalExtension<
         assignment: &HashMap<VarKey, VarValue>,
         possible: &PairSet,
         system: &System,
-    ) -> HashSet<VarKey>;
+    ) -> VarSet;
 
     #[must_use]
-    fn oracle() -> ExtensionOracle<VarKey, VarValue, TermKey, PairSet, System, Self>
+    fn oracle() -> ExtensionOracle<VarKey, VarValue, TermKey, VarSet, PairSet, System, Self>
     where
         Self: Default,
         VarKey: Hash + Eq + Copy,
         VarValue: PartialOrd,
         TermKey: Copy + Eq,
+        VarSet: Without
+            + Cartesian<Output = PairSet>
+            + Diagonal<Output = PairSet>
+            + for<'a> CopiedIter<'a, VarKey>,
         PairSet: Union + FromIterator<(VarKey, VarKey)>,
     {
         ExtensionOracle::from(Self::default())
@@ -47,37 +55,37 @@ pub struct ExtensionOracle<
     K: Hash + Eq + Copy,
     V: PartialOrd,
     T: Copy,
+    VS,
     PS,
     S: TermSystem<K, V, T>,
-    E: LocalExtension<K, V, T, PS, S>,
+    E: LocalExtension<K, V, T, VS, PS, S>,
 > {
     extension: E,
-    _phantom_data: PhantomData<(K, V, T, PS, S)>,
+    _phantom_data: PhantomData<(K, V, T, VS, PS, S)>,
 }
 
 impl<
-    K: Hash + Eq + Copy,
+    K: Hash + Eq + Copy + Debug,
     V: PartialOrd,
     T: Copy + Eq,
-    PS: Union + Union<HashSet<(K, K)>> + FromIterator<(K, K)>,
-    S: TermSystem<K, V, T> + Universe<HashSet<K>>,
-    E: LocalExtension<K, V, T, PS, S>,
-> LocalOracle<K, V, PS, S> for ExtensionOracle<K, V, T, PS, S, E>
+    VS: Without + Cartesian<Output = PS> + Diagonal<Output = PS> + for<'a> CopiedIter<'a, K> + Debug,
+    PS: Union + Union<HashSet<(K, K)>> + FromIterator<(K, K)> + FromRights<VS, K> + Debug,
+    S: TermSystem<K, V, T> + Universe<VS> + Visited<VS>,
+    E: LocalExtension<K, V, T, VS, PS, S>,
+> LocalOracle<K, V, PS, S> for ExtensionOracle<K, V, T, VS, PS, S, E>
 {
     fn approximate_flow(&self, assignment: &HashMap<K, V>, possible: &PS, system: &S) -> PS {
         let visited = system.visited();
         let unvisited = system.universe().without(&visited);
         let unvisited_dep = system.universe().cartesian(&unvisited);
-        let self_dep: PS = visited.iter().map(|&x| (x, x)).collect();
-        let term_dep: PS = visited
-            .iter()
-            .flat_map(|var| {
-                self.extension
-                    .depends(system.definition(*var), assignment, possible, system)
-                    .into_iter()
-                    .map(|dep| (dep, *var))
-            })
-            .collect();
+        let self_dep: PS = visited.diagonal();
+        let term_dep = visited.copied_iter().map(|var| {
+            let deps = self
+                .extension
+                .depends(system.definition(var), assignment, possible, system);
+            (deps, var)
+        });
+        let term_dep = PS::from_rights(term_dep);
 
         self_dep.union(unvisited_dep).union(term_dep)
     }
@@ -87,10 +95,11 @@ impl<
     K: Hash + Eq + Copy,
     V: PartialOrd,
     T: Copy + Eq,
+    VS,
     PS: Union + FromIterator<(K, K)>,
     S: TermSystem<K, V, T>,
-    E: LocalExtension<K, V, T, PS, S>,
-> From<E> for ExtensionOracle<K, V, T, PS, S, E>
+    E: LocalExtension<K, V, T, VS, PS, S>,
+> From<E> for ExtensionOracle<K, V, T, VS, PS, S, E>
 {
     fn from(extension: E) -> Self {
         Self {
@@ -104,10 +113,11 @@ impl<
     K: Hash + Eq + Copy,
     V: PartialOrd,
     T: Copy,
+    VS,
     PS,
     S: TermSystem<K, V, T>,
-    E: LocalExtension<K, V, T, PS, S> + Clone,
-> Clone for ExtensionOracle<K, V, T, PS, S, E>
+    E: LocalExtension<K, V, T, VS, PS, S> + Clone,
+> Clone for ExtensionOracle<K, V, T, VS, PS, S, E>
 {
     fn clone(&self) -> Self {
         Self {
@@ -121,10 +131,11 @@ impl<
     K: Hash + Eq + Copy,
     V: PartialOrd,
     T: Copy + Eq,
-    PS: Union + FromIterator<(K, K)>,
+    VS,
+    PS,
     S: TermSystem<K, V, T>,
-    E: LocalExtension<K, V, T, PS, S> + Display,
-> Display for ExtensionOracle<K, V, T, PS, S, E>
+    E: LocalExtension<K, V, T, VS, PS, S> + Display,
+> Display for ExtensionOracle<K, V, T, VS, PS, S, E>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "E^({})", self.extension)

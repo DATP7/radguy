@@ -1,8 +1,7 @@
 use radguy_ccs::{bool_system, systems::bool::BoolSystemImpl};
-use slotmap::DefaultKey;
 
 pub struct SystemSpec {
-    pub system: BoolSystemImpl<DefaultKey, DefaultKey, &'static str>,
+    pub system: BoolSystemImpl<usize, usize, &'static str>,
     pub variables: Vec<&'static str>,
     pub goal: Vec<bool>,
 }

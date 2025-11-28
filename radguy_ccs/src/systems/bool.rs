@@ -6,12 +6,12 @@ use std::{
 };
 
 use itertools::{Itertools, iproduct};
-use radguy::bislotmap::BiSlotMap;
 use radguy::{
-    Arguments, Assignment, Cartesian, Intersect, PairUniverse, System, Universe,
+    Arguments, Assignment, Cartesian, Intersect, PairUniverse, Set, System, Universe, Visited,
+    arena::{BiArena, Key, SecondaryArena},
     extension::TermSystem,
+    set::bitset::{BitSet, BitsetRelation},
 };
-use slotmap::{Key, SecondaryMap};
 
 pub mod extension;
 
@@ -24,24 +24,20 @@ pub trait BoolSystem<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone>:
 
 #[derive(Default, Debug, Clone)]
 pub struct BoolSystemImpl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone> {
-    pub names: BiSlotMap<V, N>,
-    pub definitions: SecondaryMap<V, T>,
-    pub terms: BiSlotMap<T, BoolTerm<V, T>>,
-    term_arguments_cache: RefCell<HashMap<T, HashSet<V>>>,
+    pub names: BiArena<V, N>,
+    pub definitions: SecondaryArena<V, T>,
+    pub terms: BiArena<T, BoolTerm<V, T>>,
+    term_arguments_cache: RefCell<HashMap<T, BitSet<V>>>,
 }
 
-impl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone> BoolSystemImpl<V, T, N> {
-    pub fn term_arguments(&self, term_key: T) -> HashSet<V> {
+impl<V: Key, T: Key + Hash, N: Hash + Eq + Clone> BoolSystemImpl<V, T, N> {
+    pub fn term_arguments(&self, term_key: T) -> BitSet<V> {
         if let Some(cached) = self.term_arguments_cache.borrow().get(&term_key) {
             return cached.clone();
         }
         let args = match self.terms.get_value(term_key) {
-            BoolTerm::False | BoolTerm::True => HashSet::new(),
-            BoolTerm::Variable(k) => {
-                let mut set = HashSet::new();
-                set.insert(*k);
-                set
-            }
+            BoolTerm::False | BoolTerm::True => BitSet::new(),
+            BoolTerm::Variable(k) => BitSet::from([*k]),
             BoolTerm::Or(elements) | BoolTerm::And(elements) => elements
                 .iter()
                 .flat_map(|term_key| self.term_arguments(*term_key))
@@ -58,7 +54,7 @@ impl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone> BoolSystemImpl<V, T, N>
 
 impl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone + Debug> BoolSystemImpl<V, T, N> {
     pub fn print_assignment(&self, a: &dyn Assignment<V, bool>) {
-        for (key, name) in self.names.iter() {
+        for (key, name) in &self.names {
             println!("{name:?} = {:?}", a.get_assignment(&key));
         }
     }
@@ -79,6 +75,11 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone> Universe<HashSet<K>> for BoolSystemIm
         self.names.keys().collect()
     }
 }
+impl<K: Key, T: Key, N: Hash + Eq + Clone> Universe<BitSet<K>> for BoolSystemImpl<K, T, N> {
+    fn universe(&self) -> BitSet<K> {
+        BitSet::full(self.names.len())
+    }
+}
 
 impl<K: Key, T: Key, N: Hash + Eq + Clone> PairUniverse<HashSet<(K, K)>>
     for BoolSystemImpl<K, T, N>
@@ -87,6 +88,17 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone> PairUniverse<HashSet<(K, K)>>
         iproduct!(self.names.keys(), self.names.keys(),).collect()
     }
 }
+
+impl<K: Key, T: Key, N: Hash + Eq + Clone> PairUniverse<BitsetRelation<K, K>>
+    for BoolSystemImpl<K, T, N>
+{
+    fn pair_universe(&self) -> BitsetRelation<K, K> {
+        // PERF: we might be able to build this relation faster when we know that it will be full
+        let universe: BitSet<_> = self.universe();
+        universe.cartesian(&universe)
+    }
+}
+
 impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone + Debug>
     System<VarKey, bool> for BoolSystemImpl<VarKey, TermKey, VarName>
 {
@@ -109,8 +121,16 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone + Debug
     fn unlock(&mut self) {
         // Nothing to do
     }
+}
 
-    fn visited(&self) -> HashSet<VarKey> {
+impl<
+    VarKey: Key + Hash,
+    TermKey: Key + Hash,
+    VarName: Hash + Eq + Clone + Debug,
+    S: FromIterator<VarKey>,
+> Visited<S> for BoolSystemImpl<VarKey, TermKey, VarName>
+{
+    fn visited(&self) -> S {
         self.definitions.keys().collect()
     }
 }
@@ -131,7 +151,16 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone + Debug
 {
     fn arguments(&self, key: VarKey) -> HashSet<VarKey> {
         let term_key = self.definitions.get(key).expect("variable must be defined");
-        self.term_arguments(*term_key)
+        self.term_arguments(*term_key).into_iter().collect()
+    }
+}
+
+impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone + Debug>
+    Arguments<VarKey, BitSet<VarKey>> for BoolSystemImpl<VarKey, TermKey, VarName>
+{
+    fn arguments(&self, key: VarKey) -> BitSet<VarKey> {
+        let term_key = self.definitions.get(key).expect("variable must be defined");
+        self.term_arguments(*term_key).into_iter().collect()
     }
 }
 
@@ -186,7 +215,7 @@ macro_rules! ensure_lazy_access {
         debug_assert!(!$self.locked || $self.visited.borrow().contains(&$key));
         if (!$self.locked) {
             $self.visited.borrow_mut().insert($key);
-            let args = $self.inner.borrow().arguments($key);
+            let args: HashSet<_> = $self.inner.borrow().arguments($key);
             $self.discovered.borrow_mut().extend(args.into_iter());
         }
     };
@@ -210,8 +239,12 @@ impl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone + Debug> LazyBoolSystem<
     }
 }
 
-impl<K: Key, T: Key, N: Hash + Eq + Clone> Universe<HashSet<K>> for LazyBoolSystem<K, T, N> {
-    fn universe(&self) -> HashSet<K> {
+impl<K: Key, T: Key, N: Hash + Eq + Clone, S: Set<K> + Intersect<HashSet<K>> + Debug> Universe<S>
+    for LazyBoolSystem<K, T, N>
+where
+    BoolSystemImpl<K, T, N>: Universe<S>,
+{
+    fn universe(&self) -> S {
         self.inner
             .borrow()
             .universe()
@@ -219,15 +252,18 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone> Universe<HashSet<K>> for LazyBoolSyst
     }
 }
 
-impl<K: Key, T: Key, N: Hash + Eq + Clone> PairUniverse<HashSet<(K, K)>>
+impl<K: Key, T: Key, N: Hash + Eq + Clone, PS: Set<(K, K)> + FromIterator<(K, K)>> PairUniverse<PS>
     for LazyBoolSystem<K, T, N>
 {
-    fn pair_universe(&self) -> HashSet<(K, K)> {
+    fn pair_universe(&self) -> PS {
         self.discovered
             .borrow()
-            .cartesian(&self.discovered.borrow())
+            .cartesian(&*self.discovered.borrow())
+            .into_iter()
+            .collect()
     }
 }
+
 impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone + Debug>
     System<VarKey, bool> for LazyBoolSystem<VarKey, TermKey, VarName>
 {
@@ -247,9 +283,17 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone + Debug
     fn unlock(&mut self) {
         self.inner.borrow_mut().unlock();
     }
+}
 
-    fn visited(&self) -> HashSet<VarKey> {
-        self.visited.borrow().clone()
+impl<
+    VarKey: Key + Hash,
+    TermKey: Key + Hash,
+    VarName: Hash + Eq + Clone + Debug,
+    S: Set<VarKey> + FromIterator<VarKey>,
+> Visited<S> for LazyBoolSystem<VarKey, TermKey, VarName>
+{
+    fn visited(&self) -> S {
+        self.visited.borrow().iter().copied().collect()
     }
 }
 
@@ -262,10 +306,13 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone + Debug
     }
 }
 
-impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone + Debug>
-    Arguments<VarKey, HashSet<VarKey>> for LazyBoolSystem<VarKey, TermKey, VarName>
+impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone + Debug, VarSet>
+    Arguments<VarKey, VarSet> for LazyBoolSystem<VarKey, TermKey, VarName>
+where
+    BoolSystemImpl<VarKey, TermKey, VarName>:
+        Arguments<VarKey, VarSet> + Arguments<VarKey, HashSet<VarKey>>,
 {
-    fn arguments(&self, key: VarKey) -> HashSet<VarKey> {
+    fn arguments(&self, key: VarKey) -> VarSet {
         ensure_lazy_access!(self, key);
         self.inner.borrow().arguments(key)
     }
@@ -384,7 +431,7 @@ macro_rules! bool_def {
 macro_rules! bool_system {
     ($($id:ident = $def:tt;)*) => {
         {
-            let mut system = $crate::systems::bool::BoolSystemImpl::<slotmap::DefaultKey, slotmap::DefaultKey, &str>::default();
+            let mut system = $crate::systems::bool::BoolSystemImpl::<usize, usize, &str>::default();
             $(
                 $crate::bool_def!($id = $def; system);
             )*
@@ -397,7 +444,7 @@ macro_rules! bool_system {
 macro_rules! lazy_bool_system {
     ($($id:ident = $def:tt;)*) => {
         {
-            let mut system = $crate::systems::bool::LazyBoolSystem::<slotmap::DefaultKey, slotmap::DefaultKey, &str>::default();
+            let mut system = $crate::systems::bool::LazyBoolSystem::<usize, usize, &str>::default();
             $(
                 $crate::bool_def!($id = $def; system);
             )*
@@ -410,7 +457,7 @@ macro_rules! lazy_bool_system {
 mod tests {
     use std::collections::HashMap;
 
-    use radguy::System;
+    use radguy::{Arguments, System, set::bitset::BitSet};
 
     #[test]
     fn bool_system_and_or() {
@@ -602,5 +649,28 @@ mod tests {
         assert!(sys.evaluate(b, &map));
         assert!(sys.evaluate(a, &map));
         assert!(!sys.evaluate(h, &map));
+    }
+
+    #[test]
+    #[allow(clippy::many_single_char_names)]
+    fn arguments() {
+        let mut sys = bool_system! {
+            x = (x || y || z);
+            y = (u && y && z);
+            z = (x && (y || v));
+            u = tt;
+            v = ff;
+        };
+        let x = sys.names.get_or_insert_key("x");
+        let y = sys.names.get_or_insert_key("y");
+        let z = sys.names.get_or_insert_key("z");
+        let u = sys.names.get_or_insert_key("u");
+        let v = sys.names.get_or_insert_key("v");
+
+        assert_eq!(BitSet::from([x, y, z]), sys.arguments(x));
+        assert_eq!(BitSet::from([u, y, z]), sys.arguments(y));
+        assert_eq!(BitSet::from([x, y, v]), sys.arguments(z));
+        assert_eq!(BitSet::new(), sys.arguments(u));
+        assert_eq!(BitSet::new(), sys.arguments(v));
     }
 }

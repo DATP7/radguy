@@ -4,7 +4,6 @@ use radguy_ccs::systems::ccs::bisimulation_system::BisimulationSystem;
 use radguy_ccs::systems::ccs::grammar::ProgramParser;
 use radguy_ccs::systems::ccs::strong_transition_system::StrongTransitionSystem;
 use radguy_ccs::systems::ccs::transition_system::TransitionSystem;
-use slotmap::DefaultKey;
 
 macro_rules! strong_bisim_test {
         ($($left:expr, $right:expr => $eq:literal in $ccs:expr;)*) => {
@@ -14,14 +13,14 @@ macro_rules! strong_bisim_test {
                     let program_ast = parser
                         .parse(&$ccs)
                         .expect("Failed to parse CCS program content.");
-                    let mut strong_transition_system = StrongTransitionSystem::<DefaultKey>::default();
+                    let mut strong_transition_system = StrongTransitionSystem::<usize>::default();
                     strong_transition_system.load_ast(program_ast);
 
-                    let mut sys = BisimulationSystem::<DefaultKey, DefaultKey, DefaultKey, StrongTransitionSystem<DefaultKey>>::new(strong_transition_system);
+                    let mut sys = BisimulationSystem::<usize, usize, usize, StrongTransitionSystem<usize>>::new(strong_transition_system);
                     let start = sys.specify_comparison($left, $right);
 
 
-                    let oracle = SMax::default();
+                    let oracle = SMax::bitset();
                     let (result, _) = kleene_local(&mut sys, start, &oracle);
                     assert_eq!($eq, !result, "{} and {} should{} be bisimilar in{}", $left, $right, if !$eq { " not" } else {""}, $ccs);
                 }

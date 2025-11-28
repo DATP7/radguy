@@ -1,5 +1,4 @@
 use radguy::{
-    extension::LocalExtension,
     oracle::{IdentityOracle, SMax, TrivialOracle},
     ordered::{
         oracle::{
@@ -174,34 +173,44 @@ macro_rules! test_oracles_ordered {
 }
 
 test_oracles_ordered! {
-    IdentityOracle.constant(StrategyWeight::Infinity), identity_oracle_inf;
-    IdentityOracle.ordered(), identity_oracle_ord;
-    TrivialOracle.constant(StrategyWeight::Infinity), trivial_oracle_inf;
-    TrivialOracle.ordered(), trivial_oracle_ord;
-    SMax.constant(StrategyWeight::Num(0)), smax_const_0;
-    SMax.constant(StrategyWeight::Infinity), smax_const_infinity;
-    SMax.constant(StrategyWeight::Num(0)).then(DependencyCountOracle::default()), smax_then_dependency_count;
-    SMax.constant(StrategyWeight::Num(10)).and_by(DependencyCountOracle::default(), std::cmp::min), smax_10_and_min_dependency_count;
-    SMax.ordered(), smax_ord;
-    SMax.ordered().then(DependencyCountOracle::default()), smax_ord_then_dependency_count;
-    SMax.ordered().then(DependentCountOracle::default()), smax_ord_then_dependent_count;
-    BoolExtension::oracle().constant(StrategyWeight::Num(0)), bool_extension_0;
-    BoolExtension::oracle().constant(StrategyWeight::Num(0)).and_by(DependencyCountOracle::default(), std::cmp::min), bool_extension_0_and_min_dependency_count;
-    BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(DependencyCountOracle::default(), std::cmp::min), bool_extension_inf_and_min_dependency_count;
-    BoolExtension::oracle().constant(StrategyWeight::Infinity).and_by(InverseDependencyCountOracle::default(), std::cmp::min), bool_extension_inf_and_min_dependency_count_inverse;
-    BoolExtension::oracle().ordered(), bool_extension_ord;
-    BoolExtension::oracle().ordered().and_by(DependencyCountOracle::default(), std::cmp::min), bool_extension_ord_and_min_dependency_count;
-    BoolExtension::oracle().ordered().and_by(InverseDependencyCountOracle::default(), std::cmp::min), bool_extension_ord_and_min_dependency_count_inverse;
-    BoolExtension::oracle().ordered().then(DependencyCountOracle::default()), bool_extension_ord_then_dependency_count;
-    BoolExtension::oracle().ordered().then(DependentCountOracle::default()), bool_extension_ord_then_dependent_count;
+    IdentityOracle::bitset().constant(StrategyWeight::Infinity), identity_oracle_inf_bitset;
+    IdentityOracle::bitset().ordered(), identity_oracle_ord_bitset;
+    TrivialOracle::bitset().constant(StrategyWeight::Infinity), trivial_oracle_inf_bitset;
+    TrivialOracle::bitset().ordered(), trivial_oracle_ord_bitset;
+    SMax::bitset().constant(StrategyWeight::Num(0)), smax_const_0_bitset;
+    SMax::bitset().constant(StrategyWeight::Infinity), smax_const_infinity_bitset;
+    SMax::bitset().constant(StrategyWeight::Num(0)).then(DependencyCountOracle::default()), smax_then_count_bitset;
+    SMax::bitset().constant(StrategyWeight::Num(10)).and_by(DependencyCountOracle::default(), std::cmp::min), smax_10_and_min_count_bitset;
+    SMax::bitset().ordered(), smax_ord_bitset;
+    SMax::bitset().ordered().then(DependencyCountOracle::default()), smax_ord_then_count_bitset;
+    BoolExtension::bitset().as_oracle().constant(StrategyWeight::Num(0)), bool_extension_0_bitset;
+    BoolExtension::bitset().as_oracle().constant(StrategyWeight::Num(0)).and_by(DependencyCountOracle::default(), std::cmp::min), bool_extension_0_and_min_count_bitset;
+    BoolExtension::bitset().as_oracle().constant(StrategyWeight::Infinity).and_by(DependencyCountOracle::default(), std::cmp::min), bool_extension_inf_and_min_count_bitset;
+    BoolExtension::bitset().as_oracle().constant(StrategyWeight::Infinity).and_by(InverseDependencyCountOracle::default(), std::cmp::min), bool_extension_inf_and_min_count_inverse_bitset;
+    BoolExtension::bitset().as_oracle().ordered(), bool_extension_ord_bitset;
+    BoolExtension::bitset().as_oracle().ordered().and_by(DependencyCountOracle::default(), std::cmp::min), bool_extension_ord_and_min_count_bitset;
+    BoolExtension::bitset().as_oracle().ordered().and_by(InverseDependencyCountOracle::default(), std::cmp::min), bool_extension_ord_and_min_count_inverse_bitset;
+    IdentityOracle::hashset().constant(StrategyWeight::Infinity), identity_oracle_inf_hashset;
+    IdentityOracle::hashset().ordered(), identity_oracle_ord_hashset;
+    TrivialOracle::hashset().constant(StrategyWeight::Infinity), trivial_oracle_inf_hashset;
+    TrivialOracle::hashset().ordered(), trivial_oracle_ord_hashset;
+    SMax::hashset().constant(StrategyWeight::Num(0)), smax_const_0_hashset;
+    SMax::hashset().constant(StrategyWeight::Infinity), smax_const_infinity_hashset;
+    SMax::hashset().constant(StrategyWeight::Num(0)).then(DependencyCountOracle::default()), smax_then_count_hashset;
+    SMax::hashset().constant(StrategyWeight::Num(10)).and_by(DependencyCountOracle::default(), std::cmp::min), smax_10_and_min_count_hashset;
+    SMax::hashset().ordered(), smax_ord_hashset;
+    SMax::hashset().ordered().then(DependencyCountOracle::default()), smax_ord_then_count_hashset;
+    BoolExtension::hashset().as_oracle().constant(StrategyWeight::Num(0)), bool_extension_0_hashset;
+    BoolExtension::hashset().as_oracle().constant(StrategyWeight::Num(0)).and_by(DependencyCountOracle::default(), std::cmp::min), bool_extension_0_and_min_count_hashset;
+    BoolExtension::hashset().as_oracle().constant(StrategyWeight::Infinity).and_by(DependencyCountOracle::default(), std::cmp::min), bool_extension_inf_and_min_count_hashset;
+    BoolExtension::hashset().as_oracle().constant(StrategyWeight::Infinity).and_by(InverseDependencyCountOracle::default(), std::cmp::min), bool_extension_inf_and_min_count_inverse_hashset;
+    BoolExtension::hashset().as_oracle().ordered(), bool_extension_ord_hashset;
+    BoolExtension::hashset().as_oracle().ordered().and_by(DependencyCountOracle::default(), std::cmp::min), bool_extension_ord_and_min_count_hashset;
+    BoolExtension::hashset().as_oracle().ordered().and_by(InverseDependencyCountOracle::default(), std::cmp::min), bool_extension_ord_and_min_count_inverse_hashset;
     DependencyCountOracle::default(), dependency_count;
     InverseDependencyCountOracle::default(), dependency_count_inverse;
     DependentCountOracle::default(), dependent_count;
     InverseDependentCountOracle::default(), dependent_count_inverse;
-    BoolExtension::oracle().ordered().and_by(DependencyCountOracle::default(), std::cmp::min), bool_extension_ord_and_min_count;
-    BoolExtension::oracle().ordered().and_by(InverseDependencyCountOracle::default(), std::cmp::min), bool_extension_ord_and_min_count_inverse;
-    DependencyCountOracle::default(), count;
-    InverseDependencyCountOracle::default(), count_inverse;
     StrategicArgumentsOracle::with(ArgumentsStrategy::Successors), arguments_s_s;
     StrategicArgumentsOracle::with(ArgumentsStrategy::Successors).and_by(DependencyCountOracle::default(), std::cmp::min), args_s_s_and_min_dependency;
     StrategicArgumentsOracle::with(ArgumentsStrategy::Successors).and_by(InverseDependencyCountOracle::default(), std::cmp::min), args_s_s_and_min_dependency_inverse;

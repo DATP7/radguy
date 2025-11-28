@@ -3,10 +3,11 @@ use std::{
     collections::{BTreeSet, HashMap, HashSet},
 };
 
-use radguy::DependencyGraphSystem;
-use radguy::extension::TermSystem;
-use radguy::{Arguments, PairUniverse, System, Universe, bislotmap::BiSlotMap};
-use slotmap::{Key, SecondaryMap};
+use radguy::{
+    Arguments, DependencyGraphSystem, PairUniverse, System, Universe, Visited,
+    arena::{BiArena, Key, SecondaryArena},
+    extension::TermSystem,
+};
 
 use crate::systems::{
     numeric::{
@@ -17,14 +18,14 @@ use crate::systems::{
     wctl::flat_formula::{FlatExpr, FlatFormula},
 };
 
-type HyperedgeMap<VarKey> = SecondaryMap<VarKey, Vec<Vec<(VarKey, Number)>>>;
+type HyperedgeMap<VarKey> = SecondaryArena<VarKey, Vec<Vec<(VarKey, Number)>>>;
 
 #[derive(Debug, Clone)]
 pub struct WCTLSystem<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key> {
     pub(crate) wccs_system: WCCSSystem<'a, ProcKey>,
     numeric_system: RefCell<NumericSystemImpl<VarKey, TermKey, (ProcKey, FormKey)>>,
-    pub(crate) formulas: RefCell<BiSlotMap<FormKey, FlatFormula<'a, FormKey, ExprKey>>>,
-    pub(crate) expresions: RefCell<BiSlotMap<ExprKey, FlatExpr<'a, ExprKey>>>,
+    pub(crate) formulas: RefCell<BiArena<FormKey, FlatFormula<'a, FormKey, ExprKey>>>,
+    pub(crate) expresions: RefCell<BiArena<ExprKey, FlatExpr<'a, ExprKey>>>,
     locked: bool,
     hyper_edge_cache: RefCell<HyperedgeMap<VarKey>>,
 }
@@ -39,8 +40,8 @@ impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
         WCTLSystem {
             wccs_system,
             numeric_system: RefCell::new(NumericSystemImpl::default()),
-            formulas: RefCell::new(BiSlotMap::default()),
-            expresions: RefCell::new(BiSlotMap::default()),
+            formulas: RefCell::new(BiArena::default()),
+            expresions: RefCell::new(BiArena::default()),
             locked: false,
             hyper_edge_cache: RefCell::default(),
         }
@@ -313,8 +314,13 @@ impl<ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key> System
     fn unlock(&mut self) {
         self.locked = false;
     }
-
-    fn visited(&self) -> HashSet<VarKey> {
+}
+impl<ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key, S> Visited<S>
+    for WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
+where
+    NumericSystemImpl<VarKey, TermKey, (ProcKey, FormKey)>: Visited<S>,
+{
+    fn visited(&self) -> S {
         self.numeric_system.borrow().visited()
     }
 }
@@ -330,19 +336,22 @@ impl<ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
     }
 }
 
-impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key> Universe<HashSet<VarKey>>
+impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key, S> Universe<S>
     for WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
+where
+    NumericSystemImpl<VarKey, TermKey, (ProcKey, FormKey)>: Universe<S>,
 {
-    fn universe(&self) -> HashSet<VarKey> {
+    fn universe(&self) -> S {
         self.numeric_system.borrow().universe()
     }
 }
 
-impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key>
-    PairUniverse<HashSet<(VarKey, VarKey)>>
+impl<ProcKey: Key, VarKey: Key, TermKey: Key, FormKey: Key, ExprKey: Key, S> PairUniverse<S>
     for WCTLSystem<'_, ProcKey, FormKey, ExprKey, VarKey, TermKey>
+where
+    NumericSystemImpl<VarKey, TermKey, (ProcKey, FormKey)>: PairUniverse<S>,
 {
-    fn pair_universe(&self) -> HashSet<(VarKey, VarKey)> {
+    fn pair_universe(&self) -> S {
         self.numeric_system.borrow().pair_universe()
     }
 }

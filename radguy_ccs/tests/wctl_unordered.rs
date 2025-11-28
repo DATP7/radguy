@@ -9,7 +9,6 @@ use radguy_ccs::systems::wccs;
 use radguy_ccs::systems::wccs::wccs_system::WCCSSystem;
 use radguy_ccs::systems::wctl;
 use radguy_ccs::systems::wctl::wctl_system::WCTLSystem;
-use slotmap::DefaultKey;
 
 macro_rules! wctl_test_fast {
     ($($(#ignore($reason:literal))? $test_name:ident: $oracle:expr, $($process_name:literal, $formula_str:expr => $eq:literal),* $(,)? in $wccs:expr;)*) => {
@@ -23,13 +22,13 @@ macro_rules! wctl_test_fast {
                     let wccs_ast = wccs_parser
                         .parse(&$wccs)
                         .expect("Failed to parse WCCS program content.");
-                    let mut wccs_system = WCCSSystem::<DefaultKey>::default();
+                    let mut wccs_system = WCCSSystem::<usize>::default();
                     wccs_system.insert_ast_bindings(wccs_ast);
 
                     let formula_parser = wctl::grammar::FormulaParser::new();
                     let formula = formula_parser.parse($formula_str).expect("Formula should parse");
 
-                    let mut sys = WCTLSystem::<DefaultKey, DefaultKey, DefaultKey, DefaultKey, DefaultKey>::new(wccs_system);
+                    let mut sys = WCTLSystem::<usize, usize, usize, usize, usize>::new(wccs_system);
                     let process_key = sys.get_process_definition($process_name).expect("Process name should be bound");
                     let formula_key = sys.insert_ast_formula(formula.clone());
                     let start = sys.get_var(process_key, formula_key);
@@ -55,13 +54,13 @@ macro_rules! wctl_test_slow {
                     let wccs_ast = wccs_parser
                         .parse(&$wccs)
                         .expect("Failed to parse WCCS program content.");
-                    let mut wccs_system = WCCSSystem::<DefaultKey>::default();
+                    let mut wccs_system = WCCSSystem::<usize>::default();
                     wccs_system.insert_ast_bindings(wccs_ast);
 
                     let formula_parser = wctl::grammar::FormulaParser::new();
                     let formula = formula_parser.parse($formula_str).expect("Formula should parse");
 
-                    let mut sys = WCTLSystem::<DefaultKey, DefaultKey, DefaultKey, DefaultKey, DefaultKey>::new(wccs_system);
+                    let mut sys = WCTLSystem::<usize, usize, usize, usize, usize>::new(wccs_system);
                     let process_key = sys.get_process_definition($process_name).expect("Process name should be bound");
                     let formula_key = sys.insert_ast_formula(formula.clone());
                     let start = sys.get_var(process_key, formula_key);
@@ -119,19 +118,34 @@ macro_rules! wctl_test_oracles {
 }
 
 wctl_test_oracles! {
-    SMax, smax;
-    WeightedDepOracle::default(), wctl_oracle;
-    TrivialOracle, trivialoracle;
-    IdentityOracle, identityoracle;
-    LocalMaxR::default(), localmaxr;
-    TrivialOracle.and(SMax), trivialoracle_and_smax;
-    LocalMaxR::default().and(SMax), localmaxr_and_smax;
-    LocalMaxR::default().and(TrivialOracle), localmaxr_and_trivialoracle;
-    TrivialOracle.then(SMax), trivialoracle_then_smax;
-    TrivialOracle.then(LocalMaxR::default()), trivialoracle_then_localmaxr;
-    SMax.then(TrivialOracle), smax_then_trivialoracle;
-    SMax.then(LocalMaxR::default()), smax_then_localmaxr;
-    LocalMaxR::default().then(SMax), localmaxr_then_smax;
-    LocalMaxR::default().then(TrivialOracle), localmaxr_then_trivialoracle;
-    ArgumentsOracle::default(), arguments;
+    SMax::bitset(), smax_bitset;
+    WeightedDepOracle::default(), wctl_oracle_bitset;
+    TrivialOracle::bitset(), trivialoracle_bitset;
+    IdentityOracle::bitset(), identityoracle_bitset;
+    LocalMaxR::bitset(), localmaxr_bitset;
+    TrivialOracle::bitset().and(SMax::bitset()), trivialoracle_and_smax_bitset;
+    LocalMaxR::bitset().and(SMax::bitset()), localmaxr_and_smax_bitset;
+    LocalMaxR::bitset().and(TrivialOracle::bitset()), localmaxr_and_trivialoracle_bitset;
+    TrivialOracle::bitset().then(SMax::bitset()), trivialoracle_then_smax_bitset;
+    TrivialOracle::bitset().then(LocalMaxR::bitset()), trivialoracle_then_localmaxr_bitset;
+    SMax::bitset().then(TrivialOracle::bitset()), smax_then_trivialoracle_bitset;
+    SMax::bitset().then(LocalMaxR::bitset()), smax_then_localmaxr_bitset;
+    LocalMaxR::bitset().then(SMax::bitset()), localmaxr_then_smax_bitset;
+    LocalMaxR::bitset().then(TrivialOracle::bitset()), localmaxr_then_trivialoracle_bitset;
+    ArgumentsOracle::bitset(), arguments_bitset;
+    SMax::hashset(), smax_hashset;
+    WeightedDepOracle::default(), wctl_oracle_hashset;
+    TrivialOracle::hashset(), trivialoracle_hashset;
+    IdentityOracle::hashset(), identityoracle_hashset;
+    LocalMaxR::hashset(), localmaxr_hashset;
+    TrivialOracle::hashset().and(SMax::hashset()), trivialoracle_and_smax_hashset;
+    LocalMaxR::hashset().and(SMax::hashset()), localmaxr_and_smax_hashset;
+    LocalMaxR::hashset().and(TrivialOracle::hashset()), localmaxr_and_trivialoracle_hashset;
+    TrivialOracle::hashset().then(SMax::hashset()), trivialoracle_then_smax_hashset;
+    TrivialOracle::hashset().then(LocalMaxR::hashset()), trivialoracle_then_localmaxr_hashset;
+    SMax::hashset().then(TrivialOracle::hashset()), smax_then_trivialoracle_hashset;
+    SMax::hashset().then(LocalMaxR::hashset()), smax_then_localmaxr_hashset;
+    LocalMaxR::hashset().then(SMax::hashset()), localmaxr_then_smax_hashset;
+    LocalMaxR::hashset().then(TrivialOracle::hashset()), localmaxr_then_trivialoracle_hashset;
+    ArgumentsOracle::hashset(), arguments_hashset;
 }

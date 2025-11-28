@@ -1,10 +1,13 @@
 use itertools::Itertools;
 
-use crate::Assignment;
-use crate::DependencyGraphSystem;
+use fixedbitset::FixedBitSet;
+
 use crate::{
-    Arguments, Bottom, Cartesian, Diagonal, Intersect, Maximal, PairUniverse, System, Union,
-    Universe, Without,
+    Arguments, Assignment, Bottom, Cartesian, CopiedIter, DependencyGraphSystem, Diagonal,
+    FromLefts, FromRights, Intersect, Maximal, PairUniverse, RightSliced, Set, System, Union,
+    UnionWith, Universe, Visited, Without,
+    arena::{Key, SecondaryArena},
+    set::bitset::{BitSet, BitsetRelation},
 };
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -46,12 +49,14 @@ pub struct LocalMaxR<U>(PhantomData<U>);
 impl<
     K: Hash + Eq + Copy + Debug,
     V: Maximal,
-    PS: FromIterator<(K, K)> + Union + Union<HashSet<(K, K)>>,
-    S: System<K, V> + Universe<U>,
-    U: Cartesian<Output = PS> + Without<HashSet<K>>,
+    PS: FromIterator<(K, K)>
+        + Union
+        + Union<HashSet<(K, K)>>
+        + RightSliced<K, K, SlicedRight = U>
+        + FromRights<U, K>,
+    S: System<K, V> + Universe<U> + Visited<U>,
+    U: Cartesian<Output = PS> + Without<U> + for<'a> CopiedIter<'a, K> + Diagonal<Output = PS> + Clone,
 > LocalOracle<K, V, PS, S> for LocalMaxR<U>
-where
-    for<'a> &'a U: IntoIterator<Item = &'a K>,
 {
     fn approximate_flow(&self, assignment: &HashMap<K, V>, _possible: &PS, system: &S) -> PS {
         let visited = system.visited();
@@ -60,33 +65,92 @@ where
         let unvisited_dep = universe.cartesian(&unvisited);
         let self_dep = visited.diagonal();
 
-        let max_dep: PS = visited
-            .iter()
-            .flat_map(|&y| {
-                if system.evaluate(y, assignment).is_maximal() {
-                    std::iter::empty().collect::<Vec<_>>()
-                } else {
-                    universe.into_iter().map(|&x| (x, y)).collect()
-                }
-            })
-            .collect();
+        let rights = visited.copied_iter().filter_map(|y| {
+            if system.evaluate(y, assignment).is_maximal() {
+                None
+            } else {
+                Some((universe.clone(), y))
+            }
+        });
+        let max_dep = PS::from_rights(rights);
 
         unvisited_dep.union(self_dep).union(max_dep)
     }
 }
 
-impl<U> Display for LocalMaxR<U> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "LocalMaxR")
+#[expect(
+    clippy::implicit_hasher,
+    reason = "we don't want to specify the hasher everytime we construct LocalMaxR"
+)]
+impl<K> LocalMaxR<HashSet<K>> {
+    #[must_use]
+    pub fn hashset() -> Self {
+        Self::default()
     }
 }
 
-#[derive(Default, Clone)]
-pub struct SMax;
+impl<K> LocalMaxR<BitSet<K>> {
+    #[must_use]
+    pub fn bitset() -> Self {
+        Self::default()
+    }
+}
 
-impl Display for SMax {
+impl<K, S: ::std::hash::BuildHasher> Display for LocalMaxR<HashSet<K, S>> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "SMax")
+        write!(f, "LocalMaxR:hashset")
+    }
+}
+
+impl<K> Display for LocalMaxR<BitSet<K>> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "LocalMaxR:bitset")
+    }
+}
+
+// having `PS` as a type parameter on `SMax` isn't techinically required, however it allows us to
+// specify the output type of it at compile-time.
+pub struct SMax<PS>(PhantomData<PS>);
+
+impl<PS> Default for SMax<PS> {
+    fn default() -> Self {
+        Self(PhantomData)
+    }
+}
+
+#[expect(
+    clippy::implicit_hasher,
+    reason = "we don't want to specify the hasher everytime we construct SMax"
+)]
+impl<VarKey> SMax<HashSet<(VarKey, VarKey)>> {
+    #[must_use]
+    pub fn hashset() -> Self {
+        Self::default()
+    }
+}
+
+impl<VarKey> SMax<BitsetRelation<VarKey, VarKey, FixedBitSet>> {
+    #[must_use]
+    pub fn bitset() -> Self {
+        Self::default()
+    }
+}
+
+impl<PS> Clone for SMax<PS> {
+    fn clone(&self) -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<K, S: ::std::hash::BuildHasher> Display for SMax<HashSet<(K, K), S>> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SMax:hashset")
+    }
+}
+
+impl<K> Display for SMax<BitsetRelation<K, K>> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SMax:bitset")
     }
 }
 
@@ -94,26 +158,21 @@ impl Display for SMax {
 impl<
     K: Hash + Eq + Copy + Debug,
     V: Maximal + Bottom + Clone,
-    S: System<K, V> + PairUniverse<HashSet<(K, K)>>,
-> LocalOracle<K, V, HashSet<(K, K)>, S> for SMax
+    S: System<K, V>,
+    PS: for<'a> CopiedIter<'a, (K, K)> + FromIterator<(K, K)>,
+> LocalOracle<K, V, PS, S> for SMax<PS>
 {
-    fn approximate_flow(
-        &self,
-        assignment: &HashMap<K, V>,
-        possible: &HashSet<(K, K)>,
-        _system: &S,
-    ) -> HashSet<(K, K)> {
+    fn approximate_flow(&self, assignment: &HashMap<K, V>, possible: &PS, _system: &S) -> PS {
         // TODO: currently it's actually faster to just iterate over `system.pair_universe` with
         // the ordered algorithm, because we construct the initial strategy each time.
         // this (hopefully) isn't the case when we start reusing the relation
         possible
-            .iter()
+            .copied_iter()
             .filter(|(x, y)| {
                 !assignment.get_assignment(x).is_maximal()
                     && !assignment.get_assignment(y).is_maximal()
             })
-            .copied()
-            .collect::<HashSet<_>>()
+            .collect()
     }
 }
 
@@ -257,10 +316,28 @@ impl<
 }
 
 #[derive(Clone, Default)]
-pub struct TrivialOracle;
+pub struct TrivialOracle<PS>(PhantomData<PS>);
 
-impl<K, V: Maximal, PairSet, S: System<K, V> + PairUniverse<PairSet>> LocalOracle<K, V, PairSet, S>
-    for TrivialOracle
+#[expect(
+    clippy::implicit_hasher,
+    reason = "we don't want to specify the hasher everytime we construct TrivialOracle"
+)]
+impl<K> TrivialOracle<HashSet<(K, K)>> {
+    #[must_use]
+    pub fn hashset() -> Self {
+        Self::default()
+    }
+}
+
+impl<K> TrivialOracle<BitsetRelation<K, K>> {
+    #[must_use]
+    pub fn bitset() -> Self {
+        Self::default()
+    }
+}
+
+impl<K: Hash + Eq + Copy, V: Maximal, PairSet, S: System<K, V> + PairUniverse<PairSet>>
+    LocalOracle<K, V, PairSet, S> for TrivialOracle<PairSet>
 {
     fn approximate_flow(
         &self,
@@ -272,150 +349,218 @@ impl<K, V: Maximal, PairSet, S: System<K, V> + PairUniverse<PairSet>> LocalOracl
     }
 }
 
-impl Display for TrivialOracle {
+impl<K, S: ::std::hash::BuildHasher> Display for TrivialOracle<HashSet<(K, K), S>> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Trivial")
+        write!(f, "Trivial:hashset")
+    }
+}
+impl<K> Display for TrivialOracle<BitsetRelation<K, K>> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Trivial:bitset")
     }
 }
 
-#[derive(Default, Clone, Debug)]
-pub struct ArgumentsOracle<VarKey> {
-    successors: RefCell<HashMap<VarKey, HashSet<VarKey>>>,
-    ancestors: RefCell<HashMap<VarKey, HashSet<VarKey>>>,
-    previous_visited: RefCell<HashSet<VarKey>>,
-    relation_cache: RefCell<HashSet<(VarKey, VarKey)>>,
+#[derive(Clone, Debug)]
+pub struct ArgumentsOracle<VarKey, VarSet, PairSet> {
+    successors: RefCell<SecondaryArena<VarKey, VarSet>>,
+    ancestors: RefCell<SecondaryArena<VarKey, VarSet>>,
+    previous_visited: RefCell<VarSet>,
+    relation_cache: RefCell<PairSet>,
 }
 
-impl<K: Eq + Copy + Hash + Debug> ArgumentsOracle<K> {
-    fn get_updated_closure<S: Arguments<K, HashSet<K>>>(
-        &self,
-        visited: &HashSet<K>,
-        system: &S,
-    ) -> HashSet<(K, K)> {
+impl<K, VS, PS> Default for ArgumentsOracle<K, VS, PS>
+where
+    VS: Default,
+    PS: Default + RightSliced<K, K, SlicedRight = VS>,
+{
+    fn default() -> Self {
+        Self {
+            successors: RefCell::default(),
+            ancestors: RefCell::default(),
+            previous_visited: RefCell::default(),
+            relation_cache: RefCell::default(),
+        }
+    }
+}
+
+#[expect(
+    clippy::implicit_hasher,
+    reason = "we don't want to specify the hasher everytime we construct SMax"
+)]
+impl<K: Default + Eq + Hash + Copy> ArgumentsOracle<K, HashSet<K>, HashSet<(K, K)>> {
+    #[must_use]
+    pub fn hashset() -> Self {
+        Self::default()
+    }
+}
+
+impl<K: Key> ArgumentsOracle<K, BitSet<K, FixedBitSet>, BitsetRelation<K, K, FixedBitSet>> {
+    #[must_use]
+    pub fn bitset() -> Self {
+        Self::default()
+    }
+}
+
+impl<
+    K: Key,
+    VS: Set<K>
+        + for<'a> UnionWith<&'a VS>
+        + Without
+        + for<'a> CopiedIter<'a, K>
+        + From<[K; 1]>
+        + FromIterator<K>
+        + Default
+        + Clone,
+    PS: UnionWith + FromLefts<K, VS> + Default + Clone,
+> ArgumentsOracle<K, VS, PS>
+{
+    fn get_updated_closure<S: Arguments<K, HashSet<K>>>(&self, visited: &VS, system: &S) -> PS {
         let mut successors = self.successors.borrow_mut();
         let mut ancestors = self.ancestors.borrow_mut();
-        let mut previous_visited = self.previous_visited.borrow_mut();
+        let mut previous_visited = self.previous_visited.take();
 
         if previous_visited.len() == visited.len() {
             return self.relation_cache.borrow().clone();
         }
 
-        let new_variables: Vec<_> = visited.difference(&previous_visited).copied().collect();
-        let mut updated_ancestors = HashSet::new();
+        let new_variables: VS = visited.clone().without(&previous_visited);
+        let mut updated_ancestors = VS::default();
 
-        let mut to_add = HashSet::new();
-        for &variable in &new_variables {
+        let mut to_add = PS::default();
+        for variable in new_variables.copied_iter() {
             let args = system.arguments(variable);
             let var_ancestors = ancestors
                 .entry(variable)
-                .or_insert_with(|| HashSet::from([variable]))
+                .or_insert_with(|| VS::from([variable]))
                 .clone();
 
-            let new_successors: Vec<_> = args
-                .iter()
-                .copied()
+            let new_successors: VS = args
+                .copied_iter()
                 .flat_map(|a| {
                     successors
                         .entry(a)
-                        .or_insert_with(|| HashSet::from([a]))
-                        .clone()
+                        .or_insert_with(|| VS::from([a]))
+                        .copied_iter()
+                        .collect::<Vec<_>>()
                 })
                 .chain([variable])
                 .collect();
 
             let var_successors = successors.entry(variable).or_default();
 
-            var_successors.extend(new_successors);
+            var_successors.union_with(&new_successors);
 
             // Clone and shadow since we look at the entry again later and don't want to reference
             // the same object
             let var_successors = var_successors.clone();
 
             // each new variable has its parent's ancestors as ancestors, and itself
-            for &succ in &var_successors {
-                ancestors
-                    .entry(succ)
-                    .or_default()
-                    .extend(var_ancestors.iter().copied().chain([succ]));
+            for succ in var_successors.copied_iter() {
+                let ancs = ancestors.entry(succ).or_default();
+                ancs.union_with(&var_ancestors);
+                ancs.insert(succ);
             }
 
-            for &ancestor in &var_ancestors {
+            for ancestor in var_ancestors.copied_iter() {
                 if ancestor == variable {
                     continue;
                 }
                 // TODO: we don't actually need to update the weight of `ancestor` if extending its
                 // successors added nothing
                 successors
-                    .get_mut(&ancestor)
+                    .get_mut(ancestor)
                     .expect("ancestor must have successors")
-                    .extend(&var_successors);
+                    .union_with(&var_successors);
             }
 
             // TODO: this is probably very inefficient
-            for &arg in successors
-                .get(&variable)
+            let anc_rel = successors
+                .get(variable)
                 .expect("variable should have successors")
-            {
-                to_add.extend(
-                    ancestors
-                        .get(&arg)
-                        .expect("argument should have ancestors")
-                        .iter()
-                        .copied()
-                        .map(|anc| (arg, anc)),
-                );
-            }
-
-            updated_ancestors.extend(var_ancestors.iter().copied());
+                .copied_iter()
+                .map(|arg| {
+                    (
+                        arg,
+                        ancestors
+                            .get(arg)
+                            .expect("argument should have ancestors")
+                            .clone(),
+                    )
+                });
+            let anc_rel = PS::from_lefts(anc_rel);
+            to_add.union_with(anc_rel);
+            updated_ancestors.union_with(&var_ancestors);
         }
+
         let mut relation = self.relation_cache.borrow_mut();
+        relation.union_with(to_add);
 
-        // TODO: this could probably be more efficient if we could have keys into the heap
-        // remove all ancestors that could have been updated by `variable`, and reinsert them
-        // with the new weight
-        relation.retain(|(x, y)| {
-            if updated_ancestors.contains(x) || to_add.contains(&(*x, *y)) {
-                to_add.insert((*x, *y));
-                false
-            } else {
-                true
-            }
-        });
-        relation.extend(to_add);
-
-        // PERF: maybe collect to smallvec
-        previous_visited.extend(new_variables);
+        previous_visited.union_with(&new_variables);
+        self.previous_visited.replace(previous_visited);
 
         relation.clone()
     }
 }
 
 // TODO: Make this generic on set/strategy implementation
-impl<K: Eq + Copy + Hash + Debug, V: PartialOrd, S: System<K, V> + Arguments<K, HashSet<K>>>
-    LocalOracle<K, V, HashSet<(K, K)>, S> for ArgumentsOracle<K>
+impl<
+    K: Key,
+    V: PartialOrd,
+    VS: Set<K>
+        + for<'a> UnionWith<&'a VS>
+        + Without
+        + for<'a> CopiedIter<'a, K>
+        + From<[K; 1]>
+        + FromIterator<K>
+        + Default
+        + Clone,
+    PS: UnionWith + FromLefts<K, VS> + Default + Clone,
+    S: System<K, V> + Arguments<K, HashSet<K>> + Visited<VS>,
+> LocalOracle<K, V, PS, S> for ArgumentsOracle<K, VS, PS>
 {
-    fn approximate_flow(
-        &self,
-        _assignment: &HashMap<K, V>,
-        _relation: &HashSet<(K, K)>,
-        system: &S,
-    ) -> HashSet<(K, K)> {
+    fn approximate_flow(&self, _assignment: &HashMap<K, V>, _relation: &PS, system: &S) -> PS {
         let visited = system.visited();
         self.get_updated_closure(&visited, system)
     }
 }
 
-impl<VarKey: Eq + Copy + Hash> Display for ArgumentsOracle<VarKey> {
+impl<VarKey, VarSet, S: ::std::hash::BuildHasher> Display
+    for ArgumentsOracle<VarKey, VarSet, HashSet<(VarKey, VarKey), S>>
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Args")
+        write!(f, "Args:hashset")
+    }
+}
+
+impl<VarKey, VarSet> Display for ArgumentsOracle<VarKey, VarSet, BitsetRelation<VarKey, VarKey>> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Args:bitset")
     }
 }
 
 #[derive(Default)]
-pub struct IdentityOracle;
+pub struct IdentityOracle<PS>(PhantomData<PS>);
+
+#[expect(
+    clippy::implicit_hasher,
+    reason = "we don't want to specify the hasher everytime we construct TrivialOracle"
+)]
+impl<K> IdentityOracle<HashSet<(K, K)>> {
+    #[must_use]
+    pub fn hashset() -> Self {
+        Self::default()
+    }
+}
+
+impl<K> IdentityOracle<BitsetRelation<K, K>> {
+    #[must_use]
+    pub fn bitset() -> Self {
+        Self::default()
+    }
+}
 
 impl<K: Hash + Eq + Copy, V: Maximal, PairSet: Clone, S: System<K, V> + PairUniverse<PairSet>>
-    LocalOracle<K, V, PairSet, S> for IdentityOracle
+    LocalOracle<K, V, PairSet, S> for IdentityOracle<PairSet>
 {
     fn approximate_flow(
         &self,
@@ -427,9 +572,14 @@ impl<K: Hash + Eq + Copy, V: Maximal, PairSet: Clone, S: System<K, V> + PairUniv
     }
 }
 
-impl Display for IdentityOracle {
+impl<K, S: ::std::hash::BuildHasher> Display for IdentityOracle<HashSet<(K, K), S>> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Identity")
+        write!(f, "Identity:hashset")
+    }
+}
+impl<K> Display for IdentityOracle<BitsetRelation<K, K>> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Identity:bitset")
     }
 }
 
@@ -481,9 +631,15 @@ where
     }
 }
 
-impl<PS> Display for WeightedDepOracle<PS> {
+impl<K, S: ::std::hash::BuildHasher> Display for WeightedDepOracle<HashSet<(K, K), S>> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "WeightedDep")
+        write!(f, "WeightedDep:hashset")
+    }
+}
+
+impl<K> Display for WeightedDepOracle<BitsetRelation<K, K>> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WeightedDep:bitset")
     }
 }
 
@@ -491,36 +647,35 @@ impl<PS> Display for WeightedDepOracle<PS> {
 #[cfg(test)]
 mod tests {
     mod arguments {
+        use crate::{CopiedIter, UnionWith, set::bitset::BitSet};
         use std::collections::HashSet;
 
-        use slotmap::{DefaultKey, SlotMap};
-
-        use crate::{Arguments, oracle::ArgumentsOracle};
+        use crate::{Arguments, arena::Arena, oracle::ArgumentsOracle};
 
         #[derive(Default, Debug)]
         struct MockSystem {
-            variables: SlotMap<DefaultKey, HashSet<DefaultKey>>,
+            variables: Arena<usize, HashSet<usize>>,
         }
 
         impl MockSystem {
-            fn add_variable(&mut self) -> DefaultKey {
+            fn add_variable(&mut self) -> usize {
                 self.variables.insert(HashSet::new())
             }
 
-            fn set_arguments(&mut self, variable: DefaultKey, arguments: HashSet<DefaultKey>) {
-                *self
-                    .variables
-                    .get_mut(variable)
-                    .expect("variable should be defined") = arguments;
+            fn set_arguments(&mut self, variable: usize, arguments: HashSet<usize>) {
+                *self.variables.get_mut(variable) = arguments;
             }
         }
 
-        impl Arguments<DefaultKey, HashSet<DefaultKey>> for MockSystem {
-            fn arguments(&self, key: DefaultKey) -> HashSet<DefaultKey> {
-                self.variables
-                    .get(key)
-                    .expect("variable must have arguments")
-                    .clone()
+        impl Arguments<usize, HashSet<usize>> for MockSystem {
+            fn arguments(&self, key: usize) -> HashSet<usize> {
+                self.variables.get(key).clone()
+            }
+        }
+
+        impl Arguments<usize, BitSet<usize>> for MockSystem {
+            fn arguments(&self, key: usize) -> BitSet<usize> {
+                self.variables.get(key).copied_iter().collect()
             }
         }
 
@@ -554,33 +709,68 @@ mod tests {
                 };
             )*) => {
                 $(
-                    #[test]
-                    fn $test_name() {
-                        let (system, [$($var_name,)*]) = system_def! {$(
-                            $var_name = {$($dep,)*};
-                        )*};
-                        $(
-                        let oracle = ArgumentsOracle::default();
-                        assert!(
-                            oracle.relation_cache.borrow().is_empty(),
-                            "strategy should start empty"
-                        );
+                    mod $test_name {
+                        use super::*;
+                        use std::collections::HashSet;
+                        use $crate::{Set, set::bitset::{BitSet, BitsetRelation}};
 
-                        let mut visited = HashSet::new();
-                        let mut visit_seq = Vec::new();
-                        $(
-                            visited.extend(HashSet::from([$($visited_var,)*]));
-                            visit_seq.push(stringify!($($visited_var),*));
-                            let expected = HashSet::from([$(($l, $r),)*]);
-                            let got = oracle.get_updated_closure(&visited, &system);
-
-                            assert_eq!(
-                                expected,
-                                got,
-                                "wrong strategy when visiting {{{}}}. sequence: {visit_seq:#?} state: {oracle:#?}", stringify!($($visited_var),*)
+                        #[test]
+                        fn hashset() {
+                            let (system, [$($var_name,)*]) = system_def! {$(
+                                $var_name = {$($dep,)*};
+                            )*};
+                            $(
+                            let oracle = ArgumentsOracle::<_, HashSet<_>, HashSet<_>>::default();
+                            assert!(
+                                oracle.relation_cache.borrow().is_empty(),
+                                "strategy should start empty"
                             );
-                        )+
-                        )*
+
+                            let mut visited = HashSet::new();
+                            let mut visit_seq = Vec::new();
+                            $(
+                                visited.extend(HashSet::from([$($visited_var,)*]));
+                                visit_seq.push(stringify!($($visited_var),*));
+                                let expected = HashSet::from([$(($l, $r),)*]);
+                                let got = oracle.get_updated_closure(&visited, &system);
+
+                                assert_eq!(
+                                    expected,
+                                    got,
+                                    "wrong strategy when visiting {{{}}}. sequence: {visit_seq:#?} state: {oracle:#?}", stringify!($($visited_var),*)
+                                );
+                            )+
+                            )*
+                        }
+
+                        #[test]
+                        fn bitset() {
+                            let (system, [$($var_name,)*]) = system_def! {$(
+                                $var_name = {$($dep,)*};
+                            )*};
+                            $(
+                            let oracle = ArgumentsOracle::<_, BitSet<_>, BitsetRelation<_, _>>::default();
+                            assert!(
+                                oracle.relation_cache.borrow().is_empty(),
+                                "strategy should start empty"
+                            );
+
+                            let mut visited = BitSet::new();
+                            let mut visit_seq = Vec::new();
+                            $(
+                                visited.union_with(BitSet::from([$($visited_var,)*]));
+                                visit_seq.push(stringify!($($visited_var),*));
+                                let expected = BitsetRelation::from_iter([$(($l, $r),)*]);
+                                let got = oracle.get_updated_closure(&visited, &system);
+
+                                assert_eq!(
+                                    expected,
+                                    got,
+                                    "wrong strategy when visiting {{{}}}. sequence: {visit_seq:#?} state: {oracle:#?}", stringify!($($visited_var),*)
+                                );
+                            )+
+                            )*
+                        }
                     }
                 )*
             };

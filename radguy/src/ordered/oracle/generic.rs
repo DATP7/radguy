@@ -9,10 +9,10 @@ use std::{
 };
 
 use orx_priority_queue::PriorityQueueDecKey;
-use slotmap::{Key, SecondaryMap};
 
 use crate::{
-    Arguments, DependencyGraphSystem, System, Universe,
+    Arguments, DependencyGraphSystem, System, Universe, Visited,
+    arena::{Key, SecondaryArena},
     ordered::{
         StrategicLocalOracle,
         strategy::{GetWeight, OrxStrategy, Retain, Strategy, StrategyItem, StrategyWeight},
@@ -74,6 +74,17 @@ pub enum ArgumentsStrategy {
     Successors,
     AncestorsInverted,
     SuccessorsInverted,
+}
+
+impl Display for ArgumentsStrategy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Ancestors => write!(f, "anc"),
+            Self::Successors => write!(f, "succ"),
+            Self::AncestorsInverted => write!(f, "anc⁻¹"),
+            Self::SuccessorsInverted => write!(f, "succ⁻¹"),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -351,7 +362,7 @@ impl<
     K: Eq + Copy + Hash + Debug,
     V: PartialOrd,
     PS: Strategy<(K, K)> + Retain<(K, K)> + Extend<StrategyItem<(K, K)>> + Clone,
-    S: System<K, V> + Arguments<K, HashSet<K>> + Universe<HashSet<K>>,
+    S: System<K, V> + Arguments<K, HashSet<K>> + Universe<HashSet<K>> + Visited<HashSet<K>>,
 > StrategicLocalOracle<K, V, PS, S> for StrategicArgumentsOracle<K, PS>
 {
     fn get_strategy(&self, _assignment: &HashMap<K, V>, _strategy: &PS, system: &S) -> PS {
@@ -365,7 +376,7 @@ impl<
     K: Eq + Copy + Hash + Debug,
     V: PartialOrd,
     H: PriorityQueueDecKey<(K, K), StrategyWeight> + Clone + Debug,
-    S: System<K, V> + Arguments<K, HashSet<K>> + Universe<HashSet<K>>,
+    S: System<K, V> + Arguments<K, HashSet<K>> + Universe<HashSet<K>> + Visited<HashSet<K>>,
 > StrategicLocalOracle<K, V, OrxStrategy<(K, K), H>, S>
     for StrategicArgumentsOracle<K, OrxStrategy<(K, K), H>>
 {
@@ -384,7 +395,7 @@ impl<VarKey: Eq + Copy + Hash, PS: Strategy<(VarKey, VarKey)>> Display
     for StrategicArgumentsOracle<VarKey, PS>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Args_c")
+        write!(f, "Args_c-{}", self.strategy)
     }
 }
 
@@ -417,9 +428,9 @@ impl StrategicHeightOracle {
             .map(|StrategyItem(weight, (x, y))| ((x, y), weight))
             .collect();
 
-        let mut graph = SecondaryMap::new();
+        let mut graph = SecondaryArena::new();
         for &i in &variables {
-            let mut inner = SecondaryMap::new();
+            let mut inner = SecondaryArena::new();
             for &j in &variables {
                 if let Some(weight) = weightmap.get(&(i, j))
                     && (i == j || (visited.contains(&j) && system.arguments(j).contains(&i)))
@@ -488,7 +499,7 @@ impl StrategicHeightOracle {
 impl<
     K: Eq + Copy + Hash + Debug + Key,
     V: PartialOrd,
-    S: System<K, V> + Arguments<K, HashSet<K>> + Universe<HashSet<K>>,
+    S: System<K, V> + Arguments<K, HashSet<K>> + Universe<HashSet<K>> + Visited<HashSet<K>>,
     PS: Strategy<(K, K)> + Default + Extend<StrategyItem<(K, K)>> + FromIterator<StrategyItem<(K, K)>>,
 > StrategicLocalOracle<K, V, PS, S> for StrategicHeightOracle
 where
@@ -527,6 +538,7 @@ impl Display for StrategicHeightOracle {
 mod tests {
     use crate::{
         Arguments, Universe,
+        arena::Arena,
         ordered::{
             oracle::StrategicArgumentsOracle,
             strategy::{BinaryHeapStrategy, Domain, StrategyItem, StrategyWeight},
@@ -535,35 +547,28 @@ mod tests {
     use std::collections::{HashMap, HashSet};
     use std::fmt::Debug;
 
-    use slotmap::{DefaultKey, SlotMap};
     #[derive(Default, Debug)]
     struct MockSystem {
-        variables: SlotMap<DefaultKey, HashSet<DefaultKey>>,
+        variables: Arena<usize, HashSet<usize>>,
     }
     impl MockSystem {
-        fn add_variable(&mut self) -> DefaultKey {
+        fn add_variable(&mut self) -> usize {
             self.variables.insert(HashSet::new())
         }
 
-        fn set_arguments(&mut self, variable: DefaultKey, arguments: HashSet<DefaultKey>) {
-            *self
-                .variables
-                .get_mut(variable)
-                .expect("variable should be defined") = arguments;
+        fn set_arguments(&mut self, variable: usize, arguments: HashSet<usize>) {
+            *self.variables.get_mut(variable) = arguments;
         }
     }
 
-    impl Arguments<DefaultKey, HashSet<DefaultKey>> for MockSystem {
-        fn arguments(&self, key: DefaultKey) -> HashSet<DefaultKey> {
-            self.variables
-                .get(key)
-                .expect("variable must have arguments")
-                .clone()
+    impl Arguments<usize, HashSet<usize>> for MockSystem {
+        fn arguments(&self, key: usize) -> HashSet<usize> {
+            self.variables.get(key).clone()
         }
     }
 
-    impl Universe<HashSet<DefaultKey>> for MockSystem {
-        fn universe(&self) -> HashSet<DefaultKey> {
+    impl Universe<HashSet<usize>> for MockSystem {
+        fn universe(&self) -> HashSet<usize> {
             self.variables.keys().collect()
         }
     }

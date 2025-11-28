@@ -167,10 +167,10 @@ impl<
     }
 }
 
-impl<T: Hash + Eq + Copy, H: FromIterator<StrategyItem<T>> + Strategy<T>> Domain<T, HashSet<T>>
-    for LazyHeap<T, H>
+impl<T: Hash + Eq + Copy, H: FromIterator<StrategyItem<T>> + Strategy<T>, D: FromIterator<T>>
+    Domain<T, D> for LazyHeap<T, H>
 {
-    fn domain(self) -> HashSet<T> {
+    fn domain(self) -> D {
         self.items.into_keys().collect()
     }
 }

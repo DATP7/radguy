@@ -1,4 +1,4 @@
-use slotmap::Key;
+use radguy::arena::Key;
 use std::collections::BTreeSet;
 use std::fmt::Debug;
 use std::fmt::Display;

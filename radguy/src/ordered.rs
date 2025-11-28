@@ -54,10 +54,12 @@ where
 
     let mut iterations = 0;
     while let Some(x) = todo.extract_min() {
-        debug_assert!(discovered.contains(&x));
+        debug_assert!(discovered.contains(&x), "discovered should contain {x:?}");
         iterations += 1;
+
         let evaluated = system.evaluate(x, &assignment);
         let args = system.arguments(x);
+
         if assignment.get_assignment(&x) != evaluated || !args.is_subset(&discovered) {
             assignment.update_assignment(x, evaluated);
             // At this point `rel` is D x D with some elements pruned by oracles

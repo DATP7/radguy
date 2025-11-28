@@ -1,4 +1,4 @@
-use slotmap::Key;
+use radguy::arena::Key;
 
 use crate::systems::wccs::wccs_system::MultiSet;
 use crate::systems::{numeric::Number, wctl::wctl_system::WCTLSystem};
