@@ -534,7 +534,7 @@ impl<VarKey, VarSet> Display for ArgumentsOracle<VarKey, VarSet, BitsetRelation<
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct IdentityOracle<PS>(PhantomData<PS>);
 
 #[expect(
