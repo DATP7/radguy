@@ -9,7 +9,6 @@ use radguy::{
             ArgumentsStrategy, DependencyCountOracle, DependentCountOracle,
             InverseDependencyCountOracle, InverseDependentCountOracle, SiblingsOracle,
             StrategicArgumentsOracle, StrategicHeightOracle, StrategicLocalOracle, ToConstant,
-            ToOrdered,
         },
         strategy::{BinaryHeapStrategy, HashMapStrategy, LazyHeap, OrxStrategy, StrategyWeight},
     },

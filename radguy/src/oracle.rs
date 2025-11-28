@@ -492,20 +492,6 @@ impl<
             updated_ancestors.union_with(&var_ancestors);
         }
 
-        // TODO: this could probably be more efficient if we could have keys into the heap
-        // remove all ancestors that could have been updated by `variable`, and reinsert them
-        // with the new weight
-
-        // relation.retain(|(x, y)| {
-        //     if updated_ancestors.contains(x) || to_add.contains(&(*x, *y)) {
-        //         to_add.insert((*x, *y));
-        //         false
-        //     } else {
-        //         true
-        //     }
-        // });
-        // relation.extend(to_add);
-
         let mut relation = self.relation_cache.borrow_mut();
         relation.union_with(to_add);
 
