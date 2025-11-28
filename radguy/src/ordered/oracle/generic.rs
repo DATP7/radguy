@@ -215,10 +215,10 @@ impl<
                     ArgumentsStrategy::Ancestors => ancestors.get(&x).map_or(1, HashSet::len),
                     ArgumentsStrategy::Successors => successors.get(&x).map_or(1, HashSet::len),
                     ArgumentsStrategy::AncestorsInverted => {
-                        max_weight - ancestors.get(&x).map_or(1, HashSet::len)
+                        max_weight - ancestors.get(&x).map_or(1, HashSet::len) + 1
                     }
                     ArgumentsStrategy::SuccessorsInverted => {
-                        max_weight - successors.get(&x).map_or(1, HashSet::len)
+                        max_weight - successors.get(&x).map_or(1, HashSet::len) + 1
                     }
                 } as u64),
                 (x, y),
@@ -331,10 +331,10 @@ impl<K: Eq + Copy + Hash + Debug, H: PriorityQueueDecKey<(K, K), StrategyWeight>
                     ArgumentsStrategy::Ancestors => ancestors.get(&x).map_or(1, HashSet::len),
                     ArgumentsStrategy::Successors => successors.get(&x).map_or(1, HashSet::len),
                     ArgumentsStrategy::AncestorsInverted => {
-                        max_weight - ancestors.get(&x).map_or(1, HashSet::len)
+                        max_weight - ancestors.get(&x).map_or(1, HashSet::len) + 1
                     }
                     ArgumentsStrategy::SuccessorsInverted => {
-                        max_weight - successors.get(&x).map_or(1, HashSet::len)
+                        max_weight - successors.get(&x).map_or(1, HashSet::len) + 1
                     }
                 } as u64),
             );
