@@ -1,0 +1,8 @@
+[package]
+name = "sadguy"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+radguy = {path = "../radguy"}
+radguy-ccs = {path = "../radguy_ccs"}

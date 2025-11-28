@@ -9,8 +9,7 @@ use radguy::{
         self,
         oracle::{
             DependencyCountOracle, InverseDependencyCountOracle, SiblingsOracle,
-            StrategicArgumentsOracle, StrategicHeightOracle, StrategicLocalOracle, ToConstant,
-            ToOrdered,
+            StrategicArgumentsOracle, StrategicLocalOracle, ToConstant, ToOrdered,
         },
         strategy::{BinaryHeapStrategy, StrategyWeight},
     },
@@ -36,7 +35,7 @@ use std::{
 };
 
 //TODO: Figure out how many iterations is a good amount
-const ITERATIONS: u32 = 10;
+const ITERATIONS: u32 = 30;
 
 fn append_record(file_path: &Path, record: &str) {
     let mut file = OpenOptions::new()
@@ -84,8 +83,8 @@ macro_rules! weak_bisim_oracles {
         $({
         weak_bisim_system! {
             $file_path, $name, $left, $right => $ccs,
-            IdentityOracle,
-            TrivialOracle,
+            IdentityOracle::bitset(),
+            TrivialOracle::bitset(),
             SMax::bitset(),
             LocalMaxR::bitset(),
             ArgumentsOracle::bitset(),
@@ -99,8 +98,8 @@ macro_rules! weak_bisim_oracles {
         }
         weak_bisim_system_ordered! {
             $file_path, $name, $left, $right => $ccs,
-            IdentityOracle.ordered(),
-            TrivialOracle.ordered(),
+            IdentityOracle::bitset().ordered(),
+            TrivialOracle::bitset().ordered(),
             SMax::bitset().constant(StrategyWeight::Infinity),
             LocalMaxR::bitset().constant(StrategyWeight::Infinity),
             LocalMaxR::bitset().constant(StrategyWeight::Num(1)).then(SiblingsOracle),
@@ -168,8 +167,8 @@ macro_rules! wctl_oracles {
         $({
         wctl_system! {
             $file_path, $name: $proc, $formula => $wccs,
-            IdentityOracle,
-            TrivialOracle,
+            IdentityOracle::bitset(),
+            TrivialOracle::bitset(),
             SMax::bitset(),
             LocalMaxR::bitset(),
             WeightedDepOracle::bitset(),
@@ -181,8 +180,8 @@ macro_rules! wctl_oracles {
         }
         wctl_system_ordered! {
             $file_path, $name: $proc, $formula => $wccs,
-            IdentityOracle.ordered(),
-            TrivialOracle.ordered(),
+            IdentityOracle::bitset().ordered(),
+            TrivialOracle::bitset().ordered(),
             SMax::bitset().constant(StrategyWeight::Infinity),
             LocalMaxR::bitset().constant(StrategyWeight::Infinity),
             LocalMaxR::bitset().constant(StrategyWeight::Num(1)).then(SiblingsOracle),
@@ -203,8 +202,8 @@ macro_rules! wctl_oracles {
             StrategicArgumentsOracle::default().and_by(SMax::bitset().constant(StrategyWeight::Infinity), std::cmp::min).then(InverseDependencyCountOracle::default()),
             // StrategicArgumentsOracle::default().then(StrategicHeightOracle::simple()),
             // StrategicArgumentsOracle::default().then(StrategicHeightOracle::transitive()),
-            LocalMaxR::bitset().constant(StrategyWeight::Infinity).then(InverseDependencyCountOracle::default()).then(StrategicHeightOracle::simple()),
-            LocalMaxR::bitset().constant(StrategyWeight::Infinity).then(InverseDependencyCountOracle::default()).then(StrategicHeightOracle::transitive()),
+            // LocalMaxR::default().constant(StrategyWeight::Infinity).then(InverseDependencyCountOracle::default()).then(StrategicHeightOracle::simple()),
+            // LocalMaxR::default().constant(StrategyWeight::Infinity).then(InverseDependencyCountOracle::default()).then(StrategicHeightOracle::transitive()),
         }
         })*
 
