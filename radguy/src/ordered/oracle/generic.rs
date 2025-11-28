@@ -2,7 +2,7 @@
 
 use std::{
     cell::RefCell,
-    cmp::min,
+    cmp::{max, min},
     collections::{HashMap, HashSet},
     fmt::{Debug, Display},
     hash::Hash,
@@ -72,6 +72,8 @@ impl Display for SiblingsOracle {
 pub enum ArgumentsStrategy {
     Ancestors,
     Successors,
+    AncestorsInverted,
+    SuccessorsInverted,
 }
 
 #[derive(Clone, Debug)]
@@ -87,24 +89,13 @@ impl<K: Eq + Copy + Hash + Default, PS: Strategy<(K, K)> + Default>
     StrategicArgumentsOracle<K, PS>
 {
     #[must_use]
-    pub fn ancestors() -> Self {
+    pub fn with(strategy: ArgumentsStrategy) -> Self {
         Self {
             successors: RefCell::default(),
             ancestors: RefCell::default(),
             previous_visited: RefCell::default(),
             strategy_cache: RefCell::default(),
-            strategy: ArgumentsStrategy::Ancestors,
-        }
-    }
-
-    #[must_use]
-    pub fn successors() -> Self {
-        Self {
-            successors: RefCell::default(),
-            ancestors: RefCell::default(),
-            previous_visited: RefCell::default(),
-            strategy_cache: RefCell::default(),
-            strategy: ArgumentsStrategy::Successors,
+            strategy,
         }
     }
 }
@@ -113,7 +104,7 @@ impl<K: Eq + Copy + Hash + Default, PS: Strategy<(K, K)> + Default> Default
     for StrategicArgumentsOracle<K, PS>
 {
     fn default() -> Self {
-        Self::successors()
+        Self::with(ArgumentsStrategy::Successors)
     }
 }
 
@@ -122,7 +113,7 @@ impl<
     PS: Strategy<(K, K)> + Extend<StrategyItem<(K, K)>> + Retain<(K, K)> + Clone,
 > StrategicArgumentsOracle<K, PS>
 {
-    fn get_updated_closure_generic<S: Arguments<K, HashSet<K>>>(
+    fn get_updated_closure_generic<S: Arguments<K, HashSet<K>> + Universe<HashSet<K>>>(
         &self,
         visited: &HashSet<K>,
         system: &S,
@@ -217,14 +208,19 @@ impl<
             }
         });
 
-        let lookup = match self.strategy {
-            ArgumentsStrategy::Ancestors => ancestors,
-            ArgumentsStrategy::Successors => successors,
-        };
-
+        let max_weight = max(visited.len(), system.universe().len());
         strategy.extend(to_add.into_iter().map(|(x, y)| {
             StrategyItem(
-                StrategyWeight::Num(lookup.get(&x).map_or(1, HashSet::len) as u64),
+                StrategyWeight::Num(match self.strategy {
+                    ArgumentsStrategy::Ancestors => ancestors.get(&x).map_or(1, HashSet::len),
+                    ArgumentsStrategy::Successors => successors.get(&x).map_or(1, HashSet::len),
+                    ArgumentsStrategy::AncestorsInverted => {
+                        max_weight - ancestors.get(&x).map_or(1, HashSet::len) + 1
+                    }
+                    ArgumentsStrategy::SuccessorsInverted => {
+                        max_weight - successors.get(&x).map_or(1, HashSet::len) + 1
+                    }
+                } as u64),
                 (x, y),
             )
         }));
@@ -239,7 +235,7 @@ impl<
 impl<K: Eq + Copy + Hash + Debug, H: PriorityQueueDecKey<(K, K), StrategyWeight> + Clone + Debug>
     StrategicArgumentsOracle<K, OrxStrategy<(K, K), H>>
 {
-    fn get_updated_closure_orx<S: Arguments<K, HashSet<K>>>(
+    fn get_updated_closure_orx<S: Arguments<K, HashSet<K>> + Universe<HashSet<K>>>(
         &self,
         visited: &HashSet<K>,
         system: &S,
@@ -327,15 +323,20 @@ impl<K: Eq + Copy + Hash + Debug, H: PriorityQueueDecKey<(K, K), StrategyWeight>
                 .filter(|(x, _)| updated_ancestors.contains(x)),
         );
 
-        let lookup = match self.strategy {
-            ArgumentsStrategy::Ancestors => ancestors,
-            ArgumentsStrategy::Successors => successors,
-        };
-
+        let max_weight = max(visited.len(), system.universe().len());
         for (x, y) in to_update {
             strategy.update_key_or_push(
                 &(x, y),
-                StrategyWeight::Num(lookup.get(&x).map_or(1, HashSet::len) as u64),
+                StrategyWeight::Num(match self.strategy {
+                    ArgumentsStrategy::Ancestors => ancestors.get(&x).map_or(1, HashSet::len),
+                    ArgumentsStrategy::Successors => successors.get(&x).map_or(1, HashSet::len),
+                    ArgumentsStrategy::AncestorsInverted => {
+                        max_weight - ancestors.get(&x).map_or(1, HashSet::len) + 1
+                    }
+                    ArgumentsStrategy::SuccessorsInverted => {
+                        max_weight - successors.get(&x).map_or(1, HashSet::len) + 1
+                    }
+                } as u64),
             );
         }
 
@@ -350,7 +351,7 @@ impl<
     K: Eq + Copy + Hash + Debug,
     V: PartialOrd,
     PS: Strategy<(K, K)> + Retain<(K, K)> + Extend<StrategyItem<(K, K)>> + Clone,
-    S: System<K, V> + Arguments<K, HashSet<K>>,
+    S: System<K, V> + Arguments<K, HashSet<K>> + Universe<HashSet<K>>,
 > StrategicLocalOracle<K, V, PS, S> for StrategicArgumentsOracle<K, PS>
 {
     fn get_strategy(&self, _assignment: &HashMap<K, V>, _strategy: &PS, system: &S) -> PS {
@@ -364,7 +365,7 @@ impl<
     K: Eq + Copy + Hash + Debug,
     V: PartialOrd,
     H: PriorityQueueDecKey<(K, K), StrategyWeight> + Clone + Debug,
-    S: System<K, V> + Arguments<K, HashSet<K>>,
+    S: System<K, V> + Arguments<K, HashSet<K>> + Universe<HashSet<K>>,
 > StrategicLocalOracle<K, V, OrxStrategy<(K, K), H>, S>
     for StrategicArgumentsOracle<K, OrxStrategy<(K, K), H>>
 {
