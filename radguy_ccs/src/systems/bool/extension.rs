@@ -1,5 +1,5 @@
 use radguy::{
-    Assignment, Set, SliceRight, Union, Universe,
+    Assignment, Set, SliceRight, Union, UnionOf, Universe,
     arena::Key,
     extension::{ExtensionOracle, LocalExtension},
     set::bitset::BitSet,
@@ -72,7 +72,7 @@ impl<
     VarKey: Key + Hash,
     TermKey: Key + Hash,
     VarName: Hash + Eq + Clone,
-    VarSet: Set<VarKey> + Union + Default + IntoIterator<Item = VarKey> + FromIterator<VarKey> + Debug,
+    VarSet: Set<VarKey> + Union + Default + IntoIterator<Item = VarKey> + UnionOf + Debug,
     PairSet: SliceRight<VarKey, VarKey, VarSet>,
     System: BoolSystem<VarKey, TermKey, VarName> + Universe<VarSet>,
 > LocalExtension<VarKey, bool, TermKey, VarSet, PairSet, System>
@@ -95,10 +95,11 @@ impl<
                     .iter()
                     .all(|&term_key| !system.evaluate_term(term_key, assignment))
                 {
-                    term_keys
-                        .into_iter()
-                        .flat_map(|t| self.depends(t, assignment, possible, system))
-                        .collect()
+                    VarSet::union_of(
+                        term_keys
+                            .into_iter()
+                            .map(|t| self.depends(t, assignment, possible, system)),
+                    )
                 } else {
                     VarSet::default()
                 }

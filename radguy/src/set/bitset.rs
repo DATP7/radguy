@@ -1,21 +1,23 @@
-mod fixed;
-mod raw;
-mod relation;
-
 use std::{collections::HashSet, fmt::Debug, marker::PhantomData};
 
-use fixedbitset::FixedBitSet;
-pub use relation::{BitsetRelation, BitsetRelationOrder, DEFAULT_RELATION_ORDER};
+use ::roaring::RoaringBitmap;
 
 use crate::{
-    CopiedIter, Diagonal, DifferenceWith, Intersect, IntersectWith, Set, Union, UnionWith, Without,
-    arena::Key,
+    Cartesian, CopiedIter, Diagonal, DifferenceWith, Intersect, IntersectWith, IsSubset, Set,
+    Union, UnionOf, UnionWith, Without, arena::Key, set::bitset::raw::SetMethods,
 };
 
 use self::raw::RawBitSet;
 
+mod fixed;
+mod raw;
+mod relation;
+mod roaring;
+
+pub use relation::{BitsetRelation, BitsetRelationOrder, DEFAULT_RELATION_ORDER};
+
 #[derive(Clone)]
-pub struct BitSet<K, S = FixedBitSet> {
+pub struct BitSet<K, S = RoaringBitmap> {
     bitset: RawBitSet<S>,
     _phantom_data: PhantomData<K>,
 }
@@ -27,6 +29,15 @@ impl<K, S> BitSet<K, S> {
         S: Default,
     {
         Self::default()
+    }
+
+    /// Create a `BitSet` with `count` keys, all in the set
+    #[must_use]
+    pub fn full(count: usize) -> Self
+    where
+        RawBitSet<S>: SetMethods,
+    {
+        RawBitSet::full(count).into()
     }
 }
 
@@ -56,6 +67,15 @@ impl<K, S> From<RawBitSet<S>> for BitSet<K, S> {
             bitset: value,
             _phantom_data: PhantomData,
         }
+    }
+}
+
+impl<K, S> From<S> for BitSet<K, S>
+where
+    RawBitSet<S>: From<S>,
+{
+    fn from(value: S) -> Self {
+        RawBitSet::from(value).into()
     }
 }
 
@@ -161,6 +181,16 @@ where
     }
 }
 
+impl<K: Key, S, O> Intersect<O> for BitSet<K, S>
+where
+    RawBitSet<S>: IntersectWith<O>,
+{
+    fn intersect(mut self, other: &O) -> Self {
+        self.bitset.intersect_with(other);
+        self
+    }
+}
+
 impl<K: Key, S> Without for BitSet<K, S>
 where
     RawBitSet<S>: DifferenceWith,
@@ -189,6 +219,15 @@ where
     }
 }
 
+impl<K: Key, S, H: ::std::hash::BuildHasher> IsSubset<BitSet<K, S>> for HashSet<K, H>
+where
+    Self: IsSubset<RawBitSet<S>>,
+{
+    fn is_subset(&self, other: &BitSet<K, S>) -> bool {
+        IsSubset::<RawBitSet<S>>::is_subset(self, &other.bitset)
+    }
+}
+
 impl<K: Key, S> Diagonal for BitSet<K, S>
 where
     BitsetRelation<K, K, S>: FromIterator<(K, K)>,
@@ -198,6 +237,18 @@ where
 
     fn diagonal(&self) -> Self::Output {
         self.copied_iter().map(|x| (x, x)).collect()
+    }
+}
+
+impl<K: Key, O: Key, S: Default + Clone> Cartesian<BitSet<O, S>> for BitSet<K, S>
+where
+    RawBitSet<S>: Set<usize> + SetMethods,
+{
+    type Output = BitsetRelation<K, O, S>;
+
+    fn cartesian(&self, other: &BitSet<O, S>) -> Self::Output {
+        // TODO: maybe provide some way to choose the order?
+        BitsetRelation::new_from_cartesian_raw(&self.bitset, &other.bitset, DEFAULT_RELATION_ORDER)
     }
 }
 
@@ -224,6 +275,15 @@ where
             bitset,
             _phantom_data: PhantomData,
         }
+    }
+}
+
+impl<K, S> UnionOf<Self> for BitSet<K, S>
+where
+    RawBitSet<S>: UnionOf,
+{
+    fn union_of<T: IntoIterator<Item = Self>>(iter: T) -> Self {
+        RawBitSet::union_of(iter.into_iter().map(|s| s.bitset)).into()
     }
 }
 

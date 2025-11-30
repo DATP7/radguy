@@ -1,7 +1,5 @@
 use itertools::Itertools;
 
-use fixedbitset::FixedBitSet;
-
 use crate::{
     Arguments, Assignment, Bottom, Cartesian, CopiedIter, DependencyGraphSystem, Diagonal,
     FromLefts, FromRights, Intersect, Maximal, PairUniverse, RightSliced, Set, System, Union,
@@ -129,7 +127,7 @@ impl<VarKey> SMax<HashSet<(VarKey, VarKey)>> {
     }
 }
 
-impl<VarKey> SMax<BitsetRelation<VarKey, VarKey, FixedBitSet>> {
+impl<VarKey> SMax<BitsetRelation<VarKey, VarKey>> {
     #[must_use]
     pub fn bitset() -> Self {
         Self::default()
@@ -394,7 +392,7 @@ impl<K: Default + Eq + Hash + Copy> ArgumentsOracle<K, HashSet<K>, HashSet<(K, K
     }
 }
 
-impl<K: Key> ArgumentsOracle<K, BitSet<K, FixedBitSet>, BitsetRelation<K, K, FixedBitSet>> {
+impl<K: Key> ArgumentsOracle<K, BitSet<K>, BitsetRelation<K, K>> {
     #[must_use]
     pub fn bitset() -> Self {
         Self::default()

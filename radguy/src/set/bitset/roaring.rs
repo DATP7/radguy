@@ -1,9 +1,9 @@
-use std::{collections::HashSet, fmt::Debug, marker::PhantomData};
+use std::{collections::HashSet, fmt::Debug};
 
-use fixedbitset::FixedBitSet;
+use roaring::{MultiOps, RoaringBitmap};
 
 use crate::{
-    Cartesian, CopiedIter, DifferenceWith, IntersectWith, Set, Union, UnionWith,
+    Cartesian, CopiedIter, DifferenceWith, IntersectWith, Set, UnionWith,
     arena::Key,
     set::bitset::{
         BitSet, BitsetRelation, DEFAULT_RELATION_ORDER,
@@ -11,30 +11,44 @@ use crate::{
     },
 };
 
-impl Set<usize> for RawBitSet<FixedBitSet> {
+/// Convenience function to cast usize to u32 with panicing
+#[track_caller]
+fn to_u32(i: usize) -> u32 {
+    u32::try_from(i).expect("cannot cast value to u32")
+}
+
+/// Convenience function to cast usize to u32 with panicing
+#[track_caller]
+fn to_usize(i: u32) -> usize {
+    usize::try_from(i).expect("cannot cast value to usize")
+}
+
+impl Set<usize> for RawBitSet<RoaringBitmap> {
     fn contains(&self, item: &usize) -> bool {
-        self.bitset.contains(item.index())
+        self.bitset.contains(to_u32(*item))
     }
 
     fn insert(&mut self, item: usize) -> bool {
-        let ret = self.bitset.contains(item.index());
-        self.bitset.grow_and_insert(item.index());
-        ret
+        // `RoaringBitmap::insert` returns whether the index was *absent* before inserting
+        !self.bitset.insert(to_u32(item))
     }
 
     fn len(&self) -> usize {
-        self.bitset.count_ones(..)
+        usize::try_from(self.bitset.len()).expect("cannot cast length to usize")
     }
 
     fn is_empty(&self) -> bool {
-        self.bitset.is_clear()
+        self.bitset.is_empty()
     }
 }
 
-impl SetMethods for RawBitSet<FixedBitSet> {
+impl SetMethods for RawBitSet<RoaringBitmap> {
     fn full(count: usize) -> Self {
-        let iter = std::iter::repeat(usize::MAX);
-        FixedBitSet::with_capacity_and_blocks(count, iter).into()
+        let mut bitmap = RoaringBitmap::full();
+        // `RoaringBitmap::full` gives a bitmap containing 2^32 values, which is a bit excessive,
+        // so we just remove to give it the correct length
+        bitmap.remove_range((to_u32(count))..);
+        bitmap.into()
     }
 
     fn clear(&mut self) {
@@ -42,158 +56,146 @@ impl SetMethods for RawBitSet<FixedBitSet> {
     }
 
     fn last_one(&self) -> usize {
-        self.bitset.maximum().unwrap_or(0)
+        to_usize(self.bitset.max().unwrap_or(0))
     }
 }
 
-impl Eq for RawBitSet<FixedBitSet> {}
-impl PartialEq for RawBitSet<FixedBitSet> {
+impl Eq for RawBitSet<RoaringBitmap> {}
+impl PartialEq for RawBitSet<RoaringBitmap> {
     fn eq(&self, other: &Self) -> bool {
-        for i in 0..self.bitset.len().max(other.bitset.len()) {
-            if self.bitset.contains(i) != other.bitset.contains(i) {
-                return false;
-            }
-        }
-        true
+        self.bitset == other.bitset
     }
 }
 
-impl Debug for RawBitSet<FixedBitSet> {
+impl Debug for RawBitSet<RoaringBitmap> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RawBitSet")
-            .field("bitset", &format!("{:b}", self.bitset))
+            .field("bitset", &self.bitset)
             .finish()
     }
 }
 
-impl FromIterator<usize> for RawBitSet<FixedBitSet> {
+impl FromIterator<RoaringBitmap> for RawBitSet<RoaringBitmap> {
+    fn from_iter<T: IntoIterator<Item = RoaringBitmap>>(iter: T) -> Self {
+        iter.into_iter().union().into()
+    }
+}
+
+impl FromIterator<u32> for RawBitSet<RoaringBitmap> {
+    fn from_iter<T: IntoIterator<Item = u32>>(iter: T) -> Self {
+        iter.into_iter().collect::<RoaringBitmap>().into()
+    }
+}
+
+impl FromIterator<usize> for RawBitSet<RoaringBitmap> {
     fn from_iter<T: IntoIterator<Item = usize>>(iter: T) -> Self {
-        Self {
-            bitset: FixedBitSet::from_iter(iter),
-        }
+        iter.into_iter().map(to_u32).collect()
     }
 }
-
-impl FromIterator<FixedBitSet> for RawBitSet<FixedBitSet> {
-    fn from_iter<T: IntoIterator<Item = FixedBitSet>>(iter: T) -> Self {
-        iter.into_iter().fold(Self::default(), Union::union)
-    }
-}
-
-impl<K: Key, O: Key> Cartesian<HashSet<O>> for BitSet<K, FixedBitSet> {
-    type Output = BitsetRelation<K, O, FixedBitSet>;
+impl<K: Key, O: Key> Cartesian<HashSet<O>> for BitSet<K, RoaringBitmap> {
+    type Output = BitsetRelation<K, O, RoaringBitmap>;
 
     fn cartesian(&self, other: &HashSet<O>) -> Self::Output {
-        let rhs = other.iter().map(Key::index).collect();
+        let rhs = other.iter().map(Key::index).map(to_u32).collect();
         // TODO: maybe provide some way to choose the order?
         BitsetRelation::new_from_cartesian_raw(&self.bitset, &rhs, DEFAULT_RELATION_ORDER)
     }
 }
 
-impl<K: Key, O: Key, S: ::std::hash::BuildHasher> Cartesian<BitSet<O, FixedBitSet>>
+impl<K: Key, O: Key, S: ::std::hash::BuildHasher> Cartesian<BitSet<O, RoaringBitmap>>
     for HashSet<K, S>
 {
-    type Output = BitsetRelation<K, O, FixedBitSet>;
+    type Output = BitsetRelation<K, O, RoaringBitmap>;
 
-    fn cartesian(&self, other: &BitSet<O, FixedBitSet>) -> Self::Output {
-        let lhs = self.iter().map(Key::index).collect();
+    fn cartesian(&self, other: &BitSet<O, RoaringBitmap>) -> Self::Output {
+        let lhs = self.iter().map(Key::index).map(to_u32).collect();
         // TODO: maybe provide some way to choose the order?
         BitsetRelation::new_from_cartesian_raw(&lhs, &other.bitset, DEFAULT_RELATION_ORDER)
     }
 }
 
-impl<K: Key, const N: usize> From<[K; N]> for BitSet<K, FixedBitSet> {
+impl<K: Key, const N: usize> From<[K; N]> for BitSet<K, RoaringBitmap> {
     fn from(value: [K; N]) -> Self {
-        let mut bitset = FixedBitSet::with_capacity(value.iter().map(K::index).max().unwrap_or(0));
-        for v in value {
-            bitset.grow_and_insert(v.index());
-        }
-        Self {
-            bitset: bitset.into(),
-            _phantom_data: PhantomData,
-        }
+        value
+            .into_iter()
+            .map(|i| to_u32(i.index()))
+            .collect::<RawBitSet<_>>()
+            .into()
     }
 }
 
-impl UnionWith for RawBitSet<FixedBitSet> {
+impl UnionWith for RawBitSet<RoaringBitmap> {
     fn union_with(&mut self, other: Self) {
-        self.bitset.union_with(&other.bitset);
+        self.bitset |= other.bitset;
     }
 }
 
-impl UnionWith<FixedBitSet> for RawBitSet<FixedBitSet> {
-    fn union_with(&mut self, other: FixedBitSet) {
-        self.bitset.union_with(&other);
+impl UnionWith<RoaringBitmap> for RawBitSet<RoaringBitmap> {
+    fn union_with(&mut self, other: RoaringBitmap) {
+        self.bitset |= other;
     }
 }
 
-impl<'a> UnionWith<&'a Self> for RawBitSet<FixedBitSet> {
+impl<'a> UnionWith<&'a Self> for RawBitSet<RoaringBitmap> {
     fn union_with(&mut self, other: &'a Self) {
-        self.bitset.union_with(&other.bitset);
+        self.bitset |= &other.bitset;
     }
 }
 
-impl<K: Key> UnionWith<HashSet<K>> for RawBitSet<FixedBitSet> {
+impl<K: Key> UnionWith<HashSet<K>> for RawBitSet<RoaringBitmap> {
     fn union_with(&mut self, other: HashSet<K>) {
-        for i in other {
-            self.bitset.grow_and_insert(i.index());
-        }
+        // PERF: the roaring docs says that it might be faster to sort `other` before extending
+        self.bitset
+            .extend(other.into_iter().map(|i| to_u32(i.index())));
     }
 }
 
-impl IntersectWith for RawBitSet<FixedBitSet> {
+impl IntersectWith for RawBitSet<RoaringBitmap> {
     fn intersect_with(&mut self, other: &Self) {
-        self.bitset.intersect_with(&other.bitset);
-        // `FixedBitSet` doesn't seem to truncate properly when intersecting, so we just do it manually
-        if self.bitset.len() > other.bitset.len() {
-            self.bitset.remove_range(other.bitset.len()..);
-        }
+        self.bitset &= &other.bitset;
     }
 }
 
-impl<K: Key> IntersectWith<HashSet<K>> for RawBitSet<FixedBitSet> {
+impl IntersectWith<RoaringBitmap> for RawBitSet<RoaringBitmap> {
+    fn intersect_with(&mut self, other: &RoaringBitmap) {
+        self.bitset &= other;
+    }
+}
+
+impl<K: Key> IntersectWith<HashSet<K>> for RawBitSet<RoaringBitmap> {
     fn intersect_with(&mut self, other: &HashSet<K>) {
-        let other: FixedBitSet = other.iter().map(K::index).collect();
-        self.bitset.intersect_with(&other);
+        let other: RoaringBitmap = other.iter().map(K::index).map(to_u32).collect();
+        self.bitset &= other;
     }
 }
 
-impl DifferenceWith for RawBitSet<FixedBitSet> {
+impl DifferenceWith for RawBitSet<RoaringBitmap> {
     fn difference_with(&mut self, other: &Self) {
-        self.bitset.difference_with(&other.bitset);
+        self.bitset -= &other.bitset;
     }
 }
 
-impl<'a> CopiedIter<'a, usize> for RawBitSet<FixedBitSet> {
+impl<'a> CopiedIter<'a, usize> for RawBitSet<RoaringBitmap> {
     type IterCopied = impl Iterator<Item = usize>;
 
     fn copied_iter(&'a self) -> Self::IterCopied {
-        // `FixedBitSet::ones` produces indexes for *every* bit set to one in its blocks, including
-        // ones outside the length of the bitset.
-        // For example, BitSet::full(3).bitset will have a length of 3, but hold a block of 64
-        // bits, all set to 1, so `ones` will emit `0..64`.
-        let len = self.bitset.len();
-        self.bitset.ones().filter(move |i| *i < len)
+        self.bitset.iter().map(to_usize)
     }
 }
 
-impl IntoIterator for RawBitSet<FixedBitSet> {
+impl IntoIterator for RawBitSet<RoaringBitmap> {
     type Item = usize;
+
     type IntoIter = impl Iterator<Item = Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
-        // `FixedBitSet::ones` produces indexes for *every* bit set to one in its blocks, including
-        // ones outside the length of the bitset.
-        // For example, BitSet::full(3).bitset will have a length of 3, but hold a block of 64
-        // bits, all set to 1, so `ones` will emit `0..64`.
-        let len = self.bitset.len();
-        self.bitset.into_ones().filter(move |i| *i < len)
+        self.bitset.into_iter().map(to_usize)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use fixedbitset::FixedBitSet;
+    use roaring::RoaringBitmap;
 
     use crate::{
         Cartesian, Intersect, Set, SliceRight, UnionWith,
@@ -207,7 +209,7 @@ mod tests {
             (BitSet::from([1, 2, 3]), 2),
             (BitSet::from([3, 4, 5]), 3),
         ];
-        let expected: BitsetRelation<usize, usize, FixedBitSet> = [
+        let expected: BitsetRelation<usize, usize, RoaringBitmap> = [
             (0, 0),
             (2, 0),
             (4, 0),
@@ -230,7 +232,7 @@ mod tests {
             (BitSet::from([0, 2, 4]), 0),
             (BitSet::from([3, 4, 5]), 3),
         ];
-        let expected: BitsetRelation<usize, usize, FixedBitSet> = [
+        let expected: BitsetRelation<usize, usize, RoaringBitmap> = [
             (0, 0),
             (2, 0),
             (4, 0),
@@ -252,7 +254,7 @@ mod tests {
             (BitSet::from([0, 2, 4]), 3),
             (BitSet::from([3, 4, 5]), 5),
         ];
-        let expected: BitsetRelation<usize, usize, FixedBitSet> = [
+        let expected: BitsetRelation<usize, usize, RoaringBitmap> = [
             (0, 3),
             (2, 3),
             (4, 3),
@@ -271,7 +273,7 @@ mod tests {
     #[test]
     fn slice_right_right() {
         let rights = [
-            (BitSet::<_, FixedBitSet>::from([1, 2, 3]), 2),
+            (BitSet::<_, RoaringBitmap>::from([1, 2, 3]), 2),
             (BitSet::from([0, 2, 4]), 3),
             (BitSet::from([3, 4, 5]), 5),
         ];
@@ -283,7 +285,7 @@ mod tests {
     #[test]
     fn cartesian_self() {
         let set = BitSet::from([0, 1, 3]);
-        let expected: BitsetRelation<_, _, FixedBitSet> = [
+        let expected: BitsetRelation<_, _, RoaringBitmap> = [
             (0, 0),
             (0, 1),
             (0, 3),
@@ -303,12 +305,12 @@ mod tests {
     fn cartesian_uneven() {
         let a = BitSet::from([0, 1, 3]);
         let b = BitSet::from([1, 2]);
-        let expected: BitsetRelation<_, _, FixedBitSet> =
+        let expected: BitsetRelation<_, _, RoaringBitmap> =
             [(0, 1), (0, 2), (1, 1), (1, 2), (3, 1), (3, 2)]
                 .into_iter()
                 .collect();
         assert_eq!(expected, a.cartesian(&b));
-        let expected: BitsetRelation<_, _, FixedBitSet> =
+        let expected: BitsetRelation<_, _, RoaringBitmap> =
             [(1, 0), (2, 0), (1, 1), (2, 1), (1, 3), (2, 3)]
                 .into_iter()
                 .collect();
@@ -318,7 +320,7 @@ mod tests {
     #[test]
     fn cartesian_full() {
         let s = BitSet::full(4);
-        let expected: BitsetRelation<_, _, FixedBitSet> = [
+        let expected: BitsetRelation<_, _, RoaringBitmap> = [
             (0, 0),
             (0, 1),
             (0, 2),
@@ -343,20 +345,20 @@ mod tests {
 
     #[test]
     fn intersect_truncate_left() {
-        let big: BitSet<usize, FixedBitSet> = BitSet::full(5);
-        let small: BitSet<usize, FixedBitSet> = BitSet::full(2);
+        let big: BitSet<usize, RoaringBitmap> = BitSet::full(5);
+        let small: BitSet<usize, RoaringBitmap> = BitSet::full(2);
         assert_eq!(small, big.intersect(&small));
     }
     #[test]
     fn intersect_truncate_right() {
-        let big: BitSet<usize, FixedBitSet> = BitSet::full(5);
-        let small: BitSet<usize, FixedBitSet> = BitSet::full(2);
+        let big: BitSet<usize, RoaringBitmap> = BitSet::full(5);
+        let small: BitSet<usize, RoaringBitmap> = BitSet::full(2);
         assert_eq!(small, small.clone().intersect(&big));
     }
 
     #[test]
     fn intersect() {
-        let a = BitSet::<_, FixedBitSet>::from([0, 2, 3]);
+        let a = BitSet::<_, RoaringBitmap>::from([0, 2, 3]);
         let b = BitSet::from([1, 2, 4]);
         let expected = BitSet::from([2]);
         assert_eq!(expected, a.clone().intersect(&b));
@@ -377,14 +379,14 @@ mod tests {
 
     #[test]
     fn cartesian_empty() {
-        let s: BitSet<usize, FixedBitSet> = BitSet::new();
+        let s: BitSet<usize, RoaringBitmap> = BitSet::new();
         assert!(s.cartesian(&s).is_empty());
         assert!(!s.cartesian(&s).contains(&(0, 0)));
     }
 
     #[test]
     fn cartesian_single() {
-        let mut s: BitSet<usize, FixedBitSet> = BitSet::new();
+        let mut s: BitSet<usize, RoaringBitmap> = BitSet::new();
         s.insert(0);
         assert!(!s.cartesian(&s).is_empty());
         assert!(s.cartesian(&s).contains(&(0, 0)));

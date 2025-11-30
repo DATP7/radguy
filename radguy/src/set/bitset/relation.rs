@@ -1,7 +1,7 @@
 use std::{collections::HashSet, fmt::Debug, marker::PhantomData};
 
-use fixedbitset::FixedBitSet;
 use itertools::Itertools;
+use roaring::RoaringBitmap;
 
 use crate::{
     CopiedIter, FromLefts, FromRights, Intersect, IntersectWith, RightSliced, Set, SliceRight,
@@ -30,7 +30,7 @@ impl BitsetRelationOrder {
 }
 
 #[derive(Clone)]
-pub struct BitsetRelation<T, U, S = FixedBitSet> {
+pub struct BitsetRelation<T, U, S = RoaringBitmap> {
     items: Vec<RawBitSet<S>>,
     order: BitsetRelationOrder,
     _phantom_data: PhantomData<(T, U)>,
@@ -467,190 +467,5 @@ where
             rel.insert(pair);
         }
         rel
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use fixedbitset::FixedBitSet;
-
-    use crate::{
-        Cartesian, Intersect, SliceRight, UnionWith,
-        set::bitset::{BitSet, BitsetRelation},
-    };
-
-    #[test]
-    fn from_rights_ordered() {
-        let rights = [
-            (BitSet::from([0, 2, 4]), 0),
-            (BitSet::from([1, 2, 3]), 2),
-            (BitSet::from([3, 4, 5]), 3),
-        ];
-        let expected: BitsetRelation<usize, usize, FixedBitSet> = [
-            (0, 0),
-            (2, 0),
-            (4, 0),
-            (1, 2),
-            (2, 2),
-            (3, 2),
-            (3, 3),
-            (4, 3),
-            (5, 3),
-        ]
-        .into_iter()
-        .collect();
-        assert_eq!(expected, BitsetRelation::from_rights(rights));
-    }
-
-    #[test]
-    fn from_rights_unordered() {
-        let rights = [
-            (BitSet::from([1, 2, 3]), 2),
-            (BitSet::from([0, 2, 4]), 0),
-            (BitSet::from([3, 4, 5]), 3),
-        ];
-        let expected: BitsetRelation<usize, usize, FixedBitSet> = [
-            (0, 0),
-            (2, 0),
-            (4, 0),
-            (1, 2),
-            (2, 2),
-            (3, 2),
-            (3, 3),
-            (4, 3),
-            (5, 3),
-        ]
-        .into_iter()
-        .collect();
-        assert_eq!(expected, BitsetRelation::from_rights(rights));
-    }
-    #[test]
-    fn from_rights_hole_at_start() {
-        let rights = [
-            (BitSet::from([1, 2, 3]), 2),
-            (BitSet::from([0, 2, 4]), 3),
-            (BitSet::from([3, 4, 5]), 5),
-        ];
-        let expected: BitsetRelation<usize, usize> = [
-            (0, 3),
-            (2, 3),
-            (4, 3),
-            (1, 2),
-            (2, 2),
-            (3, 2),
-            (3, 5),
-            (4, 5),
-            (5, 5),
-        ]
-        .into_iter()
-        .collect();
-        assert_eq!(expected, BitsetRelation::from_rights(rights));
-    }
-
-    #[test]
-    fn slice_right_right() {
-        let rights = [
-            (BitSet::from([1, 2, 3]), 2),
-            (BitSet::from([0, 2, 4]), 3),
-            (BitSet::from([3, 4, 5]), 5),
-        ];
-        let expected = BitSet::from([3, 4, 5]);
-
-        assert_eq!(expected, BitsetRelation::from_rights(rights).slice_right(5));
-    }
-
-    #[test]
-    fn cartesian_self() {
-        let set = BitSet::from([0, 1, 3]);
-        let expected: BitsetRelation<_, _, FixedBitSet> = [
-            (0, 0),
-            (0, 1),
-            (0, 3),
-            (1, 0),
-            (1, 1),
-            (1, 3),
-            (3, 0),
-            (3, 1),
-            (3, 3),
-        ]
-        .into_iter()
-        .collect();
-        assert_eq!(expected, set.cartesian(&set));
-    }
-
-    #[test]
-    fn cartesian_uneven() {
-        let a = BitSet::from([0, 1, 3]);
-        let b = BitSet::from([1, 2]);
-        let expected: BitsetRelation<_, _, FixedBitSet> =
-            [(0, 1), (0, 2), (1, 1), (1, 2), (3, 1), (3, 2)]
-                .into_iter()
-                .collect();
-        assert_eq!(expected, a.cartesian(&b));
-        let expected: BitsetRelation<_, _, FixedBitSet> =
-            [(1, 0), (2, 0), (1, 1), (2, 1), (1, 3), (2, 3)]
-                .into_iter()
-                .collect();
-        assert_eq!(expected, b.cartesian(&a));
-    }
-
-    #[test]
-    fn cartesian_full() {
-        let s = BitSet::full(4);
-        let expected: BitsetRelation<_, _, FixedBitSet> = [
-            (0, 0),
-            (0, 1),
-            (0, 2),
-            (0, 3),
-            (1, 0),
-            (1, 1),
-            (1, 2),
-            (1, 3),
-            (2, 0),
-            (2, 1),
-            (2, 2),
-            (2, 3),
-            (3, 0),
-            (3, 1),
-            (3, 2),
-            (3, 3),
-        ]
-        .into_iter()
-        .collect();
-        assert_eq!(expected, s.cartesian(&s));
-    }
-
-    #[test]
-    fn intersect_truncate_left() {
-        let big: BitSet<usize, FixedBitSet> = BitSet::full(5);
-        let small: BitSet<usize, FixedBitSet> = BitSet::full(2);
-        assert_eq!(small, big.intersect(&small));
-    }
-    #[test]
-    fn intersect_truncate_right() {
-        let big: BitSet<usize, FixedBitSet> = BitSet::full(5);
-        let small: BitSet<usize, FixedBitSet> = BitSet::full(2);
-        assert_eq!(small, small.clone().intersect(&big));
-    }
-
-    #[test]
-    fn intersect() {
-        let a = BitSet::from([0, 2, 3]);
-        let b = BitSet::from([1, 2, 4]);
-        let expected = BitSet::from([2]);
-        assert_eq!(expected, a.clone().intersect(&b));
-        assert_eq!(expected, b.intersect(&a));
-    }
-
-    #[test]
-    fn union_with_grows() {
-        let mut rel: BitsetRelation<usize, usize> = std::iter::once((0, 0)).collect();
-        rel.union_with(
-            [(0, 1), (1, 0)]
-                .into_iter()
-                .collect::<BitsetRelation<_, _>>(),
-        );
-        let expected = [(0, 0), (0, 1), (1, 0)].into_iter().collect();
-        assert_eq!(rel, expected);
     }
 }

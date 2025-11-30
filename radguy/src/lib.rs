@@ -33,6 +33,10 @@ pub trait UnionWith<Other = Self> {
     fn union_with(&mut self, other: Other);
 }
 
+pub trait UnionOf<Item = Self> {
+    fn union_of<I: IntoIterator<Item = Item>>(iter: I) -> Self;
+}
+
 pub trait Intersect<Other = Self> {
     #[must_use]
     fn intersect(self, other: &Other) -> Self;
@@ -187,6 +191,12 @@ impl<T: Eq + Hash, S: ::std::hash::BuildHasher + Default> Union<Self> for HashSe
 impl<T: Eq + Hash, S: ::std::hash::BuildHasher + Default> UnionWith<Self> for HashSet<T, S> {
     fn union_with(&mut self, other: Self) {
         self.extend(other);
+    }
+}
+
+impl<T: Eq + Hash, S: ::std::hash::BuildHasher + Default> UnionOf<Self> for HashSet<T, S> {
+    fn union_of<I: IntoIterator<Item = Self>>(iter: I) -> Self {
+        iter.into_iter().flatten().collect()
     }
 }
 
