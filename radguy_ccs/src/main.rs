@@ -30,6 +30,7 @@ use std::{
     hash::Hash,
     io::{BufRead, BufReader, Write},
     path::{Path, PathBuf},
+    sync::atomic::AtomicU32,
 };
 
 //TODO: Figure out how many iterations is a good amount
@@ -265,7 +266,12 @@ fn run_unordered_kleene<
         println!("skipping {problem}, {name}, {oracle}");
         return;
     }
-    println!("running {problem}, {name}, {oracle}");
+    println!(
+        "starting ({problem},{name},{oracle},false) at {}",
+        chrono::Local::now()
+    );
+    let counter = AtomicU32::new(1);
+
     let pairs = (1..=ITERATIONS)
         .map(|_| ((*oracle).clone(), (*system).clone()))
         .collect::<Vec<_>>();
@@ -273,6 +279,10 @@ fn run_unordered_kleene<
         .into_par_iter()
         .map(|(oracle, mut system)| {
             let (_, iteration) = kleene_local(&mut system, target, &oracle);
+
+            let c = counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            println!("{c}/{ITERATIONS} finished at {}", chrono::Local::now());
+
             iteration
         })
         .collect();
@@ -308,7 +318,12 @@ fn run_ordered_kleene<
         println!("skipping {problem}, {name}, {oracle}");
         return;
     }
-    println!("running {problem}, {name}, {oracle}");
+    println!(
+        "starting ({problem},{name},{oracle},false) at {}",
+        chrono::Local::now()
+    );
+    let counter = AtomicU32::new(1);
+
     let pairs = (1..=ITERATIONS)
         .map(|_| ((*oracle).clone(), (*system).clone()))
         .collect::<Vec<_>>();
@@ -321,6 +336,10 @@ fn run_ordered_kleene<
                     target,
                     &oracle,
                 );
+
+            let c = counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            println!("{c}/{ITERATIONS} finished at {}", chrono::Local::now());
+
             iteration
         })
         .collect();
