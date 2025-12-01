@@ -10,6 +10,7 @@ lalrpop-util = {version = "0.22.2", features=["lexer"]}
 radguy = {workspace = true}
 orx-priority-queue = {workspace = true}
 rayon = "1.11.0"
+chrono = "0.4.42"
 
 
 [lints.clippy]

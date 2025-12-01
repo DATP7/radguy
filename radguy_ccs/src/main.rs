@@ -26,14 +26,15 @@ use std::{
     fmt::{Debug, Display},
     fs::{self, File, OpenOptions},
     hash::Hash,
-    io::Write,
-    path::PathBuf,
+    io::{BufRead, BufReader, Write},
+    path::{Path, PathBuf},
+    sync::atomic::AtomicU32,
 };
 
 //TODO: Figure out how many iterations is a good amount
 const ITERATIONS: u32 = 10;
 
-fn append_record(file_path: &PathBuf, record: &str) {
+fn append_record(file_path: &Path, record: &str) {
     let mut file = OpenOptions::new()
         .append(true)
         .open(file_path)
@@ -42,6 +43,13 @@ fn append_record(file_path: &PathBuf, record: &str) {
     if let Err(e) = writeln!(file, "{record}") {
         panic!("Couldn't write to file: {e}");
     }
+}
+
+fn record_exists(path: &Path, problem: &str, system: &str, oracle: &str) -> bool {
+    let file = BufReader::new(File::open(path).expect("could not open file"));
+    let pattern = format!("{problem},{system},{oracle}");
+    file.lines()
+        .any(|line| line.expect("could not read line").starts_with(&pattern))
 }
 
 fn create_csv() -> std::io::Result<PathBuf> {
@@ -248,7 +256,7 @@ fn run_unordered_kleene<
         + Send,
     O: LocalOracle<K, V, PS, S> + Display + Clone + Send,
 >(
-    file_path: &PathBuf,
+    file_path: &Path,
     problem: &str,
     name: &str,
     system: &S,
@@ -257,6 +265,16 @@ fn run_unordered_kleene<
 ) where
     HashSet<K>: Cartesian<Output = HashSet<(K, K)>> + Cartesian<VS, Output = PS> + IsSubset<VS>,
 {
+    if record_exists(file_path, problem, name, &format!("{oracle}")) {
+        println!("skipping {problem}, {name}, {oracle}");
+        return;
+    }
+    println!(
+        "starting ({problem},{name},{oracle},false) at {}",
+        chrono::Local::now()
+    );
+    let counter = AtomicU32::new(1);
+
     let pairs = (1..=ITERATIONS)
         .map(|_| ((*oracle).clone(), (*system).clone()))
         .collect::<Vec<_>>();
@@ -264,6 +282,10 @@ fn run_unordered_kleene<
         .into_par_iter()
         .map(|(oracle, mut system)| {
             let (_, iteration) = kleene_local(&mut system, target, &oracle);
+
+            let c = counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            println!("{c}/{ITERATIONS} finished at {}", chrono::Local::now());
+
             iteration
         })
         .collect();
@@ -288,13 +310,23 @@ fn run_ordered_kleene<
         + Clone
         + Send,
 >(
-    file_path: &PathBuf,
+    file_path: &Path,
     problem: &str,
     name: &str,
     system: &S,
     target: VarKey,
     oracle: &O,
 ) {
+    if record_exists(file_path, problem, name, &format!("{oracle}")) {
+        println!("skipping {problem}, {name}, {oracle}");
+        return;
+    }
+    println!(
+        "starting ({problem},{name},{oracle},false) at {}",
+        chrono::Local::now()
+    );
+    let counter = AtomicU32::new(1);
+
     let pairs = (1..=ITERATIONS)
         .map(|_| ((*oracle).clone(), (*system).clone()))
         .collect::<Vec<_>>();
@@ -307,6 +339,10 @@ fn run_ordered_kleene<
                     target,
                     &oracle,
                 );
+
+            let c = counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            println!("{c}/{ITERATIONS} finished at {}", chrono::Local::now());
+
             iteration
         })
         .collect();
@@ -318,10 +354,17 @@ fn run_ordered_kleene<
 }
 
 fn main() {
-    let file_path = match create_csv() {
-        Ok(path) => path,
-        Err(e) => panic!("{e}"),
-    };
+    let file_path = std::env::args().nth(1).map_or_else(
+        || {
+            let path = create_csv().expect("could not create output");
+            println!(
+                "no iterations file giving, writing to new file {}",
+                path.display()
+            );
+            path
+        },
+        PathBuf::from,
+    );
 
     weak_bisim_oracles! {
         &file_path,
