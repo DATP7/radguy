@@ -4,6 +4,11 @@ use radguy::{
     extension::{ExtensionOracle, LocalExtension},
     set::bitset::BitSet,
 };
+use radguy::extension::{StrategicExtension, TermSystem};
+use radguy::ordered::strategy::{GetWeight, Strategy, StrategyItem, StrategyWeight};
+
+use radguy::Bottom;
+use std::ops::Not;
 use std::{
     collections::{HashMap, HashSet},
     fmt::{Debug, Display},
@@ -139,3 +144,77 @@ impl<VarKey, TermKey, VarName> Display for BoolExtension<TermKey, VarName, BitSe
         write!(f, "Bool:bitset")
     }
 }
+
+//---------------------------------------------------------------------------------------------------//
+
+#[derive(Default, Clone)]
+pub struct StrategicBoolExtension;
+
+impl<
+    TermKey: Key + Hash + Copy,
+    VarName: Hash + Eq + Copy,
+    VarKey: Key + Eq + Hash + Copy,
+    VarValue: Clone + Bottom + Not<Output = bool>,
+    PairStrat: Strategy<(VarKey, VarKey)>
+        + FromIterator<StrategyItem<(VarKey, VarKey)>>
+        + IntoIterator<Item = StrategyItem<(VarKey, VarKey)>>
+        + GetWeight<(VarKey, VarKey)>
+        + Clone,
+    S: BoolSystem<VarKey, TermKey, VarName>
+        + radguy::System<VarKey, VarValue>
+        + TermSystem<VarKey, VarValue, TermKey>,
+> StrategicExtension<TermKey, VarName, VarKey, VarValue, PairStrat, S> for StrategicBoolExtension
+where
+    std::collections::HashMap<VarKey, VarValue>: radguy::Assignment<VarKey, bool>,
+{
+    fn strategic_extend(
+        &self,
+        x: VarKey,
+        term_key: TermKey,
+        assignment: &HashMap<VarKey, VarValue>,
+        strategy: &PairStrat,
+        system: &S,
+    ) -> Option<StrategyWeight> {
+        let term = system.get_term(term_key);
+        match term {
+            BoolTerm::Variable(y) if !assignment.get_assignment(&y) => strategy.get_weight((x, y)),
+            BoolTerm::Variable(_) | BoolTerm::True | BoolTerm::False => None,
+            BoolTerm::Or(term_keys) => {
+                // All terms are false and there exist a false term that x can influence
+                if term_keys
+                    .iter()
+                    .all(|&term_key| !system.evaluate_term(term_key, assignment))
+                {
+                    term_keys
+                        .into_iter()
+                        .filter_map(|t| self.strategic_extend(x, t, assignment, strategy, system))
+                        .min()
+                } else {
+                    None
+                }
+            }
+            BoolTerm::And(term_keys) => {
+                // Filter out true terms
+                let mut term_keys = term_keys
+                    .iter()
+                    .copied()
+                    .filter(|&term_key| !system.evaluate_term(term_key, assignment))
+                    .peekable();
+
+                if term_keys.peek().is_some() {
+                    term_keys
+                        .map(|t| self.strategic_extend(x, t, assignment, strategy, system))
+                        .sum()
+                } else {
+                    None
+                }
+            }
+        }
+    }
+}
+
+//impl Display for StrategicBoolExtension {
+//    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//        write!(f, "StratBool")
+//    }
+//}

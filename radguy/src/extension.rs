@@ -1,13 +1,21 @@
+use crate::Assignment;
+use crate::Bottom;
+use crate::ordered::oracle::StrategicLocalOracle;
+use crate::ordered::strategy::GetWeight;
+use crate::ordered::strategy::Strategy;
+use crate::ordered::strategy::StrategyItem;
 use std::{
     collections::{HashMap, HashSet},
     fmt::{Debug, Display},
     hash::Hash,
     marker::PhantomData,
+    cmp::PartialOrd,
 };
 
 use crate::{
     Cartesian, CopiedIter, Diagonal, FromRights, System, Union, Universe, Visited, Without,
     oracle::LocalOracle,
+    ordered::strategy::StrategyWeight,
 };
 
 pub trait TermSystem<VarKey: Copy, VarValue: PartialOrd, TermKey: Copy>:
@@ -139,5 +147,121 @@ impl<
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "E^({})", self.extension)
+    }
+}
+
+//---------------------------------------------------------------------------------------------------//
+
+pub trait StrategicExtension<
+    TermKey: Hash + Copy,
+    VarName: Hash + Eq + Clone,
+    VarKey: Hash + Eq + Copy,
+    VarValue: Bottom + Clone,
+    PairStrat: Strategy<(VarKey, VarKey)>
+        + FromIterator<StrategyItem<(VarKey, VarKey)>>
+        + IntoIterator<Item = StrategyItem<(VarKey, VarKey)>>
+        + GetWeight<(VarKey, VarKey)>
+        + Clone,
+    S: TermSystem<VarKey, VarValue, TermKey>,
+>
+{
+    fn strategic_extend(
+        &self,
+        x: VarKey,
+        term_key: TermKey,
+        assignment: &HashMap<VarKey, VarValue>,
+        strategy: &PairStrat,
+        system: &S,
+    ) -> Option<StrategyWeight>;
+
+    #[must_use]
+    fn oracle() -> StrategicExtensionOracle<TermKey, VarName, VarKey, VarValue, PairStrat, S, Self>
+    where
+        Self: Default,
+    {
+        StrategicExtensionOracle::from(Self::default())
+    }
+}
+
+pub struct StrategicExtensionOracle<
+    TermKey: Hash + Copy,
+    VarName: Hash + Eq + Clone,
+    VarKey: Copy + Eq + Hash,
+    VarValue: Bottom + Clone,
+    PairStrat: Strategy<(VarKey, VarKey)>
+        + FromIterator<StrategyItem<(VarKey, VarKey)>>
+        + IntoIterator<Item = StrategyItem<(VarKey, VarKey)>>
+        + GetWeight<(VarKey, VarKey)>
+        + Clone,
+    S: TermSystem<VarKey, VarValue, TermKey>,
+    E: StrategicExtension<TermKey, VarName, VarKey, VarValue, PairStrat, S>,
+> {
+    extension: E,
+    _phantom_data: PhantomData<(TermKey, VarName, VarKey, VarValue, PairStrat, S)>,
+}
+
+
+impl<TermKey, VarName, VarKey, VarValue, PairStrat, S, E>
+    StrategicLocalOracle<VarKey, VarValue, PairStrat, S>
+    for StrategicExtensionOracle<TermKey, VarName, VarKey, VarValue, PairStrat, S, E>
+where
+    TermKey: Hash + Copy,
+    VarName: Hash + Eq + Clone,
+    VarKey: Copy + Eq + Hash,
+    VarValue: Bottom + Clone,
+    PairStrat: Strategy<(VarKey, VarKey)>
+        + FromIterator<StrategyItem<(VarKey, VarKey)>>
+        + IntoIterator<Item = StrategyItem<(VarKey, VarKey)>>
+        + GetWeight<(VarKey, VarKey)>
+        + Clone,
+    S: TermSystem<VarKey, VarValue, TermKey> + System<VarKey, VarValue>,
+    E: StrategicExtension<TermKey, VarName, VarKey, VarValue, PairStrat, S>,
+{
+    fn get_strategy(
+        &self,
+        assignment: &HashMap<VarKey, VarValue>,
+        strategy: &PairStrat,
+        system: &S,
+    ) -> PairStrat {
+        let new_strat = strategy.clone();
+        new_strat
+            .into_iter()
+            .filter_map(|StrategyItem(_, (x, y))| {
+                if x == y && assignment.get_assignment(&x) != system.evaluate(x, assignment) {
+                    Some(StrategyItem(StrategyWeight::Num(0), (x, y)))
+                } else if x != y {
+                    let y_term_key = system.definition(y);
+                    let weight = self
+                        .extension
+                        .strategic_extend(x, y_term_key, assignment, strategy, system);
+                    //dbg!(weight);
+                    weight.map(|w| StrategyItem(w, (x, y)))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+}
+
+impl<
+    TermKey: Hash + Copy,
+    VarName: Hash + Eq + Clone,
+    VarKey: Copy + Eq + Hash,
+    VarValue: Bottom + Clone,
+    PairStrat: Strategy<(VarKey, VarKey)>
+        + FromIterator<StrategyItem<(VarKey, VarKey)>>
+        + IntoIterator<Item = StrategyItem<(VarKey, VarKey)>>
+        + GetWeight<(VarKey, VarKey)>
+        + Clone,
+    S: TermSystem<VarKey, VarValue, TermKey>,
+    E: StrategicExtension<TermKey, VarName, VarKey, VarValue, PairStrat, S>,
+> From<E> for StrategicExtensionOracle<TermKey, VarName, VarKey, VarValue, PairStrat, S, E>
+{
+    fn from(extension: E) -> Self {
+        Self {
+            extension,
+            _phantom_data: PhantomData,
+        }
     }
 }
