@@ -71,6 +71,55 @@ impl Display for SiblingsOracle {
     }
 }
 
+#[derive(Default, Clone, Debug)]
+pub struct SiblingsOracleInv;
+
+impl<
+    K: Eq + Copy + Hash + Key,
+    V: PartialOrd,
+    PS: Strategy<(K, K)> + GetWeight<(K, K)> + FromIterator<StrategyItem<(K, K)>>,
+    S: System<K, V> + DependencyGraphSystem<K, K>,
+> StrategicLocalOracle<K, V, PS, S> for SiblingsOracleInv
+where
+    for<'a> &'a PS: IntoIterator<Item = StrategyItem<(K, K)>>,
+{
+    fn get_strategy(&self, _assignment: &HashMap<K, V>, strategy: &PS, system: &S) -> PS {
+        strategy
+            .into_iter()
+            .map(|StrategyItem(weight, (x, y))| {
+                let Some(hyper_edges) = system.get_hyperedges(y) else {
+                    return StrategyItem(StrategyWeight::Num(u64::MAX) - weight, (x, y));
+                };
+
+                let out_weight = weight
+                    + hyper_edges
+                        .into_iter()
+                        .filter(|siblings| siblings.contains(&x))
+                        .map(|siblings| {
+                            siblings
+                                .into_iter()
+                                .map(|sibling| {
+                                    strategy
+                                        .get_weight((sibling, y))
+                                        .unwrap_or(StrategyWeight::Num(0))
+                                })
+                                .sum()
+                        })
+                        .min()
+                        .unwrap_or(StrategyWeight::Infinity);
+
+                StrategyItem(StrategyWeight::Num(u64::MAX) - out_weight, (x, y))
+            })
+            .collect()
+    }
+}
+
+impl Display for SiblingsOracleInv {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SiblingsInv")
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum ArgumentsStrategy {
     Ancestors,
