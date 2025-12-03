@@ -4,7 +4,7 @@ use radguy::{
         oracle::{
             ArgumentsStrategy, DependencyCountOracle, DependentCountOracle,
             InverseDependencyCountOracle, InverseDependentCountOracle, StrategicArgumentsOracle,
-            StrategicHeightOracle, StrategicLocalOracle, ToConstant, ToOrdered,
+            StrategicHeightOracle, StrategicLocalOracle, ToConstant, ToInverse, ToOrdered,
         },
         strategy::StrategyWeight,
     },
@@ -183,6 +183,7 @@ test_oracles_ordered! {
     SMax::bitset().constant(StrategyWeight::Num(10)).and_by(DependencyCountOracle::default(), std::cmp::min), smax_10_and_min_count_bitset;
     SMax::bitset().ordered(), smax_ord_bitset;
     SMax::bitset().ordered().then(DependencyCountOracle::default()), smax_ord_then_count_bitset;
+    SMax::bitset().ordered().then(DependencyCountOracle::default()).inverse(), smax_ord_then_count_bitset_inversed;
     BoolExtension::bitset().as_oracle().constant(StrategyWeight::Num(0)), bool_extension_0_bitset;
     BoolExtension::bitset().as_oracle().constant(StrategyWeight::Num(0)).and_by(DependencyCountOracle::default(), std::cmp::min), bool_extension_0_and_min_count_bitset;
     BoolExtension::bitset().as_oracle().constant(StrategyWeight::Infinity).and_by(DependencyCountOracle::default(), std::cmp::min), bool_extension_inf_and_min_count_bitset;
@@ -192,6 +193,8 @@ test_oracles_ordered! {
     BoolExtension::bitset().as_oracle().ordered().and_by(InverseDependencyCountOracle::default(), std::cmp::min), bool_extension_ord_and_min_count_inverse_bitset;
     IdentityOracle::hashset().constant(StrategyWeight::Infinity), identity_oracle_inf_hashset;
     IdentityOracle::hashset().ordered(), identity_oracle_ord_hashset;
+    IdentityOracle::hashset().constant(StrategyWeight::Infinity).inverse(), identity_oracle_inf_hashset_inverse;
+    IdentityOracle::hashset().ordered().inverse(), identity_oracle_ord_hashset_inverse;
     TrivialOracle::hashset().constant(StrategyWeight::Infinity), trivial_oracle_inf_hashset;
     TrivialOracle::hashset().ordered(), trivial_oracle_ord_hashset;
     SMax::hashset().constant(StrategyWeight::Num(0)), smax_const_0_hashset;
@@ -207,11 +210,14 @@ test_oracles_ordered! {
     BoolExtension::hashset().as_oracle().ordered(), bool_extension_ord_hashset;
     BoolExtension::hashset().as_oracle().ordered().and_by(DependencyCountOracle::default(), std::cmp::min), bool_extension_ord_and_min_count_hashset;
     BoolExtension::hashset().as_oracle().ordered().and_by(InverseDependencyCountOracle::default(), std::cmp::min), bool_extension_ord_and_min_count_inverse_hashset;
+    BoolExtension::hashset().as_oracle().ordered().and_by(DependencyCountOracle::default(), std::cmp::min).inverse(), bool_extension_ord_and_min_count_hashset_inversed;
+    BoolExtension::hashset().as_oracle().ordered().and_by(InverseDependencyCountOracle::default(), std::cmp::min).inverse(), bool_extension_ord_and_min_count_inverse_hashset_inversed;
     DependencyCountOracle::default(), dependency_count;
     InverseDependencyCountOracle::default(), dependency_count_inverse;
     DependentCountOracle::default(), dependent_count;
     InverseDependentCountOracle::default(), dependent_count_inverse;
     StrategicArgumentsOracle::with(ArgumentsStrategy::Successors), arguments_s_s;
+    StrategicArgumentsOracle::with(ArgumentsStrategy::Successors).inverse(), arguments_s_s_inversed;
     StrategicArgumentsOracle::with(ArgumentsStrategy::Successors).and_by(DependencyCountOracle::default(), std::cmp::min), args_s_s_and_min_dependency;
     StrategicArgumentsOracle::with(ArgumentsStrategy::Successors).and_by(InverseDependencyCountOracle::default(), std::cmp::min), args_s_s_and_min_dependency_inverse;
     StrategicArgumentsOracle::with(ArgumentsStrategy::Successors).then(StrategicHeightOracle::transitive()), args_s_s_then_height_transitive;
@@ -219,6 +225,7 @@ test_oracles_ordered! {
     StrategicArgumentsOracle::with(ArgumentsStrategy::Ancestors), arguments_s_a;
     StrategicArgumentsOracle::with(ArgumentsStrategy::Ancestors).and_by(DependencyCountOracle::default(), std::cmp::min), args_s_a_and_min_dependency;
     StrategicArgumentsOracle::with(ArgumentsStrategy::Ancestors).and_by(InverseDependencyCountOracle::default(), std::cmp::min), args_s_a_and_min_dependency_inverse;
+    StrategicArgumentsOracle::with(ArgumentsStrategy::Ancestors).and_by(InverseDependencyCountOracle::default(), std::cmp::min).inverse(), args_s_a_and_min_dependency_inverse_inversed;
     StrategicArgumentsOracle::with(ArgumentsStrategy::Ancestors).then(StrategicHeightOracle::transitive()), args_s_a_then_height_transitive;
     StrategicArgumentsOracle::with(ArgumentsStrategy::Ancestors).and_by(StrategicHeightOracle::transitive(), std::cmp::min), args_s_a_and_height_transitive;
     StrategicArgumentsOracle::with(ArgumentsStrategy::SuccessorsInverted), arguments_s_si;
@@ -241,6 +248,7 @@ test_oracles_ordered! {
     StrategicArgumentsOracle::with(ArgumentsStrategy::AncestorsInverted).and_by(InverseDependentCountOracle::default(), std::cmp::min), args_s_ai_and_min_dependent_inverse;
     StrategicHeightOracle::simple(), height_simple;
     StrategicHeightOracle::simple().and_by(DependencyCountOracle::default(), std::cmp::min), height_simple_and_min_dependency_count;
+    StrategicHeightOracle::simple().and_by(DependencyCountOracle::default(), std::cmp::min).inverse(), height_simple_and_min_dependency_count_inverse;
     StrategicHeightOracle::simple().then(DependencyCountOracle::default()), height_simple_then_dependency_count;
     StrategicHeightOracle::transitive(), height_transitive;
     StrategicHeightOracle::transitive().and_by(InverseDependencyCountOracle::default(), std::cmp::min), height_transitive_and_min_dependency_count_inverse;

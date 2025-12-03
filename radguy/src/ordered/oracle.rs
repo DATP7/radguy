@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display, hash::Hash, marker::PhantomData};
+use std::{cmp, collections::HashMap, fmt::Display, hash::Hash, marker::PhantomData};
 
 use crate::{
     Set, System,
@@ -347,5 +347,91 @@ impl<
             inner: self.inner.clone(),
             _phantom_data: self._phantom_data,
         }
+    }
+}
+
+pub trait ToInverse<K: Eq + Copy, V: PartialOrd, PS: Strategy<(K, K)>, S: System<K, V>>:
+    Sized + StrategicLocalOracle<K, V, PS, S>
+where
+    for<'a> &'a PS: IntoIterator<Item = StrategyItem<(K, K)>>,
+{
+    fn inverse(self) -> InverseOracle<K, V, PS, S, Self> {
+        InverseOracle::from(self)
+    }
+}
+
+impl<
+    K: Eq + Copy,
+    V: PartialOrd,
+    PS: Strategy<(K, K)>,
+    S: System<K, V>,
+    O: StrategicLocalOracle<K, V, PS, S>,
+> ToInverse<K, V, PS, S> for O
+where
+    for<'a> &'a PS: IntoIterator<Item = StrategyItem<(K, K)>>,
+{
+}
+
+#[derive(Default, Clone)]
+pub struct InverseOracle<
+    K: Eq + Copy,
+    V: PartialOrd,
+    PS: Strategy<(K, K)>,
+    S: System<K, V>,
+    O: StrategicLocalOracle<K, V, PS, S>,
+> {
+    oracle: O,
+    _phantom_data: PhantomData<(K, V, S, PS)>,
+}
+
+impl<
+    K: Eq + Copy,
+    V: PartialOrd,
+    PS: Strategy<(K, K)> + FromIterator<StrategyItem<(K, K)>>,
+    S: System<K, V>,
+    O: StrategicLocalOracle<K, V, PS, S>,
+> StrategicLocalOracle<K, V, PS, S> for InverseOracle<K, V, PS, S, O>
+where
+    for<'a> &'a PS: IntoIterator<Item = StrategyItem<(K, K)>>,
+{
+    fn get_strategy(&self, assignment: &HashMap<K, V>, strategy: &PS, system: &S) -> PS {
+        let inner_strategy = self.oracle.get_strategy(assignment, strategy, system);
+        let (min, max) = inner_strategy.into_iter().map(|s| s.0).fold(
+            (StrategyWeight::Infinity, StrategyWeight::Num(0)),
+            |(min, max), w| (cmp::min(min, w), cmp::max(max, w)),
+        );
+        inner_strategy
+            .into_iter()
+            .map(|StrategyItem(w, pair)| StrategyItem(max - w + min, pair))
+            .collect()
+    }
+}
+
+impl<
+    K: Eq + Copy,
+    V: PartialOrd,
+    PS: Strategy<(K, K)>,
+    S: System<K, V>,
+    O: StrategicLocalOracle<K, V, PS, S>,
+> From<O> for InverseOracle<K, V, PS, S, O>
+{
+    fn from(value: O) -> Self {
+        Self {
+            oracle: value,
+            _phantom_data: PhantomData,
+        }
+    }
+}
+
+impl<
+    K: Eq + Copy,
+    V: PartialOrd,
+    PS: Strategy<(K, K)>,
+    S: System<K, V>,
+    O: StrategicLocalOracle<K, V, PS, S> + Display,
+> Display for InverseOracle<K, V, PS, S, O>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({})⁻¹", self.oracle)
     }
 }

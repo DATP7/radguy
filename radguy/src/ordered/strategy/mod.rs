@@ -3,7 +3,7 @@ use std::{
     fmt::Display,
     hash::Hash,
     iter::Sum,
-    ops::Add,
+    ops::{Add, Sub},
 };
 
 mod binary_heap;
@@ -56,6 +56,19 @@ impl Add for StrategyWeight {
         match (self, rhs) {
             (Self::Num(l), Self::Num(r)) => Self::Num(l + r),
             _ => Self::Infinity,
+        }
+    }
+}
+
+impl Sub for StrategyWeight {
+    type Output = Self;
+
+    #[track_caller]
+    fn sub(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Self::Infinity, _) => Self::Infinity,
+            (_, Self::Infinity) => Self::Num(0),
+            (Self::Num(l), Self::Num(r)) => Self::Num(l - r),
         }
     }
 }
