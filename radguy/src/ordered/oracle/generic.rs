@@ -6,17 +6,20 @@ use std::{
     collections::{HashMap, HashSet},
     fmt::{Debug, Display},
     hash::Hash,
+    marker::PhantomData,
 };
 
 use orx_priority_queue::PriorityQueueDecKey;
 
 use crate::{
-    Arguments, DependencyGraphSystem, System, Universe, Visited,
+    Arguments, Assignment, Bottom, CopiedIter, DependencyGraphSystem, Maximal, System, Universe,
+    Visited,
     arena::{Key, SecondaryArena},
     ordered::{
         StrategicLocalOracle,
         strategy::{GetWeight, OrxStrategy, Retain, Strategy, StrategyItem, StrategyWeight},
     },
+    set::bitset::BitSet,
 };
 
 #[derive(Default, Clone, Debug)]
@@ -531,6 +534,73 @@ impl StrategicHeightOracle {
 impl Display for StrategicHeightOracle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "height_c")
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct StrategicNonStuckOracle<VS>(PhantomData<VS>);
+
+#[expect(
+    clippy::implicit_hasher,
+    reason = "we don't want to specify the hasher everytime we construct NonStuck"
+)]
+impl<K> StrategicNonStuckOracle<HashSet<K>> {
+    #[must_use]
+    pub fn hashset() -> Self {
+        Self::default()
+    }
+}
+
+impl<K> StrategicNonStuckOracle<BitSet<K>> {
+    #[must_use]
+    pub fn bitset() -> Self {
+        Self::default()
+    }
+}
+
+impl<
+    K: Key,
+    V: PartialOrd + Eq + Bottom + Clone,
+    VS: for<'a> CopiedIter<'a, K> + Set<K>,
+    PairStrategy: Strategy<(K, K)> + FromIterator<StrategyItem<(K, K)>>,
+    S: System<K, V> + Universe<VS> + Visited<VS>,
+> StrategicLocalOracle<K, V, PairStrategy, S> for StrategicNonStuckOracle<VS>
+{
+    fn get_strategy(
+        &self,
+        assignment: &HashMap<K, V>,
+        _strategy: &PairStrategy,
+        system: &S,
+    ) -> PairStrategy {
+        let universe = system.universe();
+        let visited = system.visited();
+        universe
+            .copied_iter()
+            .flat_map(|x| {
+                let weight = if visited.contains(&x)
+                    && assignment.get_assignment(&x) != system.evaluate(x, assignment)
+                {
+                    StrategyWeight::Num(0)
+                } else {
+                    StrategyWeight::Infinity
+                };
+                universe
+                    .copied_iter()
+                    .map(move |y| StrategyItem(weight, (x, y)))
+            })
+            .collect()
+    }
+}
+
+impl<K, S: ::std::hash::BuildHasher> Display for StrategicNonStuckOracle<HashSet<K, S>> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NS:hashset")
+    }
+}
+
+impl<K> Display for StrategicNonStuckOracle<BitSet<K>> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NS:bitset")
     }
 }
 

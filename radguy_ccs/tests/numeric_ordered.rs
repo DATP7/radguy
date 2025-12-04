@@ -4,7 +4,8 @@ use radguy::{
         oracle::{
             ArgumentsStrategy, DependencyCountOracle, DependentCountOracle,
             InverseDependencyCountOracle, InverseDependentCountOracle, StrategicArgumentsOracle,
-            StrategicHeightOracle, StrategicLocalOracle, ToConstant, ToOrdered,
+            StrategicHeightOracle, StrategicLocalOracle, StrategicNonStuckOracle, ToConstant,
+            ToOrdered,
         },
         strategy::StrategyWeight,
     },
@@ -244,4 +245,8 @@ test_oracles_ordered_numerical! {
     StrategicArgumentsOracle::with(ArgumentsStrategy::SuccessorsInverted).and_by(InverseDependentCountOracle::default(), std::cmp::min), args_s_si_and_min_dependent_inverse;
     StrategicArgumentsOracle::with(ArgumentsStrategy::AncestorsInverted).and_by(DependentCountOracle::default(), std::cmp::min), args_s_ai_and_min_dependent;
     StrategicArgumentsOracle::with(ArgumentsStrategy::AncestorsInverted).and_by(InverseDependentCountOracle::default(), std::cmp::min), args_s_ai_and_min_dependent_inverse;
+    StrategicNonStuckOracle::bitset(), nonstuck_bitset;
+    StrategicNonStuckOracle::hashset(), nonstuck_hashset;
+    StrategicNonStuckOracle::bitset().then(SMax::bitset().ordered()), nonstuck_bitset_then_smax;
+    StrategicNonStuckOracle::hashset().then(SMax::hashset().ordered()), nonstuck_hashset_then_smax;
 }

@@ -151,6 +151,10 @@ weak_bisim_test_oracles! {
     StrategicArgumentsOracle::with(ArgumentsStrategy::Successors), arguments_s_s;
     StrategicArgumentsOracle::with(ArgumentsStrategy::AncestorsInverted), arguments_s_ai;
     StrategicArgumentsOracle::with(ArgumentsStrategy::SuccessorsInverted), arguments_s_si;
+    StrategicNonStuckOracle::bitset(), nonstuck_bitset;
+    StrategicNonStuckOracle::hashset(), nonstuck_hashset;
+    StrategicNonStuckOracle::bitset().then(SMax::bitset().ordered()), nonstuck_bitset_then_smax;
+    StrategicNonStuckOracle::hashset().then(SMax::hashset().ordered()), nonstuck_hashset_then_smax;
     // These are commented out due to perfromance issues
     // SMax.constant(StrategyWeight::Infinity), smax_const_infinity;
     // SMax.constant(StrategyWeight::Num(1)), smax_const_1;

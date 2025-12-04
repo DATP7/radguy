@@ -5,7 +5,8 @@ use radguy::{
         oracle::{
             ArgumentsStrategy, DependencyCountOracle, DependentCountOracle,
             InverseDependencyCountOracle, InverseDependentCountOracle, SiblingsOracle,
-            StrategicArgumentsOracle, StrategicLocalOracle, ToConstant, ToInverse,
+            StrategicArgumentsOracle, StrategicLocalOracle, StrategicNonStuckOracle, ToConstant,
+            ToInverse, ToOrdered,
         },
         strategy::StrategyWeight,
     },
@@ -159,12 +160,18 @@ wctl_test_oracles! {
     SMax::hashset().constant(StrategyWeight::Infinity), smax_const_infinity_hashset;
     SMax::hashset().constant(StrategyWeight::Num(0)).then(DependencyCountOracle::default()), smax_then_count_hashset;
     SMax::hashset().constant(StrategyWeight::Num(10)).and_by(DependencyCountOracle::default(), std::cmp::min), smax_10_and_min_count_hashset;
-    WeightedDepOracle::default().constant(StrategyWeight::Num(1)).then(SiblingsOracle), wctl_1_then_siblings;
-    WeightedDepOracle::default().constant(StrategyWeight::Num(1)).then(SiblingsOracle).inverse(), wctl_1_then_siblings_inversed;
+    WeightedDepOracle::bitset().constant(StrategyWeight::Num(1)).then(SiblingsOracle), wctl_1_then_siblings_bitset;
+    WeightedDepOracle::hashset().constant(StrategyWeight::Num(1)).then(SiblingsOracle), wctl_1_then_siblings_hashset;
+    WeightedDepOracle::bitset().constant(StrategyWeight::Num(1)).then(SiblingsOracle).inverse(), wctl_1_then_siblings_bitset_inversed;
+    WeightedDepOracle::hashset().constant(StrategyWeight::Num(1)).then(SiblingsOracle).inverse(), wctl_1_then_siblings_hashset_inversed;
     DependencyCountOracle::default(), dependency;
     InverseDependencyCountOracle::default(), dependency_inverse;
     DependentCountOracle::default(), dependent;
     InverseDependentCountOracle::default(), dependent_inverse;
+    StrategicNonStuckOracle::bitset(), nonstuck_bitset;
+    StrategicNonStuckOracle::hashset(), nonstuck_hashset;
+    StrategicNonStuckOracle::bitset().then(SMax::bitset().ordered()), nonstuck_bitset_then_smax;
+    StrategicNonStuckOracle::hashset().then(SMax::hashset().ordered()), nonstuck_hashset_then_smax;
     StrategicArgumentsOracle::with(ArgumentsStrategy::Successors), arguments_s_s;
     StrategicArgumentsOracle::with(ArgumentsStrategy::Successors).and_by(DependencyCountOracle::default(), std::cmp::min), args_s_s_and_min_dependency;
     StrategicArgumentsOracle::with(ArgumentsStrategy::Successors).and_by(InverseDependencyCountOracle::default(), std::cmp::min), args_s_s_and_min_dependency_inverse;

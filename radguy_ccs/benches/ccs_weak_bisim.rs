@@ -8,7 +8,8 @@ use radguy::{
         oracle::{
             ArgumentsStrategy, DependencyCountOracle, DependentCountOracle,
             InverseDependencyCountOracle, InverseDependentCountOracle, SiblingsOracle,
-            StrategicArgumentsOracle, StrategicHeightOracle, StrategicLocalOracle, ToConstant,
+            StrategicArgumentsOracle, StrategicHeightOracle, StrategicLocalOracle,
+            StrategicNonStuckOracle, ToConstant,
         },
         strategy::{BinaryHeapStrategy, HashMapStrategy, LazyHeap, OrxStrategy, StrategyWeight},
     },
