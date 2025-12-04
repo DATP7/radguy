@@ -579,7 +579,7 @@ impl<K> Display for IdentityOracle<BitsetRelation<K, K>> {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Clone, Default)]
 pub struct WeightedDepOracle<PS>(PhantomData<PS>);
 
 #[expect(clippy::implicit_hasher)]

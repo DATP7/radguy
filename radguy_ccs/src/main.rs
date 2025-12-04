@@ -101,6 +101,10 @@ macro_rules! weak_bisim_oracles {
             IdentityOracle::bitset().ordered(),
             TrivialOracle::bitset().ordered(),
             SMax::bitset().constant(StrategyWeight::Infinity),
+            SMax::bitset().ordered().then(StrategicArgumentsOracle::default()),
+            SMax::bitset().ordered().then(DependencyCountOracle::default()),
+            LocalMaxR::bitset().ordered().then(StrategicArgumentsOracle::default()),
+            LocalMaxR::bitset().ordered().then(DependencyCountOracle::default()),
             LocalMaxR::bitset().constant(StrategyWeight::Infinity),
             LocalMaxR::bitset().constant(StrategyWeight::Num(1)).then(SiblingsOracle),
             LocalMaxR::bitset().constant(StrategyWeight::Num(1)).then(SiblingsOracleInv),
@@ -176,7 +180,7 @@ macro_rules! wctl_oracles {
             TrivialOracle::bitset(),
             SMax::bitset(),
             LocalMaxR::bitset(),
-            WeightedDepOracle::bitset(),
+            WeightedDepOracle::default(),
             ArgumentsOracle::bitset(),
             ArgumentsOracle::bitset().then(SMax::bitset()),
             ArgumentsOracle::bitset().then(LocalMaxR::bitset()),
@@ -188,14 +192,19 @@ macro_rules! wctl_oracles {
             IdentityOracle::bitset().ordered(),
             TrivialOracle::bitset().ordered(),
             SMax::bitset().constant(StrategyWeight::Infinity),
+            SMax::bitset().ordered().then(StrategicArgumentsOracle::default()),
+            SMax::bitset().ordered().then(DependencyCountOracle::default()),
+            LocalMaxR::bitset().ordered().then(StrategicArgumentsOracle::default()),
+            LocalMaxR::bitset().ordered().then(DependencyCountOracle::default()),
             LocalMaxR::bitset().constant(StrategyWeight::Infinity),
             LocalMaxR::bitset().constant(StrategyWeight::Num(1)).then(SiblingsOracle),
             LocalMaxR::bitset().constant(StrategyWeight::Num(1)).then(SiblingsOracleInv),
             LocalMaxR::bitset().constant(StrategyWeight::Infinity).then(DependencyCountOracle::default()),
             LocalMaxR::bitset().constant(StrategyWeight::Infinity).then(InverseDependencyCountOracle::default()),
-            WeightedDepOracle::default().constant(StrategyWeight::Num(1)).then(SiblingsOracle),
-            WeightedDepOracle::default().constant(StrategyWeight::Num(1)).then(SiblingsOracleInv),
-            StrategicArgumentsOracle::default(),
+            WeightedDepOracle::bitset().constant(StrategyWeight::Num(1)).then(SiblingsOracle),
+            WeightedDepOracle::bitset().constant(StrategyWeight::Num(1)).then(SiblingsOracleInv),
+            WeightedDepOracle::bitset().ordered().then(StrategicArgumentsOracle::default()),
+            WeightedDepOracle::bitset().ordered().then(DependencyCountOracle::default()),
             StrategicArgumentsOracle::default().then(SiblingsOracle),
             StrategicArgumentsOracle::default().then(SiblingsOracleInv),
             StrategicArgumentsOracle::default().and_by(DependencyCountOracle::default(), std::cmp::min),
@@ -401,8 +410,6 @@ fn main() {
         abpl_ok: "SPEC", "ABPl" => include_str!("../systems/ccs/abp_ok.ccs");
         abpl_ok_2: "SPEC", "ABPl_2" => include_str!("../systems/ccs/abp_ok.ccs");
         abpl_bad_2: "SPEC", "ABPl_2" => include_str!("../systems/ccs/abp_bad.ccs");
-        abpl_ok_3: "SPEC", "ABPl_3" => include_str!("../systems/ccs/abp_ok.ccs");
-        abpl_bad_3: "SPEC", "ABPl_3" => include_str!("../systems/ccs/abp_bad.ccs");
         leader_election_ok_6: "Spec", "Ring" => include_str!("../systems/ccs/leader_election_ok_6.ccs");
         leader_election_bad_6: "Spec", "Ring" => include_str!("../systems/ccs/leader_election_bad_6.ccs");
         dekker_mutual_exclusion: "Dekker-2", "Spec" => include_str!("../systems/ccs/dekkers_mutual_exclusion.ccs");
