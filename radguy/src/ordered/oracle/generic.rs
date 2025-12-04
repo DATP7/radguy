@@ -12,7 +12,7 @@ use std::{
 use orx_priority_queue::PriorityQueueDecKey;
 
 use crate::{
-    Arguments, Assignment, Bottom, CopiedIter, DependencyGraphSystem, Maximal, System, Universe,
+    Arguments, Assignment, Bottom, CopiedIter, DependencyGraphSystem, Set, System, Universe,
     Visited,
     arena::{Key, SecondaryArena},
     ordered::{

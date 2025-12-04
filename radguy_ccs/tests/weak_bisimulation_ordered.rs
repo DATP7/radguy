@@ -9,7 +9,7 @@ use radguy::{
     ordered::{
         oracle::{
             ArgumentsStrategy, DependencyCountOracle, SiblingsOracle, StrategicArgumentsOracle,
-            StrategicLocalOracle, ToConstant,
+            StrategicLocalOracle, StrategicNonStuckOracle, ToConstant, ToOrdered,
         },
         strategy::StrategyWeight,
     },
