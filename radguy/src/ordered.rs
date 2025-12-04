@@ -33,7 +33,7 @@ pub fn kleene_local<
     system: &mut S,
     target: VarKey,
     oracle: &impl StrategicLocalOracle<VarKey, VarValue, PairStrat, S>,
-) -> (VarValue, u32)
+) -> (VarValue, (u32, u32))
 where
     for<'a> &'a PairStrat: IntoIterator<Item = StrategyItem<(VarKey, VarKey)>>,
 {
@@ -53,14 +53,16 @@ where
     }
     let mut todo = strategy.slice_right(target).intersect(&discovered);
 
-    let mut iterations = 0;
+    let mut variable_iterations = 0;
+    let mut oracle_iterations = 0;
     while let Some(x) = todo.extract_min() {
         debug_assert!(discovered.contains(&x), "discovered should contain {x:?}");
-        iterations += 1;
+        variable_iterations += 1;
 
         let evaluated = system.evaluate(x, &assignment);
         let args = system.arguments(x);
         if assignment.get_assignment(&x) != evaluated || !args.is_subset(&discovered) {
+            oracle_iterations += 1;
             assignment.update_assignment(x, evaluated);
             // At this point `rel` is D x D with some elements pruned by oracles
             // We expand it with args to create (D u A) x (D u A), still with those elements
@@ -89,5 +91,8 @@ where
         }
     }
 
-    (assignment.get_assignment(&target), iterations)
+    (
+        assignment.get_assignment(&target),
+        (variable_iterations, oracle_iterations),
+    )
 }

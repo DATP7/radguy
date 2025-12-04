@@ -74,7 +74,10 @@ fn create_csv() -> std::io::Result<PathBuf> {
     }
 
     let mut file = File::create(&new_file_path)?;
-    writeln!(file, "Problem,System,Oracle,Ordered,Iters")?;
+    writeln!(
+        file,
+        "Problem,System,Oracle,Ordered,VariableIterations,OracleIterations"
+    )?;
     Ok(new_file_path)
 }
 
@@ -328,8 +331,9 @@ fn run_unordered_kleene<
         })
         .collect();
 
-    for i in iterations {
-        let record = format!("{problem},{name},{oracle},false,{i}");
+    for (variable_iterations, oracle_iterations) in iterations {
+        let record =
+            format!("{problem},{name},{oracle},false,{variable_iterations},{oracle_iterations}");
         append_record(file_path, &record);
     }
 }
@@ -385,8 +389,9 @@ fn run_ordered_kleene<
         })
         .collect();
 
-    for i in iterations {
-        let record = format!("{problem},{name},{oracle},true,{i}");
+    for (variable_iterations, oracle_iterations) in iterations {
+        let record =
+            format!("{problem},{name},{oracle},true,{variable_iterations},{oracle_iterations}");
         append_record(file_path, &record);
     }
 }

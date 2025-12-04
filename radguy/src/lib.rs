@@ -339,7 +339,7 @@ pub fn kleene_local<
     system: &mut S,
     target: K,
     oracle: &impl LocalOracle<K, V, PS, S>,
-) -> (V, u32)
+) -> (V, (u32, u32))
 where
     HashSet<K>: Cartesian<Output = HashSet<(K, K)>> + Cartesian<VS, Output = PS> + IsSubset<VS>,
 {
@@ -354,13 +354,15 @@ where
     }
 
     let mut iter = todo.copied_iter();
-    let mut iterations = 0;
+    let mut variable_iterations = 0;
+    let mut oracle_iterations = 0;
     while let Some(x) = iter.next() {
         debug_assert!(discovered.contains(&x), "discovered should contain {x:?}");
-        iterations += 1;
+        variable_iterations += 1;
         let evaluated = system.evaluate(x, &assignment);
         let args = system.arguments(x);
         if assignment.get_assignment(&x) != evaluated || !IsSubset::is_subset(&args, &discovered) {
+            oracle_iterations += 1;
             assignment.update_assignment(x, evaluated);
             // At this point `rel` is D x D with some elements pruned by oracles
             // We expand it with args to create (D u A) x (D u A), still with those elements
@@ -385,7 +387,10 @@ where
         }
     }
 
-    (assignment.get_assignment(&target), iterations)
+    (
+        assignment.get_assignment(&target),
+        (variable_iterations, oracle_iterations),
+    )
 }
 
 fn local_dependencies<
