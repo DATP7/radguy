@@ -119,7 +119,7 @@ macro_rules! wctl_test_oracles {
 
 wctl_test_oracles! {
     SMax::bitset(), smax_bitset;
-    WeightedDepOracle::default(), wctl_oracle_bitset;
+    WeightedDepOracle::bitset(), wctl_oracle_bitset;
     TrivialOracle::bitset(), trivialoracle_bitset;
     IdentityOracle::bitset(), identityoracle_bitset;
     LocalMaxR::bitset(), localmaxr_bitset;
@@ -134,7 +134,7 @@ wctl_test_oracles! {
     LocalMaxR::bitset().then(TrivialOracle::bitset()), localmaxr_then_trivialoracle_bitset;
     ArgumentsOracle::bitset(), arguments_bitset;
     SMax::hashset(), smax_hashset;
-    WeightedDepOracle::default(), wctl_oracle_hashset;
+    WeightedDepOracle::hashset(), wctl_oracle_hashset;
     TrivialOracle::hashset(), trivialoracle_hashset;
     IdentityOracle::hashset(), identityoracle_hashset;
     LocalMaxR::hashset(), localmaxr_hashset;

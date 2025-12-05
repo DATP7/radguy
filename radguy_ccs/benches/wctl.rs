@@ -128,7 +128,7 @@ macro_rules! wctl_bench_problem_ordered {
 
         wctl_bench_oracles_ordered! {
             $name: using $c, strategy $s; $sname; bench $process_name, $formula_str => $sat in wccs, with
-            WeightedDepOracle::default().constant(StrategyWeight::Num(1)).then(SiblingsOracle::default()),
+            WeightedDepOracle::hashset().constant(StrategyWeight::Num(1)).then(SiblingsOracle::default()),
             SMax::hashset().constant(StrategyWeight::Num(1)).then(SiblingsOracle::default()),
             SMax::hashset().constant(StrategyWeight::Infinity),
             LocalMaxR::hashset().constant(StrategyWeight::Infinity).then(DependencyCountOracle::default()),
@@ -158,7 +158,8 @@ macro_rules! wctl_bench_suite_problem {
             SMax::hashset(),
             LocalMaxR::bitset(),
             LocalMaxR::hashset(),
-            WeightedDepOracle::default(),
+            WeightedDepOracle::hashset(),
+            WeightedDepOracle::bitset(),
             // ArgumentsOracle::default(),
             // ArgumentsOracle::default().then(SMax::default()),
             // ArgumentsOracle::default().then(LocalMaxR::default()),

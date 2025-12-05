@@ -1,7 +1,3 @@
-use itertools::Itertools;
-
-use fixedbitset::FixedBitSet;
-
 use crate::{
     Arguments, Assignment, Bottom, Cartesian, CopiedIter, DependencyGraphSystem, Diagonal,
     FromLefts, FromRights, Intersect, Maximal, PairUniverse, RightSliced, Set, System, Union,
@@ -129,7 +125,7 @@ impl<VarKey> SMax<HashSet<(VarKey, VarKey)>> {
     }
 }
 
-impl<VarKey> SMax<BitsetRelation<VarKey, VarKey, FixedBitSet>> {
+impl<VarKey> SMax<BitsetRelation<VarKey, VarKey>> {
     #[must_use]
     pub fn bitset() -> Self {
         Self::default()
@@ -394,7 +390,7 @@ impl<K: Default + Eq + Hash + Copy> ArgumentsOracle<K, HashSet<K>, HashSet<(K, K
     }
 }
 
-impl<K: Key> ArgumentsOracle<K, BitSet<K, FixedBitSet>, BitsetRelation<K, K, FixedBitSet>> {
+impl<K: Key> ArgumentsOracle<K, BitSet<K>, BitsetRelation<K, K>> {
     #[must_use]
     pub fn bitset() -> Self {
         Self::default()
@@ -583,12 +579,20 @@ impl<K> Display for IdentityOracle<BitsetRelation<K, K>> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Default, Clone)]
 pub struct WeightedDepOracle<PS>(PhantomData<PS>);
 
 #[expect(clippy::implicit_hasher)]
-impl<K> Default for WeightedDepOracle<HashSet<(K, K)>> {
-    fn default() -> Self {
+impl<K> WeightedDepOracle<HashSet<(K, K)>> {
+    #[must_use]
+    pub const fn hashset() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<K> WeightedDepOracle<BitsetRelation<K, K>> {
+    #[must_use]
+    pub const fn bitset() -> Self {
         Self(PhantomData)
     }
 }
@@ -596,15 +600,18 @@ impl<K> Default for WeightedDepOracle<HashSet<(K, K)>> {
 impl<
     K: Hash + Eq + Copy,
     V: Maximal + Ord + Bottom + Clone,
-    PS: FromIterator<(K, K)>,
-    S: System<K, V> + DependencyGraphSystem<K, (K, V)> + Universe<HashSet<K>>,
+    VS: for<'a> CopiedIter<'a, K>,
+    PS: Set<(K, K)>
+        + FromIterator<(K, K)>
+        + for<'a> CopiedIter<'a, (K, K)>
+        + RightSliced<K, K, SlicedRight = VS>,
+    S: System<K, V> + DependencyGraphSystem<K, (K, V)> + Universe<VS>,
 > LocalOracle<K, V, PS, S> for WeightedDepOracle<PS>
-where
-    for<'a> &'a PS: IntoIterator<Item = &'a (K, K)>,
 {
     fn approximate_flow(&self, assignment: &HashMap<K, V>, possible: &PS, system: &S) -> PS {
+        let universe = system.universe();
         possible
-            .into_iter()
+            .copied_iter()
             .filter(|(x, y)| {
                 if x == y {
                     return true;
@@ -612,10 +619,10 @@ where
                 let Some(hyperedges) = system.get_hyperedges(*y) else {
                     return true;
                 };
-                if system.universe().into_iter().any(|z| {
-                    possible.into_iter().contains(&(*x, z))
-                        && possible.into_iter().contains(&(z, *y))
-                }) {
+                if universe
+                    .copied_iter()
+                    .any(|z| possible.contains(&(*x, z)) && possible.contains(&(z, *y)))
+                {
                     return true;
                 }
 
@@ -626,7 +633,6 @@ where
                             .all(|(_, w)| w < assignment.get_assignment(y))
                 })
             })
-            .copied()
             .collect()
     }
 }
