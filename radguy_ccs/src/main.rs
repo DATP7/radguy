@@ -101,8 +101,8 @@ macro_rules! weak_bisim_oracles {
         }
         weak_bisim_system_ordered! {
             $file_path, $name, $left, $right => $ccs,
-            IdentityOracle::bitset().ordered(),
-            TrivialOracle::bitset().ordered(),
+            IdentityOracle::hashset().ordered(),
+            TrivialOracle::hashset().ordered(),
 
             BoolExtension::hashset().as_oracle().ordered().then(SiblingsOracleInv),
             SMax::hashset().then(BoolExtension::hashset().as_oracle()).ordered().then(SiblingsOracleInv),
@@ -152,10 +152,11 @@ macro_rules! weak_bisim_oracles {
             SMax::hashset().ordered(),
             SMax::hashset().constant(StrategyWeight::Infinity),
             StrategicArgumentsOracle::default().and_by(SMax::hashset().ordered(), std::cmp::min),
-            ArgumentsOracle::hashset().ordered().then(SMax::hashset().ordered()),
-            ArgumentsOracle::hashset().ordered().then(LocalMaxR::hashset().ordered()),
-            ArgumentsOracle::hashset().ordered().then(BoolExtension::hashset().as_oracle().ordered()),
-            ArgumentsOracle::hashset().ordered().then(SMax::hashset().ordered()).and_by(DependencyCountOracle::default(), std::cmp::min),
+            StrategicArgumentsOracle::default().then(SMax::hashset().ordered()),
+            StrategicArgumentsOracle::default().then(LocalMaxR::hashset().ordered()),
+            StrategicArgumentsOracle::default().then(BoolExtension::hashset().as_oracle().ordered()),
+            StrategicArgumentsOracle::default().then(SMax::hashset().ordered()).and_by(DependencyCountOracle::default(), std::cmp::min),
+            StrategicArgumentsOracle::default().then(SMax::hashset().ordered()).and_by(InverseDependencyCountOracle::default(), std::cmp::min),
             ArgumentsOracle::hashset().ordered().then(DependencyCountOracle::default()),
             ArgumentsOracle::hashset().ordered().then(InverseDependencyCountOracle::default()),
             DependencyCountOracle::default().and_by(BoolExtension::hashset().as_oracle().ordered(), std::cmp::min),
@@ -222,8 +223,8 @@ macro_rules! wctl_oracles {
         }
         wctl_system_ordered! {
             $file_path, $name: $proc, $formula => $wccs,
-            IdentityOracle::bitset().ordered(),
-            TrivialOracle::bitset().ordered(),
+            IdentityOracle::hashset().ordered(),
+            TrivialOracle::hashset().ordered(),
 
             WeightedDepOracle::hashset().ordered().then(SiblingsOracleInv),
             SMax::hashset().then(WeightedDepOracle::hashset()).ordered().then(SiblingsOracleInv),
@@ -273,17 +274,18 @@ macro_rules! wctl_oracles {
             SMax::hashset().ordered(),
             SMax::hashset().constant(StrategyWeight::Infinity),
             StrategicArgumentsOracle::default().and_by(SMax::hashset().ordered(), std::cmp::min),
-            ArgumentsOracle::hashset().ordered().then(SMax::hashset().ordered()),
-            ArgumentsOracle::hashset().ordered().then(LocalMaxR::hashset().ordered()),
-            ArgumentsOracle::hashset().ordered().then(WeightedDepOracle::hashset().ordered()),
-            ArgumentsOracle::hashset().ordered().then(SMax::hashset().ordered()).and_by(DependencyCountOracle::default(), std::cmp::min),
+            StrategicArgumentsOracle::default().and_by(SMax::hashset().ordered(), std::cmp::min),
+            StrategicArgumentsOracle::default().then(SMax::hashset().ordered()),
+            StrategicArgumentsOracle::default().then(LocalMaxR::hashset().ordered()),
+            StrategicArgumentsOracle::default().then(WeightedDepOracle::hashset().ordered()),
+            StrategicArgumentsOracle::default().then(SMax::hashset().ordered()).and_by(DependencyCountOracle::default(), std::cmp::min),
+            StrategicArgumentsOracle::default().then(SMax::hashset().ordered()).and_by(InverseDependencyCountOracle::default(), std::cmp::min),
             ArgumentsOracle::hashset().ordered().then(DependencyCountOracle::default()),
             ArgumentsOracle::hashset().ordered().then(InverseDependencyCountOracle::default()),
             DependencyCountOracle::default().and_by(WeightedDepOracle::hashset().ordered(), std::cmp::min),
             InverseDependencyCountOracle::default().and_by(WeightedDepOracle::hashset().ordered(), std::cmp::min),
         }
         })*
-
     };
 }
 
