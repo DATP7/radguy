@@ -1,7 +1,7 @@
 use itertools::iproduct;
 use radguy::{
-    Arguments, Assignment, Cartesian, Intersect, PairUniverse, Set, System, Union, Universe,
-    Visited,
+    Arguments, Assignment, Cartesian, CopiedIter, Intersect, PairUniverse, Set, System, Union,
+    Universe, Visited,
     arena::{BiArena, Key, SecondaryArena},
     extension::TermSystem,
     set::bitset::{BitSet, BitsetRelation},
@@ -39,6 +39,7 @@ pub struct NumericSystemImpl<K: Key, T: Key, N: Hash + Eq + Clone> {
     pub names: BiArena<K, N>,
     pub definitions: SecondaryArena<K, T>,
     pub terms: BiArena<T, NumericTerm<K, T>>,
+    term_arguments_cache: RefCell<SecondaryArena<T, HashSet<K>>>,
     locked: bool,
 }
 
@@ -94,12 +95,20 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone + Debug> NumericSystem<K, T, N>
 
 impl<K: Key, T: Key, N: Hash + Eq + Clone + Debug> NumericSystemImpl<K, T, N> {
     pub fn term_arguments<
-        ArgSet: Set<K> + Union + Default + FromIterator<K> + IntoIterator<Item = K>,
+        ArgSet: Set<K>
+            + Union
+            + Default
+            + FromIterator<K>
+            + IntoIterator<Item = K>
+            + for<'a> CopiedIter<'a, K>,
     >(
         &self,
         term_key: T,
     ) -> ArgSet {
-        match self.terms.get_value(term_key) {
+        if let Some(cached) = self.term_arguments_cache.borrow().get(term_key) {
+            return cached.iter().copied().collect();
+        }
+        let args = match self.terms.get_value(term_key) {
             NumericTerm::Const(_) => ArgSet::default(),
             NumericTerm::Var(k) => {
                 let mut set = ArgSet::default();
@@ -114,7 +123,11 @@ impl<K: Key, T: Key, N: Hash + Eq + Clone + Debug> NumericSystemImpl<K, T, N> {
                 .flat_map(|&key| self.term_arguments::<ArgSet>(key))
                 .collect(),
             NumericTerm::Bound { term, .. } => self.term_arguments(*term),
-        }
+        };
+        self.term_arguments_cache
+            .borrow_mut()
+            .insert(term_key, args.copied_iter().collect());
+        args
     }
 }
 
@@ -199,10 +212,19 @@ impl<VarKey: Key, TermKey: Key, VarName: Hash + Eq + Clone + Debug, S: FromItera
     }
 }
 
-impl<VarKey: Key, TermKey: Key, VarName: Hash + Eq + Clone + Debug>
-    Arguments<VarKey, HashSet<VarKey>> for NumericSystemImpl<VarKey, TermKey, VarName>
+impl<
+    VarKey: Key,
+    TermKey: Key,
+    VarName: Hash + Eq + Clone + Debug,
+    S: Set<VarKey>
+        + FromIterator<VarKey>
+        + Union
+        + Default
+        + IntoIterator<Item = VarKey>
+        + for<'a> CopiedIter<'a, VarKey>,
+> Arguments<VarKey, S> for NumericSystemImpl<VarKey, TermKey, VarName>
 {
-    fn arguments(&self, key: VarKey) -> HashSet<VarKey> {
+    fn arguments(&self, key: VarKey) -> S {
         assert_access_allowed!(self, key);
         let term_key = self.definitions.get(key).expect("variable must be defined");
         self.term_arguments(*term_key)
@@ -248,7 +270,7 @@ macro_rules! ensure_lazy_access {
         debug_assert!(!$self.inner.borrow().locked || $self.visited.borrow().contains(&$key));
         if (!$self.inner.borrow().locked) {
             $self.visited.borrow_mut().insert($key);
-            let args = $self.inner.borrow().arguments($key);
+            let args: HashSet<_> = $self.inner.borrow().arguments($key);
             $self.discovered.borrow_mut().extend(args.into_iter());
         }
     };
