@@ -1,4 +1,4 @@
-use crate::Intersect;
+use crate::{CopiedIter, Intersect, Union};
 use std::fmt::Debug;
 use std::{
     cmp::Reverse,
@@ -12,7 +12,7 @@ use orx_priority_queue::{DaryHeapWithMap, NodeKeyRef, PriorityQueueDecKey};
 
 use crate::ordered::strategy::{
     Domain, GetWeight, IntersectBy, LeftSliced, Length, ResetWeights, RightSliced, Singleton,
-    SliceLeft, SliceRight, Strategy, StrategyItem, StrategyWeight,
+    SliceLeft, SliceRight, Strategy, StrategyItem, StrategyWeight, UnionWithBy,
 };
 
 #[derive(Clone, Debug)]
@@ -101,6 +101,41 @@ impl<T: Eq + Copy + Hash, H: PriorityQueueDecKey<T, StrategyWeight>> IntersectBy
     }
 }
 
+impl<T: Copy + Eq, H: PriorityQueueDecKey<T, StrategyWeight>> Union for OrxStrategy<T, H> {
+    fn union(mut self, other: Self) -> Self {
+        for x in other.0.iter() {
+            debug_assert!(!self.0.contains(x.node()));
+            self.0.push(*x.node(), *x.key());
+        }
+        self
+    }
+}
+
+impl<T: Eq + Hash + Copy, H: PriorityQueueDecKey<T, StrategyWeight>> UnionWithBy<T, Self>
+    for OrxStrategy<T, H>
+{
+    fn union_with_by(
+        &mut self,
+        other: Self,
+        f: impl Fn(StrategyWeight, StrategyWeight) -> StrategyWeight,
+    ) {
+        let mut other_map: HashMap<_, _> = other.0.iter().map(|x| (*x.node(), *x.key())).collect();
+
+        let items: Vec<(T, StrategyWeight)> =
+            self.0.iter().map(|x| (*x.node(), *x.key())).collect();
+
+        for (v, w) in items {
+            if let Some(w_other) = other_map.remove(&v) {
+                self.0.update_key(&v, f(w, w_other));
+            }
+        }
+
+        for (v, w) in other_map {
+            self.0.push(v, w);
+        }
+    }
+}
+
 impl<T: Copy + Eq + Hash, U: Copy + Eq + Hash, const D: usize> LeftSliced<T, U>
     for OrxStrategy<(T, U), DaryHeapWithMap<(T, U), StrategyWeight, D>>
 {
@@ -123,7 +158,7 @@ where
     (T, U): Copy,
     Self: LeftSliced<T, U, SlicedLeft = OrxStrategy<U, UH>>,
 {
-    fn slice_left(self, left: T) -> OrxStrategy<U, UH> {
+    fn slice_left(&self, left: T) -> OrxStrategy<U, UH> {
         // PERF: i would like to do this in-place, actually consuming the strategy
         let mut new = UH::default();
         for x in self.0.iter() {
@@ -146,7 +181,7 @@ where
     (T, U): Copy,
     Self: RightSliced<T, U, SlicedRight = OrxStrategy<T, TH>>,
 {
-    fn slice_right(self, right: U) -> OrxStrategy<T, TH> {
+    fn slice_right(&self, right: U) -> OrxStrategy<T, TH> {
         // PERF: i would like to do this in-place, actually consuming the strategy
         let mut new = TH::default();
         for x in self.0.iter() {
@@ -245,6 +280,14 @@ impl<T: Copy, H: PriorityQueueDecKey<T, StrategyWeight>> IntoIterator for &OrxSt
     fn into_iter(self) -> Self::IntoIter {
         // PERF: avoid collecting into a vec. this currently isn't possible because none of the orx
         // priority queues have an `IntoIterator` implementation
+        self.0.iter().map(|x| StrategyItem(*x.key(), *x.node()))
+    }
+}
+
+impl<'a, T: Copy + 'a, H: PriorityQueueDecKey<T, StrategyWeight> + 'a> CopiedIter<'a, StrategyItem<T>> for OrxStrategy<T, H> {
+    type IterCopied = impl Iterator<Item = StrategyItem<T>>;
+
+    fn copied_iter(&'a self) -> Self::IterCopied {
         self.0.iter().map(|x| StrategyItem(*x.key(), *x.node()))
     }
 }

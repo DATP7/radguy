@@ -1,4 +1,4 @@
-use crate::{Intersect, ordered::strategy::ResetWeights};
+use crate::{ordered::strategy::ResetWeights, CopiedIter, Intersect, Union};
 use std::{
     cmp::Reverse,
     collections::{BinaryHeap, HashMap, HashSet},
@@ -8,7 +8,7 @@ use std::{
 
 use crate::ordered::strategy::{
     Domain, GetWeight, IntersectBy, LeftSliced, Length, Retain, RightSliced, Singleton, SliceLeft,
-    SliceRight, Strategy, StrategyItem, StrategyWeight,
+    SliceRight, Strategy, StrategyItem, StrategyWeight, UnionWithBy,
 };
 
 #[derive(Default, Clone, Debug)]
@@ -68,6 +68,14 @@ where
     }
 }
 
+impl<'a, T: Copy + Eq + 'a> CopiedIter<'a, StrategyItem<T>> for BinaryHeapStrategy<T> {
+    type IterCopied = impl Iterator<Item = StrategyItem<T>>;
+
+    fn copied_iter(&'a self) -> Self::IterCopied {
+        self.0.iter().copied().map(|Reverse(i)| i)
+    }
+}
+
 impl<T: Copy + Eq> Strategy<T> for BinaryHeapStrategy<T> {
     fn extract_min(&mut self) -> Option<T> {
         self.pop().map(|Reverse(StrategyItem(_, v))| v)
@@ -114,6 +122,41 @@ impl<T: Eq + Copy + Hash> IntersectBy<T, Self> for BinaryHeapStrategy<T> {
     }
 }
 
+impl<T> Union for BinaryHeapStrategy<T> {
+    fn union(mut self, other: Self) -> Self {
+        self.0.extend(other.0);
+        self
+    }
+}
+
+impl<T: Eq + Hash + Copy> UnionWithBy<T, Self> for BinaryHeapStrategy<T> {
+    fn union_with_by(
+        &mut self,
+        other: Self,
+        f: impl Fn(StrategyWeight, StrategyWeight) -> StrategyWeight,
+    ) {
+        let mut other_map: HashMap<_, _> = other
+            .0
+            .iter()
+            .map(|Reverse(StrategyItem(w, v))| (*v, *w))
+            .collect();
+        let mut to_add = Vec::new();
+        self.0.retain(|Reverse(StrategyItem(w, v))| {
+            other_map.remove(v).is_none_or(|w_other| {
+                to_add.push(Reverse(StrategyItem(f(*w, w_other), *v)));
+                false
+            })
+        });
+        self.0.extend(
+            to_add.into_iter().chain(
+                other_map
+                    .iter()
+                    .map(|(v, w)| StrategyItem(*w, *v).reversed()),
+            ),
+        );
+    }
+}
+
 impl<T: Eq, U: Copy + Eq> LeftSliced<T, U> for BinaryHeapStrategy<(T, U)>
 where
     (T, U): Copy,
@@ -132,13 +175,13 @@ impl<T: Eq, U: Copy + Eq> SliceLeft<T, U, BinaryHeapStrategy<U>> for BinaryHeapS
 where
     (T, U): Copy,
 {
-    fn slice_left(self, left: T) -> BinaryHeapStrategy<U> {
+    fn slice_left(&self, left: T) -> BinaryHeapStrategy<U> {
         let heap = self
             .0
-            .into_iter()
+            .iter()
             .filter_map(|Reverse(StrategyItem(w, (t, u)))| {
-                if t == left {
-                    Some(Reverse(StrategyItem(w, u)))
+                if *t == left {
+                    Some(Reverse(StrategyItem(*w, *u)))
                 } else {
                     None
                 }
@@ -152,13 +195,13 @@ impl<T: Copy + Eq, U: Eq> SliceRight<T, U, BinaryHeapStrategy<T>> for BinaryHeap
 where
     (T, U): Copy,
 {
-    fn slice_right(self, right: U) -> BinaryHeapStrategy<T> {
+    fn slice_right(&self, right: U) -> BinaryHeapStrategy<T> {
         let heap = self
             .0
-            .into_iter()
+            .iter()
             .filter_map(|Reverse(StrategyItem(w, (t, u)))| {
-                if u == right {
-                    Some(Reverse(StrategyItem(w, t)))
+                if *u == right {
+                    Some(Reverse(StrategyItem(*w, *t)))
                 } else {
                     None
                 }

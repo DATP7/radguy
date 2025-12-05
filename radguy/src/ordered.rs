@@ -14,7 +14,7 @@ pub mod strategy;
 #[expect(clippy::similar_names)]
 pub fn kleene_local<
     VarKey: Copy + Eq + Debug + Hash,
-    VarValue: PartialOrd + Bottom + Copy,
+    VarValue: PartialOrd + Bottom + Copy + std::fmt::Debug,
     VarStrategy: Strategy<VarKey> + Intersect<HashSet<VarKey>> + Singleton<VarKey> + Debug,
     PairStrat: Strategy<(VarKey, VarKey)>
         + Clone
@@ -59,7 +59,6 @@ where
 
         let evaluated = system.evaluate(x, &assignment);
         let args = system.arguments(x);
-
         if assignment.get_assignment(&x) != evaluated || !args.is_subset(&discovered) {
             assignment.update_assignment(x, evaluated);
             // At this point `rel` is D x D with some elements pruned by oracles

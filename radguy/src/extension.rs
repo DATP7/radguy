@@ -1,21 +1,22 @@
 use crate::Assignment;
 use crate::Bottom;
+use crate::Intersect;
+use crate::Set;
 use crate::ordered::oracle::StrategicLocalOracle;
 use crate::ordered::strategy::GetWeight;
 use crate::ordered::strategy::Strategy;
 use crate::ordered::strategy::StrategyItem;
 use std::{
+    cmp::PartialOrd,
     collections::{HashMap, HashSet},
     fmt::{Debug, Display},
     hash::Hash,
     marker::PhantomData,
-    cmp::PartialOrd,
 };
 
 use crate::{
     Cartesian, CopiedIter, Diagonal, FromRights, System, Union, Universe, Visited, Without,
-    oracle::LocalOracle,
-    ordered::strategy::StrategyWeight,
+    oracle::LocalOracle, ordered::strategy::StrategyWeight,
 };
 
 pub trait TermSystem<VarKey: Copy, VarValue: PartialOrd, TermKey: Copy>:
@@ -153,29 +154,38 @@ impl<
 //---------------------------------------------------------------------------------------------------//
 
 pub trait StrategicExtension<
-    TermKey: Hash + Copy,
-    VarName: Hash + Eq + Clone,
-    VarKey: Hash + Eq + Copy,
-    VarValue: Bottom + Clone,
-    PairStrat: Strategy<(VarKey, VarKey)>
-        + FromIterator<StrategyItem<(VarKey, VarKey)>>
-        + IntoIterator<Item = StrategyItem<(VarKey, VarKey)>>
-        + GetWeight<(VarKey, VarKey)>
-        + Clone,
-    S: TermSystem<VarKey, VarValue, TermKey>,
+    VarKey,
+    VarValue,
+    TermKey,
+    VarName,
+    VS,
+    VarStrat,
+    PairStrat,
+    S,
+    // VarKey: Hash + Copy,
+    // VarValue: Bottom + Clone,
+    // TermKey: Hash + Copy,
+    // VarName: Hash + Copy + Eq,
+    // VS: for<'a> CopiedIter<'a, VarKey> + Debug,
+    // VarStrat,
+    // PairStrat: Strategy<(VarKey, VarKey)>
+    //     + FromIterator<StrategyItem<(VarKey, VarKey)>>
+    //     + IntoIterator<Item = StrategyItem<(VarKey, VarKey)>>
+    //     + GetWeight<(VarKey, VarKey)>
+    //     + Clone,
+    // S: TermSystem<VarKey, VarValue, TermKey>,
 >
 {
-    fn strategic_extend(
+    fn depends(
         &self,
-        x: VarKey,
-        term_key: TermKey,
+        x: TermKey,
         assignment: &HashMap<VarKey, VarValue>,
         strategy: &PairStrat,
         system: &S,
-    ) -> Option<StrategyWeight>;
+    ) -> VarStrat;
 
     #[must_use]
-    fn oracle() -> StrategicExtensionOracle<TermKey, VarName, VarKey, VarValue, PairStrat, S, Self>
+    fn oracle() -> StrategicExtensionOracle<VarKey, VarValue, TermKey, VarName, VS, VarStrat, S, Self>
     where
         Self: Default,
     {
@@ -184,38 +194,47 @@ pub trait StrategicExtension<
 }
 
 pub struct StrategicExtensionOracle<
-    TermKey: Hash + Copy,
-    VarName: Hash + Eq + Clone,
-    VarKey: Copy + Eq + Hash,
-    VarValue: Bottom + Clone,
-    PairStrat: Strategy<(VarKey, VarKey)>
-        + FromIterator<StrategyItem<(VarKey, VarKey)>>
-        + IntoIterator<Item = StrategyItem<(VarKey, VarKey)>>
-        + GetWeight<(VarKey, VarKey)>
-        + Clone,
-    S: TermSystem<VarKey, VarValue, TermKey>,
-    E: StrategicExtension<TermKey, VarName, VarKey, VarValue, PairStrat, S>,
+    VarKey,
+    VarValue,
+    TermKey,
+    VarName,
+    VS,
+    VarStrat,
+    S,
+    E,
+    // VarKey: Hash + Copy,
+    // VarValue: Bottom + Clone,
+    // TermKey: Hash + Copy,
+    // VarName: Hash + Copy + Eq,
+    // VS: for<'a> CopiedIter<'a, VarKey> + Debug,
+    // PairStrat: Strategy<(VarKey, VarKey)>
+    //     + FromIterator<StrategyItem<(VarKey, VarKey)>>
+    //     + IntoIterator<Item = StrategyItem<(VarKey, VarKey)>>
+    //     + GetWeight<(VarKey, VarKey)>
+    //     + Clone,
+    // S: TermSystem<VarKey, VarValue, TermKey>,
+    // E: StrategicExtension<VarKey, VarValue, TermKey, VarName, VS, PairStrat, S>,
 > {
     extension: E,
-    _phantom_data: PhantomData<(TermKey, VarName, VarKey, VarValue, PairStrat, S)>,
+    _phantom_data: PhantomData<(TermKey, VarKey, VarValue, VarName, VS, VarStrat, S)>,
 }
 
-
-impl<TermKey, VarName, VarKey, VarValue, PairStrat, S, E>
+impl<VarKey, VarValue, TermKey, VarName, VS, PS, VarStrat, PairStrat, S, E>
     StrategicLocalOracle<VarKey, VarValue, PairStrat, S>
-    for StrategicExtensionOracle<TermKey, VarName, VarKey, VarValue, PairStrat, S, E>
+    for StrategicExtensionOracle<VarKey, VarValue, TermKey, VarName, VS, VarStrat, S, E>
 where
-    TermKey: Hash + Copy,
-    VarName: Hash + Eq + Clone,
-    VarKey: Copy + Eq + Hash,
+    VarKey: Hash + Eq + Copy,
     VarValue: Bottom + Clone,
+    TermKey: Hash + Copy,
+    VarName: Hash + Copy + Eq,
+    VS: for<'a> CopiedIter<'a, VarKey> + Debug + Set<VarKey> + Without + Cartesian<Output = PS>,
+    VarStrat: for<'a> CopiedIter<'a, StrategyItem<VarKey>> + IntoIterator<Item = StrategyItem<VarKey>>,
     PairStrat: Strategy<(VarKey, VarKey)>
         + FromIterator<StrategyItem<(VarKey, VarKey)>>
-        + IntoIterator<Item = StrategyItem<(VarKey, VarKey)>>
         + GetWeight<(VarKey, VarKey)>
-        + Clone,
-    S: TermSystem<VarKey, VarValue, TermKey> + System<VarKey, VarValue>,
-    E: StrategicExtension<TermKey, VarName, VarKey, VarValue, PairStrat, S>,
+        + Clone + Union + Intersect<PS>,
+    S: TermSystem<VarKey, VarValue, TermKey> + Visited<VS> + Universe<VS>,
+    E: StrategicExtension<VarKey, VarValue, TermKey, VarName, VS, VarStrat, PairStrat, S>,
 {
     fn get_strategy(
         &self,
@@ -223,40 +242,36 @@ where
         strategy: &PairStrat,
         system: &S,
     ) -> PairStrat {
-        let new_strat = strategy.clone();
-        new_strat
-            .into_iter()
-            .filter_map(|StrategyItem(_, (x, y))| {
-                if x == y && assignment.get_assignment(&x) != system.evaluate(x, assignment) {
-                    Some(StrategyItem(StrategyWeight::Num(0), (x, y)))
-                } else if x != y {
-                    let y_term_key = system.definition(y);
-                    let weight = self
-                        .extension
-                        .strategic_extend(x, y_term_key, assignment, strategy, system);
-                    //dbg!(weight);
-                    weight.map(|w| StrategyItem(w, (x, y)))
-                } else {
-                    None
-                }
-            })
-            .collect()
+        let visited = system.visited();
+        let unvisited = system.universe().without(&visited);
+        let unvisited_dep = strategy.clone().intersect(&system.universe().cartesian(&unvisited));
+
+        let term_dep: PairStrat = visited
+            .copied_iter()
+            .flat_map(|y| {
+                 self.extension.depends(system.definition(y), assignment, strategy, system).into_iter().map(move |StrategyItem(w, x)| if x != y {
+                    StrategyItem(w, (x, y))
+                } else if assignment.get_assignment(&x) != system.evaluate(x, assignment) {
+                    StrategyItem(StrategyWeight::Num(0), (x,y))
+                    } else {
+                    StrategyItem(StrategyWeight::Infinity, (x,y))
+                    }
+                )
+            }).collect();
+        term_dep.union(unvisited_dep)
     }
 }
 
 impl<
-    TermKey: Hash + Copy,
-    VarName: Hash + Eq + Clone,
-    VarKey: Copy + Eq + Hash,
-    VarValue: Bottom + Clone,
-    PairStrat: Strategy<(VarKey, VarKey)>
-        + FromIterator<StrategyItem<(VarKey, VarKey)>>
-        + IntoIterator<Item = StrategyItem<(VarKey, VarKey)>>
-        + GetWeight<(VarKey, VarKey)>
-        + Clone,
-    S: TermSystem<VarKey, VarValue, TermKey>,
-    E: StrategicExtension<TermKey, VarName, VarKey, VarValue, PairStrat, S>,
-> From<E> for StrategicExtensionOracle<TermKey, VarName, VarKey, VarValue, PairStrat, S, E>
+    VarKey,
+    VarValue,
+    TermKey,
+    VarName,
+    VS,
+    PairStrat,
+    S,
+    E,
+> From<E> for StrategicExtensionOracle<VarKey, VarValue, TermKey, VarName, VS, PairStrat, S, E>
 {
     fn from(extension: E) -> Self {
         Self {
@@ -265,3 +280,52 @@ impl<
         }
     }
 }
+
+//Without
+//  + Cartesian<Output = PairStrat>
+//  + Diagonal<Output = PairStrat>
+//  + for<'a> CopiedIter<'a, VarKey> + Debug,
+//let new_strat = strategy.clone();
+//new_strat
+//    .into_iter()
+//    .filter_map(|StrategyItem(_, (x, y))| {
+//        if x == y && assignment.get_assignment(&x) != system.evaluate(x, assignment) {
+//            Some(StrategyItem(StrategyWeight::Num(0), (x, y)))
+//        } else if x != y {
+//            let y_term_key = system.definition(y);
+//            let weight = self
+//                .extension
+//                .strategic_extend(x, y_term_key, assignment, strategy, system);
+//            weight.map(|w| StrategyItem(w, (x, y)))
+//        } else {
+//            // Throws wrong stuff out and makes the big sad happen :c
+//            None
+//        }
+//    })
+//    .collect()
+
+//let unvisited = system.universe().without(&visited);
+//let unvisited_dep = system.universe().cartesian(&unvisited);
+//let self_dep: PS = visited.diagonal();
+//let term_dep = visited.copied_iter().map(|var| {
+//    let deps = self
+//        .extension
+//        .depends(system.definition(var), assignment, possible, system);
+//    (deps, var)
+//});
+//let term_dep = PS::from_rights(term_dep);
+
+//self_dep.union(unvisited_dep).union(term_dep)
+/*
+new_strategy
+    .into_iter()
+    .filter_map(|StrategyItem(_, (x, y))| {
+        if x == y && assignment.get_assignment(&x) != system.evaluate(x, assignment) {
+            Some(StrategyItem(StrategyWeight::Num(0), (x, y)))
+        } else if x != y {
+            Some((new_strategy.GetWeight(x,y), (x,y)))
+        } else {
+            None
+        }
+    })
+    .collect()*/

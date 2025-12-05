@@ -1,6 +1,5 @@
 use crate::{
-    Intersect,
-    ordered::strategy::{GetWeight, ResetWeights},
+    ordered::strategy::{GetWeight, ResetWeights}, CopiedIter, Intersect, Union
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -9,7 +8,7 @@ use std::{
 
 use crate::ordered::strategy::{
     Domain, IntersectBy, LeftSliced, Length, Retain, RightSliced, Singleton, SliceLeft, SliceRight,
-    Strategy, StrategyItem, StrategyWeight,
+    Strategy, StrategyItem, StrategyWeight, UnionWithBy,
 };
 
 /// A strategy that only builds the heap when the minimum item needs to be extracted
@@ -104,6 +103,36 @@ impl<T: Hash + Eq + Copy, H: FromIterator<StrategyItem<T>> + Strategy<T>> Inters
     }
 }
 
+impl<T: Eq + Hash, H> Union for LazyHeap<T, H> {
+    fn union(mut self, other: Self) -> Self {
+        self.items_mut().extend(other.items);
+        self
+    }
+}
+
+impl<T: Eq + Hash + Copy, H: FromIterator<StrategyItem<T>> + Strategy<T>> UnionWithBy<T, Self>
+    for LazyHeap<T, H>
+{
+    fn union_with_by(
+        &mut self,
+        mut other: Self,
+        f: impl Fn(StrategyWeight, StrategyWeight) -> StrategyWeight,
+    ) {
+        let mut to_add = Vec::new();
+        self.items_mut().retain(|v, w| {
+            other.items.remove(v).is_none_or(|w_other| {
+                to_add.push(StrategyItem(f(*w, w_other), *v));
+                false
+            })
+        });
+        self.extend(
+            to_add
+                .into_iter()
+                .chain(other.items.iter().map(|(v, w)| StrategyItem(*w, *v))),
+        );
+    }
+}
+
 impl<T: Hash + Eq, H> Singleton<T> for LazyHeap<T, H> {
     fn singleton(x: T) -> Self {
         Self {
@@ -130,11 +159,11 @@ impl<
     PH: FromIterator<StrategyItem<(T, U)>> + Strategy<(T, U)> + RightSliced<T, U, SlicedRight = TH>,
 > SliceRight<T, U, LazyHeap<T, TH>> for LazyHeap<(T, U), PH>
 {
-    fn slice_right(self, right: U) -> LazyHeap<T, TH> {
+    fn slice_right(&self, right: U) -> LazyHeap<T, TH> {
         let items = self
             .items
-            .into_iter()
-            .filter_map(|((t, u), w)| if u == right { Some((t, w)) } else { None })
+            .iter()
+            .filter_map(|((t, u), w)| if *u == right { Some((*t, *w)) } else { None })
             .collect();
         LazyHeap { items, heap: None }
     }
@@ -157,11 +186,11 @@ impl<
     PH: FromIterator<StrategyItem<(T, U)>> + Strategy<(T, U)> + LeftSliced<T, U, SlicedLeft = UH>,
 > SliceLeft<T, U, LazyHeap<U, UH>> for LazyHeap<(T, U), PH>
 {
-    fn slice_left(self, left: T) -> LazyHeap<U, UH> {
+    fn slice_left(&self, left: T) -> LazyHeap<U, UH> {
         let items = self
             .items
-            .into_iter()
-            .filter_map(|((t, u), w)| if t == left { Some((u, w)) } else { None })
+            .iter()
+            .filter_map(|((t, u), w)| if *t == left { Some((*u, *w)) } else { None })
             .collect();
         LazyHeap { items, heap: None }
     }
@@ -194,6 +223,14 @@ impl<T: Hash + Eq, H> Extend<StrategyItem<T>> for LazyHeap<T, H> {
     fn extend<I: IntoIterator<Item = StrategyItem<T>>>(&mut self, iter: I) {
         self.items_mut()
             .extend(iter.into_iter().map(|StrategyItem(w, v)| (v, w)));
+    }
+}
+
+impl<'a, T: Copy + 'a, H: 'a> CopiedIter<'a, StrategyItem<T>> for LazyHeap<T, H> {
+    type IterCopied = impl Iterator<Item = StrategyItem<T>>;
+
+    fn copied_iter(&'a self) -> Self::IterCopied {
+        self.items.iter().map(|(v, w)| StrategyItem(*w, *v))
     }
 }
 
