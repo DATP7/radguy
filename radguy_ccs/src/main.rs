@@ -9,7 +9,8 @@ use radguy::{
         self,
         oracle::{
             DependencyCountOracle, InverseDependencyCountOracle, SiblingsOracle, SiblingsOracleInv,
-            StrategicArgumentsOracle, StrategicLocalOracle, ToConstant, ToOrdered,
+            StrategicArgumentsOracle, StrategicLocalOracle, StrategicNonStuckOracle, ToConstant,
+            ToOrdered,
         },
         strategy::{BinaryHeapStrategy, StrategyWeight},
     },
@@ -81,6 +82,26 @@ fn create_csv() -> std::io::Result<PathBuf> {
     Ok(new_file_path)
 }
 
+macro_rules! weak_bisim_system_ordered_composed_unordered {
+    ($file_path:expr, $name:ident, $left:expr, $right:expr => $ccs:expr, [$($strategic_oracle:expr),*]) => {
+        $(
+            weak_bisim_system_ordered! {
+                $file_path, $name, $left, $right => $ccs,
+                BoolExtension::bitset().as_oracle().ordered().then($strategic_oracle.clone()),
+                SMax::bitset().then(BoolExtension::bitset().as_oracle()).ordered().then($strategic_oracle.clone()),
+                LocalMaxR::bitset().then(BoolExtension::bitset().as_oracle()).ordered().then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().and(SMax::bitset()).ordered().then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().and(LocalMaxR::bitset()).ordered().then($strategic_oracle.clone()),
+                SMax::bitset().ordered().then($strategic_oracle.clone()),
+                LocalMaxR::bitset().ordered().then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().ordered().then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().then(SMax::bitset()).ordered().then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().then(LocalMaxR::bitset()).ordered().then($strategic_oracle.clone()),
+            }
+        )*
+    }
+}
+
 macro_rules! weak_bisim_oracles {
     ($file_path:expr, $($name:ident: $left:expr, $right:expr => $ccs:expr;)*) => {
         $({
@@ -104,50 +125,6 @@ macro_rules! weak_bisim_oracles {
             IdentityOracle::bitset().ordered(),
             TrivialOracle::bitset().ordered(),
 
-            BoolExtension::bitset().as_oracle().ordered().then(SiblingsOracleInv),
-            SMax::bitset().then(BoolExtension::bitset().as_oracle()).ordered().then(SiblingsOracleInv),
-            LocalMaxR::bitset().then(BoolExtension::bitset().as_oracle()).ordered().then(SiblingsOracleInv),
-            ArgumentsOracle::bitset().and(SMax::bitset()).ordered().then(SiblingsOracleInv),
-            ArgumentsOracle::bitset().and(LocalMaxR::bitset()).ordered().then(SiblingsOracleInv),
-            SMax::bitset().ordered().then(SiblingsOracleInv),
-            LocalMaxR::bitset().ordered().then(SiblingsOracleInv),
-            ArgumentsOracle::bitset().ordered().then(SiblingsOracleInv),
-            ArgumentsOracle::bitset().then(SMax::bitset()).ordered().then(SiblingsOracleInv),
-            ArgumentsOracle::bitset().then(LocalMaxR::bitset()).ordered().then(SiblingsOracleInv),
-
-            BoolExtension::bitset().as_oracle().ordered().then(DependencyCountOracle::default()),
-            SMax::bitset().then(BoolExtension::bitset().as_oracle()).ordered().then(DependencyCountOracle::default()),
-            LocalMaxR::bitset().then(BoolExtension::bitset().as_oracle()).ordered().then(DependencyCountOracle::default()),
-            ArgumentsOracle::bitset().and(SMax::bitset()).ordered().then(DependencyCountOracle::default()),
-            ArgumentsOracle::bitset().and(LocalMaxR::bitset()).ordered().then(DependencyCountOracle::default()),
-            SMax::bitset().ordered().then(DependencyCountOracle::default()),
-            LocalMaxR::bitset().ordered().then(DependencyCountOracle::default()),
-            ArgumentsOracle::bitset().ordered().then(DependencyCountOracle::default()),
-            ArgumentsOracle::bitset().then(SMax::bitset()).ordered().then(DependencyCountOracle::default()),
-            ArgumentsOracle::bitset().then(LocalMaxR::bitset()).ordered().then(DependencyCountOracle::default()),
-
-            BoolExtension::bitset().as_oracle().ordered().then(InverseDependencyCountOracle::default()),
-            SMax::bitset().then(BoolExtension::bitset().as_oracle()).ordered().then(InverseDependencyCountOracle::default()),
-            LocalMaxR::bitset().then(BoolExtension::bitset().as_oracle()).ordered().then(InverseDependencyCountOracle::default()),
-            ArgumentsOracle::bitset().and(SMax::bitset()).ordered().then(InverseDependencyCountOracle::default()),
-            ArgumentsOracle::bitset().and(LocalMaxR::bitset()).ordered().then(InverseDependencyCountOracle::default()),
-            SMax::bitset().ordered().then(InverseDependencyCountOracle::default()),
-            LocalMaxR::bitset().ordered().then(InverseDependencyCountOracle::default()),
-            ArgumentsOracle::bitset().ordered().then(InverseDependencyCountOracle::default()),
-            ArgumentsOracle::bitset().then(SMax::bitset()).ordered().then(InverseDependencyCountOracle::default()),
-            ArgumentsOracle::bitset().then(LocalMaxR::bitset()).ordered().then(InverseDependencyCountOracle::default()),
-
-            BoolExtension::bitset().as_oracle().ordered().then(SiblingsOracle),
-            SMax::bitset().then(BoolExtension::bitset().as_oracle()).ordered().then(SiblingsOracle),
-            LocalMaxR::bitset().then(BoolExtension::bitset().as_oracle()).ordered().then(SiblingsOracle),
-            ArgumentsOracle::bitset().and(SMax::bitset()).ordered().then(SiblingsOracle),
-            ArgumentsOracle::bitset().and(LocalMaxR::bitset()).ordered().then(SiblingsOracle),
-            SMax::bitset().ordered().then(SiblingsOracle),
-            LocalMaxR::bitset().ordered().then(SiblingsOracle),
-            ArgumentsOracle::bitset().ordered().then(SiblingsOracle),
-            ArgumentsOracle::bitset().then(SMax::bitset()).ordered().then(SiblingsOracle),
-            ArgumentsOracle::bitset().then(LocalMaxR::bitset()).ordered().then(SiblingsOracle),
-
             StrategicArgumentsOracle::default(),
             SMax::bitset().ordered(),
             SMax::bitset().constant(StrategyWeight::Infinity),
@@ -162,6 +139,17 @@ macro_rules! weak_bisim_oracles {
             DependencyCountOracle::default().and_by(BoolExtension::bitset().as_oracle().ordered(), std::cmp::min),
             InverseDependencyCountOracle::default().and_by(BoolExtension::bitset().as_oracle().ordered(), std::cmp::min),
         }
+
+         weak_bisim_system_ordered_composed_unordered!(
+            $file_path, $name, $left, $right => $ccs,
+            [
+                SiblingsOracle,
+                SiblingsOracleInv,
+                DependencyCountOracle::default(),
+                InverseDependencyCountOracle::default(),
+                StrategicNonStuckOracle::bitset()
+            ]
+        );
         })*
     };
 }
@@ -203,6 +191,26 @@ fn generate_weak_ccs_system(
     )
 }
 
+macro_rules! wctl_system_ordered_composed_unordered {
+    ($file_path:expr, $name:ident: $proc:expr, $formula:expr => $wccs:expr, [$($strategic_oracle:expr),*]) => {
+        $(
+            wctl_system_ordered! {
+                $file_path, $name: $proc, $formula => $wccs,
+                WeightedDepOracle::bitset().ordered().then($strategic_oracle.clone()),
+                SMax::bitset().then(WeightedDepOracle::bitset()).ordered().then($strategic_oracle.clone()),
+                LocalMaxR::bitset().then(WeightedDepOracle::bitset()).ordered().then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().and(SMax::bitset()).ordered().then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().and(LocalMaxR::bitset()).ordered().then($strategic_oracle.clone()),
+                SMax::bitset().ordered().then($strategic_oracle.clone()),
+                LocalMaxR::bitset().ordered().then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().ordered().then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().then(SMax::bitset()).ordered().then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().then(LocalMaxR::bitset()).ordered().then($strategic_oracle.clone()),
+            }
+        )*
+    }
+}
+
 macro_rules! wctl_oracles {
     ($file_path:expr, $($name:ident: $proc:expr, $formula:expr => $wccs:expr;)*) => {
         $({
@@ -226,50 +234,6 @@ macro_rules! wctl_oracles {
             IdentityOracle::bitset().ordered(),
             TrivialOracle::bitset().ordered(),
 
-            WeightedDepOracle::bitset().ordered().then(SiblingsOracleInv),
-            SMax::bitset().then(WeightedDepOracle::bitset()).ordered().then(SiblingsOracleInv),
-            LocalMaxR::bitset().then(WeightedDepOracle::bitset()).ordered().then(SiblingsOracleInv),
-            ArgumentsOracle::bitset().and(SMax::bitset()).ordered().then(SiblingsOracleInv),
-            ArgumentsOracle::bitset().and(LocalMaxR::bitset()).ordered().then(SiblingsOracleInv),
-            SMax::bitset().ordered().then(SiblingsOracleInv),
-            LocalMaxR::bitset().ordered().then(SiblingsOracleInv),
-            ArgumentsOracle::bitset().ordered().then(SiblingsOracleInv),
-            ArgumentsOracle::bitset().then(SMax::bitset()).ordered().then(SiblingsOracleInv),
-            ArgumentsOracle::bitset().then(LocalMaxR::bitset()).ordered().then(SiblingsOracleInv),
-
-            WeightedDepOracle::bitset().ordered().then(DependencyCountOracle::default()),
-            SMax::bitset().then(WeightedDepOracle::bitset()).ordered().then(DependencyCountOracle::default()),
-            LocalMaxR::bitset().then(WeightedDepOracle::bitset()).ordered().then(DependencyCountOracle::default()),
-            ArgumentsOracle::bitset().and(SMax::bitset()).ordered().then(DependencyCountOracle::default()),
-            ArgumentsOracle::bitset().and(LocalMaxR::bitset()).ordered().then(DependencyCountOracle::default()),
-            SMax::bitset().ordered().then(DependencyCountOracle::default()),
-            LocalMaxR::bitset().ordered().then(DependencyCountOracle::default()),
-            ArgumentsOracle::bitset().ordered().then(DependencyCountOracle::default()),
-            ArgumentsOracle::bitset().then(SMax::bitset()).ordered().then(DependencyCountOracle::default()),
-            ArgumentsOracle::bitset().then(LocalMaxR::bitset()).ordered().then(DependencyCountOracle::default()),
-
-            WeightedDepOracle::bitset().ordered().then(InverseDependencyCountOracle::default()),
-            SMax::bitset().then(WeightedDepOracle::bitset()).ordered().then(InverseDependencyCountOracle::default()),
-            LocalMaxR::bitset().then(WeightedDepOracle::bitset()).ordered().then(InverseDependencyCountOracle::default()),
-            ArgumentsOracle::bitset().and(SMax::bitset()).ordered().then(InverseDependencyCountOracle::default()),
-            ArgumentsOracle::bitset().and(LocalMaxR::bitset()).ordered().then(InverseDependencyCountOracle::default()),
-            SMax::bitset().ordered().then(InverseDependencyCountOracle::default()),
-            LocalMaxR::bitset().ordered().then(InverseDependencyCountOracle::default()),
-            ArgumentsOracle::bitset().ordered().then(InverseDependencyCountOracle::default()),
-            ArgumentsOracle::bitset().then(SMax::bitset()).ordered().then(InverseDependencyCountOracle::default()),
-            ArgumentsOracle::bitset().then(LocalMaxR::bitset()).ordered().then(InverseDependencyCountOracle::default()),
-
-            WeightedDepOracle::bitset().ordered().then(SiblingsOracle),
-            SMax::bitset().then(WeightedDepOracle::bitset()).ordered().then(SiblingsOracle),
-            LocalMaxR::bitset().then(WeightedDepOracle::bitset()).ordered().then(SiblingsOracle),
-            ArgumentsOracle::bitset().and(SMax::bitset()).ordered().then(SiblingsOracle),
-            ArgumentsOracle::bitset().and(LocalMaxR::bitset()).ordered().then(SiblingsOracle),
-            SMax::bitset().ordered().then(SiblingsOracle),
-            LocalMaxR::bitset().ordered().then(SiblingsOracle),
-            ArgumentsOracle::bitset().ordered().then(SiblingsOracle),
-            ArgumentsOracle::bitset().then(SMax::bitset()).ordered().then(SiblingsOracle),
-            ArgumentsOracle::bitset().then(LocalMaxR::bitset()).ordered().then(SiblingsOracle),
-
             StrategicArgumentsOracle::default(),
             SMax::bitset().ordered(),
             SMax::bitset().constant(StrategyWeight::Infinity),
@@ -285,6 +249,17 @@ macro_rules! wctl_oracles {
             DependencyCountOracle::default().and_by(WeightedDepOracle::bitset().ordered(), std::cmp::min),
             InverseDependencyCountOracle::default().and_by(WeightedDepOracle::bitset().ordered(), std::cmp::min),
         }
+
+        wctl_system_ordered_composed_unordered!(
+            $file_path, $name: $proc, $formula => $wccs,
+            [
+                SiblingsOracle,
+                SiblingsOracleInv,
+                DependencyCountOracle::default(),
+                InverseDependencyCountOracle::default(),
+                StrategicNonStuckOracle::bitset()
+            ]
+        );
         })*
     };
 }
