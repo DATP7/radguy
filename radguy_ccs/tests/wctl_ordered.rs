@@ -113,8 +113,11 @@ macro_rules! wctl_test_oracles_strategy {
                     "Ring", "EF leader" => true
                     in include_str!("../systems/wccs/LeaderElection2.wccs");
 
+                    semaphore_3_5_fail: $oracle, $strategy_type, "System", "EF critical_section > 3" => false in include_str!("../systems/wccs/Semaphore_3_5.wccs");
+                    semaphore_3_5_succ: $oracle, $strategy_type, "System", "EF critical_section == 3" => true in include_str!("../systems/wccs/Semaphore_3_5.wccs");
+
                     #ignore("too slow") bit_protocol: $oracle, $strategy_type, "System", "EF[<= 35] delivered == 7" => true in include_str!("../systems/wccs/BitProtocol(B5M7).wccs");
-                    #ignore("too slow") client_server: $oracle, $strategy_type,
+                    client_server: $oracle, $strategy_type,
                         "System", "E True U[<=10] (A True U[<=1] failed)" => true,
                         "System", "E True U[<=8] delivered" => true,
                         "System", "E True U[<=5] failed" => true,

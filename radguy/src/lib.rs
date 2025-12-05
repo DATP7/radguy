@@ -15,6 +15,11 @@ pub mod oracle;
 pub mod ordered;
 pub mod set;
 
+pub trait Extract<T> {
+    /// Extracts an arbitrary element from the set and removes it.
+    fn extract(&mut self) -> Option<T>;
+}
+
 pub trait Set<T> {
     fn contains(&self, item: &T) -> bool;
     fn insert(&mut self, item: T) -> bool;
@@ -328,6 +333,7 @@ pub fn kleene_local<
     V: Eq + PartialOrd + Bottom + Clone,
     VS: Set<K>
         + Intersect
+        + Extract<K>
         + Default
         + Cartesian<HashSet<K>, Output = PS>
         + Cartesian<Output = PS>
@@ -353,10 +359,9 @@ where
         todo.insert(target);
     }
 
-    let mut iter = todo.copied_iter();
     let mut variable_iterations = 0;
     let mut oracle_iterations = 0;
-    while let Some(x) = iter.next() {
+    while let Some(x) = todo.extract() {
         debug_assert!(discovered.contains(&x), "discovered should contain {x:?}");
         variable_iterations += 1;
         let evaluated = system.evaluate(x, &assignment);
@@ -378,12 +383,7 @@ where
             rel = rel.union(axa).union(axd).union(dxa);
             discovered = system.universe();
 
-            // we need to drop iter because it holds a borrow to todo, meaning todo can't be
-            // reassigned while iter lives
-            drop(iter);
-
             todo = local_dependencies(target, &assignment, oracle, system, &mut rel);
-            iter = todo.copied_iter();
         }
     }
 
@@ -431,5 +431,17 @@ pub trait Bottom: PartialOrd {
 impl Bottom for bool {
     fn bottom() -> Self {
         false
+    }
+}
+
+impl<T: Clone + Eq + Hash, S: ::std::hash::BuildHasher> Extract<T> for HashSet<T, S> {
+    fn extract(&mut self) -> Option<T> {
+        self.iter().next().cloned().map_or_else(
+            || None,
+            |value| {
+                self.remove(&value);
+                Some(value)
+            },
+        )
     }
 }

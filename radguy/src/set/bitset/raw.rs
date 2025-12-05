@@ -20,6 +20,13 @@ pub trait SetMethods {
     fn last_one(&self) -> usize;
 }
 
+impl RawBitSet<FixedBitSet> {
+    /// Get a reference to the underlying bitset
+    pub fn remove(&mut self, index: usize) {
+        self.bitset.remove(index);
+    }
+}
+
 impl SetMethods for RawBitSet<FixedBitSet> {
     fn full(count: usize) -> Self {
         let iter = std::iter::repeat(usize::MAX);
@@ -96,10 +103,6 @@ impl Set<usize> for RawBitSet<FixedBitSet> {
 
     fn len(&self) -> usize {
         self.bitset.count_ones(..)
-    }
-
-    fn is_empty(&self) -> bool {
-        self.bitset.is_clear()
     }
 }
 
@@ -230,5 +233,21 @@ impl IntoIterator for RawBitSet<FixedBitSet> {
         // bits, all set to 1, so `ones` will emit `0..64`.
         let len = self.bitset.len();
         self.bitset.into_ones().filter(move |i| *i < len)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn full_to_empty() {
+        let mut s = RawBitSet::<FixedBitSet>::full(3);
+        assert_eq!(s.len(), 3);
+        s.remove(0);
+        s.remove(1);
+        s.remove(2);
+        assert!(s.len() == 0);
+        assert!(s.is_empty());
     }
 }

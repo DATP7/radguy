@@ -8,11 +8,13 @@ use fixedbitset::FixedBitSet;
 pub use relation::{BitsetRelation, BitsetRelationOrder, DEFAULT_RELATION_ORDER};
 
 use crate::{
-    CopiedIter, Diagonal, DifferenceWith, Intersect, IntersectWith, Set, Union, UnionWith, Without,
-    arena::Key,
+    CopiedIter, Diagonal, DifferenceWith, Extract, Intersect, IntersectWith, Set, Union, UnionWith,
+    Without, arena::Key,
 };
 
 use self::raw::RawBitSet;
+
+use rand::Rng;
 
 #[derive(Clone)]
 pub struct BitSet<K, S = FixedBitSet> {
@@ -27,6 +29,21 @@ impl<K, S> BitSet<K, S> {
         S: Default,
     {
         Self::default()
+    }
+}
+
+impl<K: Key> Extract<K> for BitSet<K, FixedBitSet> {
+    fn extract(&mut self) -> Option<K> {
+        if self.is_empty() {
+            return None;
+        }
+        let random_index = rand::rng().random_range(0..self.len());
+        let removed = self
+            .copied_iter()
+            .nth(random_index)
+            .expect("Should not be empty");
+        self.bitset.remove(removed.index());
+        Some(removed)
     }
 }
 
