@@ -11,7 +11,7 @@ use radguy::{
     },
 };
 use radguy_ccs::systems::bool::extension::BoolExtension;
-use radguy_ccs::systems::bool::extension::StrategicBoolExtension;
+use radguy_ccs::systems::bool::strategic_extension::StrategicBoolExtension;
 
 pub mod systems;
 

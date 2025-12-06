@@ -85,6 +85,7 @@ impl<T: Hash + Eq, H> Intersect<HashSet<T>> for LazyHeap<T, H> {
         self
     }
 }
+
 impl<T: Hash + Eq + Copy, H: FromIterator<StrategyItem<T>> + Strategy<T>> IntersectBy<T>
     for LazyHeap<T, H>
 {
