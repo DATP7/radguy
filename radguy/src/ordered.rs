@@ -15,7 +15,7 @@ pub mod strategy;
 #[expect(clippy::similar_names)]
 pub fn kleene_local<
     VarKey: Copy + Eq + Debug + Hash,
-    VarValue: PartialOrd + Bottom + Copy + std::fmt::Debug,
+    VarValue: PartialOrd + Bottom + Copy + Debug,
     VarStrategy: Strategy<VarKey> + Intersect<HashSet<VarKey>> + Singleton<VarKey> + Debug,
     PairStrat: Strategy<(VarKey, VarKey)>
         + Clone
@@ -51,7 +51,7 @@ where
     if (&strategy).into_iter().next().is_none() {
         strategy = PairStrat::singleton((target, target));
     }
-    let mut todo = strategy.slice_right(dbg!(target)).intersect(&discovered);
+    let mut todo = strategy.slice_right(target).intersect(&discovered);
 
     let mut iterations = 0;
     while let Some(x) = todo.extract_min() {

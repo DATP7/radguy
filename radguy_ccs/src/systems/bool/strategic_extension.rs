@@ -1,7 +1,7 @@
 use std::{
     cmp::min,
     collections::{HashMap, HashSet},
-    fmt::Debug,
+    fmt::{Debug, Display},
     hash::Hash,
     marker::PhantomData,
     ops::Add,
@@ -20,7 +20,7 @@ use radguy::{
 
 use crate::systems::bool::{BoolSystem, BoolTerm};
 
-#[derive(Default, Clone)]
+#[derive(Default)]
 pub struct StrategicBoolExtension<VS>(PhantomData<VS>);
 
 #[expect(
@@ -115,5 +115,26 @@ where
                 ret
             }
         }
+    }
+}
+
+impl<VS> Clone for StrategicBoolExtension<VS> {
+    fn clone(&self) -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<VarKey, S> Display
+    for StrategicBoolExtension<HashSet<VarKey, S>>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "StrategicBool:hashset")
+    }
+}
+
+impl<VarKey> Display 
+    for StrategicBoolExtension<BitSet<VarKey>>{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "StrategicBool:bitset")
     }
 }
