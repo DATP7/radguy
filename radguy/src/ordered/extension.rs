@@ -6,7 +6,9 @@ use crate::{
     extension::TermSystem,
     ordered::{
         oracle::StrategicLocalOracle,
-        strategy::{GetWeight, Strategy, StrategyItem, StrategyWeight, UnionWithBy},
+        strategy::{
+            GetWeight, HashMapStrategy, Strategy, StrategyItem, StrategyWeight, UnionWithBy,
+        },
     },
 };
 
@@ -48,17 +50,25 @@ where
         + Without
         + Cartesian<Output = PS>
         + Diagonal,
-    VarStrat:
-        for<'a> CopiedIter<'a, StrategyItem<VarKey>> + IntoIterator<Item = StrategyItem<VarKey>>,
     PairStrat: Strategy<(VarKey, VarKey)>
         + FromIterator<StrategyItem<(VarKey, VarKey)>>
+        + for<'a> CopiedIter<'a, StrategyItem<(VarKey, VarKey)>>
         + GetWeight<(VarKey, VarKey)>
         + Clone
         + Union
         + Intersect<PS>
         + UnionWithBy<(VarKey, VarKey)>,
     S: TermSystem<VarKey, VarValue, TermKey> + Visited<VS> + Universe<VS>,
-    E: StrategicExtension<VarKey, VarValue, TermKey, VarName, VS, VarStrat, PairStrat, S>,
+    E: StrategicExtension<
+            VarKey,
+            VarValue,
+            TermKey,
+            VarName,
+            VS,
+            HashMapStrategy<VarKey>,
+            HashMapStrategy<(VarKey, VarKey)>,
+            S,
+        >,
 {
     fn get_strategy(
         &self,
@@ -83,11 +93,13 @@ where
             })
             .collect();
 
+        let map: HashMapStrategy<_> = strategy.copied_iter().collect();
+
         let term_dep: PairStrat = visited
             .copied_iter()
             .flat_map(|y| {
                 self.extension
-                    .depends(system.definition(y), assignment, strategy, system)
+                    .depends(system.definition(y), assignment, &map, system)
                     .into_iter()
                     .map(move |StrategyItem(w, x)| StrategyItem(w, (x, y)))
             })

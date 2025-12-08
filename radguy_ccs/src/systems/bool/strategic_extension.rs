@@ -13,7 +13,7 @@ use radguy::{
     extension::TermSystem,
     ordered::{
         extension::{StrategicExtension, StrategicExtensionOracle},
-        strategy::{Strategy, StrategyItem, StrategyWeight, UnionWithBy},
+        strategy::{HashMapStrategy, Strategy, StrategyItem, StrategyWeight, UnionWithBy},
     },
     set::bitset::BitSet,
 };
@@ -43,12 +43,9 @@ impl<K> StrategicBoolExtension<BitSet<K>> {
 
 impl<VS> StrategicBoolExtension<VS> {
     #[must_use]
-    pub fn as_oracle<K, V, T, N, VarStrat, PairStrat, S>(
+    pub fn as_oracle<K, V, T, N, S>(
         self,
-    ) -> StrategicExtensionOracle<K, V, T, N, VS, VarStrat, PairStrat, S>
-    where
-        StrategicExtensionOracle<K, V, T, N, VS, VarStrat, PairStrat, S>: From<Self>,
-    {
+    ) -> StrategicExtensionOracle<K, V, T, N, VS, HashMapStrategy<K>, S, Self> {
         self.into()
     }
 }
