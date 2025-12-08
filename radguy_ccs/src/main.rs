@@ -15,6 +15,9 @@ use radguy::{
         strategy::{BinaryHeapStrategy, StrategyWeight},
     },
 };
+
+use crate::ordered::strategy::LazyHeap;
+
 use radguy_ccs::systems::{
     bool::extension::BoolExtension,
     ccs::{
@@ -140,7 +143,7 @@ macro_rules! weak_bisim_oracles {
             InverseDependencyCountOracle::default().and_by(BoolExtension::bitset().as_oracle().ordered(), std::cmp::min),
         }
 
-         weak_bisim_system_ordered_composed_unordered!(
+        weak_bisim_system_ordered_composed_unordered!(
             $file_path, $name, $left, $right => $ccs,
             [
                 SiblingsOracle,
@@ -380,8 +383,12 @@ fn run_ordered_kleene<
         + PairUniverse<HashSet<(VarKey, VarKey)>>
         + Clone
         + Send,
-    O: StrategicLocalOracle<VarKey, VarValue, BinaryHeapStrategy<(VarKey, VarKey)>, S>
-        + Display
+    O: StrategicLocalOracle<
+            VarKey,
+            VarValue,
+            LazyHeap<(VarKey, VarKey), BinaryHeapStrategy<(VarKey, VarKey)>>,
+            S,
+        > + Display
         + Clone
         + Send,
 >(
@@ -408,12 +415,13 @@ fn run_ordered_kleene<
     let iterations: Vec<_> = pairs
         .into_par_iter()
         .map(|(oracle, mut system)| {
-            let (_, iteration) =
-                ordered::kleene_local::<_, _, BinaryHeapStrategy<_>, BinaryHeapStrategy<_>, _>(
-                    &mut system,
-                    target,
-                    &oracle,
-                );
+            let (_, iteration) = ordered::kleene_local::<
+                _,
+                _,
+                LazyHeap<_, BinaryHeapStrategy<_>>,
+                LazyHeap<_, BinaryHeapStrategy<_>>,
+                _,
+            >(&mut system, target, &oracle);
 
             let c = counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             println!("{c}/{ITERATIONS} finished at {}", chrono::Local::now());
