@@ -1,6 +1,6 @@
-use crate::{ordered::strategy::ResetWeights, CopiedIter, Intersect, Union};
+use crate::{CopiedIter, Intersect, Set, Union, ordered::strategy::ResetWeights};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     hash::Hash,
     ops::{Deref, DerefMut},
 };
@@ -84,8 +84,8 @@ impl<T: Eq + Hash> GetWeight<T> for HashMapStrategy<T> {
     }
 }
 
-impl<T: Eq + Copy + Hash> Intersect<HashSet<T>> for HashMapStrategy<T> {
-    fn intersect(mut self, other: &HashSet<T>) -> Self {
+impl<T: Eq + Copy + Hash, O: Set<T>> Intersect<O> for HashMapStrategy<T> {
+    fn intersect(mut self, other: &O) -> Self {
         self.0.retain(|v, _| other.contains(v));
         self
     }

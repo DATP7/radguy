@@ -8,6 +8,7 @@ use crate::{
 use crate::{Universe, Without};
 use std::{collections::HashSet, fmt::Debug, hash::Hash};
 
+pub mod extension;
 pub mod oracle;
 pub mod strategy;
 
@@ -50,7 +51,7 @@ where
     if (&strategy).into_iter().next().is_none() {
         strategy = PairStrat::singleton((target, target));
     }
-    let mut todo = strategy.clone().slice_right(target).intersect(&discovered);
+    let mut todo = strategy.slice_right(dbg!(target)).intersect(&discovered);
 
     let mut iterations = 0;
     while let Some(x) = todo.extract_min() {
@@ -83,7 +84,7 @@ where
             discovered = system.universe();
             system.lock();
             strategy = oracle.get_strategy(&assignment, &strategy, system);
-            todo = strategy.clone().slice_right(target);
+            todo = strategy.slice_right(target);
             system.unlock();
         }
     }

@@ -14,7 +14,6 @@ pub mod extension;
 pub mod oracle;
 pub mod ordered;
 pub mod set;
-pub mod strategic_extension;
 
 pub trait Set<T> {
     fn contains(&self, item: &T) -> bool;

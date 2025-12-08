@@ -1,27 +1,21 @@
 use std::{
     cmp::min,
-    ops::Add,
-    fmt::Debug,
     collections::{HashMap, HashSet},
+    fmt::Debug,
     hash::Hash,
     marker::PhantomData,
+    ops::Add,
 };
 
 use radguy::{
+    Assignment, Bottom, CopiedIter,
     arena::Key,
     extension::TermSystem,
-    strategic_extension::StrategicExtension,
-    Assignment,
-    ordered::strategy::{
-        StrategyWeight,
-        StrategyItem,
-        UnionWithBy,
-        Strategy
+    ordered::{
+        extension::{StrategicExtension, StrategicExtensionOracle},
+        strategy::{Strategy, StrategyItem, StrategyWeight, UnionWithBy},
     },
-    CopiedIter,
-    strategic_extension::StrategicExtensionOracle,
     set::bitset::BitSet,
-    Bottom,
 };
 
 use crate::systems::bool::{BoolSystem, BoolTerm};
@@ -49,8 +43,12 @@ impl<K> StrategicBoolExtension<BitSet<K>> {
 
 impl<VS> StrategicBoolExtension<VS> {
     #[must_use]
-    pub fn as_oracle<K, V, T, N, VarStrat, PairStrat, S>(self) -> StrategicExtensionOracle<K, V, T, N, VS, VarStrat, PairStrat, S> 
-    where StrategicExtensionOracle<K, V, T, N, VS, VarStrat, PairStrat, S>: From<Self> {
+    pub fn as_oracle<K, V, T, N, VarStrat, PairStrat, S>(
+        self,
+    ) -> StrategicExtensionOracle<K, V, T, N, VS, VarStrat, PairStrat, S>
+    where
+        StrategicExtensionOracle<K, V, T, N, VS, VarStrat, PairStrat, S>: From<Self>,
+    {
         self.into()
     }
 }
@@ -61,7 +59,7 @@ impl<
     TermKey: Hash + Copy + Key,
     VarName: Hash + Copy + Eq,
     VS: for<'a> CopiedIter<'a, VarKey> + Debug,
-    VarStrat: Strategy<VarKey> + Default + UnionWithBy<VarKey>,
+    VarStrat: Strategy<VarKey> + Default + UnionWithBy<VarKey> + Debug,
     PairStrat: Strategy<(VarKey, VarKey)>
         + IntoIterator<Item = StrategyItem<(VarKey, VarKey)>>
         + FromIterator<StrategyItem<(VarKey, VarKey)>>
@@ -93,21 +91,7 @@ where
                 {
                     let mut ret = VarStrat::default();
                     for term in term_keys {
-                        ret.union_with_by(
-                            <Self as StrategicExtension<
-                                VarKey,
-                                VarValue,
-                                TermKey,
-                                VarName,
-                                VS,
-                                VarStrat,
-                                PairStrat,
-                                S,
-                            >>::depends(
-                                self, term, assignment, strategy, system
-                            ),
-                            min,
-                        );
+                        ret.union_with_by(self.depends(term, assignment, strategy, system), min);
                     }
                     ret
                 } else {
@@ -124,18 +108,7 @@ where
                 let mut ret = VarStrat::default();
                 for term in term_keys {
                     ret.union_with_by(
-                        <Self as StrategicExtension<
-                            VarKey,
-                            VarValue,
-                            TermKey,
-                            VarName,
-                            VS,
-                            VarStrat,
-                            PairStrat,
-                            S,
-                        >>::depends(
-                            self, term, assignment, strategy, system
-                        ),
+                        self.depends(term, assignment, strategy, system),
                         StrategyWeight::add,
                     );
                 }
@@ -144,67 +117,3 @@ where
         }
     }
 }
-
-/*
-fn oracle() -> radguy::extension::StrategicExtensionOracle<VarKey, VarValue, TermKey, PairStrat, S, Self>
-where
-    Self: Default,
-{
-    radguy::extension::StrategicExtensionOracle::from(Self::default())
-}*/
-//impl Display for StrategicBoolExtension {
-//    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//        write!(f, "StratBool")
-//    }
-//}
-
-//E: StrategicExtension<VarKey, VarValue, TermKey, VarName, PairStrat, S>,
-//TermKey: Key + Hash + Copy,
-//VarName: Hash + Eq + Copy,
-//VarKey: Key + Eq + Hash + Copy,
-//VarValue: Clone + Bottom + Not<Output = bool>,
-//PairStrat: Strategy<(VarKey, VarKey)>
-//    + FromIterator<StrategyItem<(VarKey, VarKey)>>
-//    + IntoIterator<Item = StrategyItem<(VarKey, VarKey)>>
-//    + GetWeight<(VarKey, VarKey)>
-//    + Clone,
-//S: BoolSystem<VarKey, TermKey, VarName>
-//    + radguy::System<VarKey, VarValue>
-//    + TermSystem<VarKey, VarValue, TermKey>,
-
-/*impl StrategicBoolExtension {
-    #[must_use]
-    pub fn as_oracle<TermKey, VarName, VarKey, VarValue, PairStrat, S, E>(
-        self,
-    ) -> StrategicExtensionOracle<TermKey, VarName, VarKey, VarValue, PairStrat, S, Self>
-    where
-        TermKey: Hash + Copy,
-        VarName: Hash + Eq + Clone,
-        VarKey: Hash + Eq + Copy,
-        VarValue: Bottom + Clone,
-        PairStrat: Strategy<(VarKey, VarKey)>
-            + FromIterator<StrategyItem<(VarKey, VarKey)>>
-            + IntoIterator<Item = StrategyItem<(VarKey, VarKey)>>
-            + GetWeight<(VarKey, VarKey)>
-            + Clone,
-        S: TermSystem<VarKey, VarValue, TermKey>,
-        E: StrategicExtension<TermKey, VarName, VarKey, VarValue, PairStrat, S>,
-        Self: StrategicExtension<TermKey, VarName, VarKey, VarValue, PairStrat, S>,
-    {
-        self.into()
-    }
-}
-
-impl StrategicBoolExtension {
-    #[must_use]
-    pub const fn hashset() -> Self {
-        Self
-    }
-}
-
-impl StrategicBoolExtension {
-    #[must_use]
-    pub const fn bitset() -> Self {
-        Self
-    }
-}*/

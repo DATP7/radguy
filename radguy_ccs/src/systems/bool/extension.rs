@@ -139,4 +139,3 @@ impl<VarKey, TermKey, VarName> Display for BoolExtension<TermKey, VarName, BitSe
         write!(f, "Bool:bitset")
     }
 }
-

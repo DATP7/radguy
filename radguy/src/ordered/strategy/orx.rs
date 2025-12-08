@@ -1,8 +1,8 @@
-use crate::{CopiedIter, Intersect, Union};
+use crate::{CopiedIter, Intersect, Set, Union};
 use std::fmt::Debug;
 use std::{
     cmp::Reverse,
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     hash::Hash,
     marker::PhantomData,
     ops::{Deref, DerefMut},
@@ -55,10 +55,10 @@ impl<T: Clone, H: PriorityQueueDecKey<T, StrategyWeight>> GetWeight<T> for OrxSt
     }
 }
 
-impl<T: Eq + Copy + Hash + Debug, H: PriorityQueueDecKey<T, StrategyWeight> + Debug>
-    Intersect<HashSet<T>> for OrxStrategy<T, H>
+impl<T: Eq + Copy + Hash + Debug, H: PriorityQueueDecKey<T, StrategyWeight> + Debug, O: Set<T>>
+    Intersect<O> for OrxStrategy<T, H>
 {
-    fn intersect(mut self, other: &HashSet<T>) -> Self {
+    fn intersect(mut self, other: &O) -> Self {
         let to_remove: Vec<T> = self
             .0
             .iter()
@@ -284,7 +284,9 @@ impl<T: Copy, H: PriorityQueueDecKey<T, StrategyWeight>> IntoIterator for &OrxSt
     }
 }
 
-impl<'a, T: Copy + 'a, H: PriorityQueueDecKey<T, StrategyWeight> + 'a> CopiedIter<'a, StrategyItem<T>> for OrxStrategy<T, H> {
+impl<'a, T: Copy + 'a, H: PriorityQueueDecKey<T, StrategyWeight> + 'a>
+    CopiedIter<'a, StrategyItem<T>> for OrxStrategy<T, H>
+{
     type IterCopied = impl Iterator<Item = StrategyItem<T>>;
 
     fn copied_iter(&'a self) -> Self::IterCopied {

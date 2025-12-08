@@ -1,7 +1,7 @@
-use crate::{ordered::strategy::ResetWeights, CopiedIter, Intersect, Union};
+use crate::{CopiedIter, Intersect, Set, Union, ordered::strategy::ResetWeights};
 use std::{
     cmp::Reverse,
-    collections::{BinaryHeap, HashMap, HashSet},
+    collections::{BinaryHeap, HashMap},
     hash::Hash,
     ops::{Deref, DerefMut},
 };
@@ -90,8 +90,8 @@ impl<T: Eq + Hash + Copy> GetWeight<T> for BinaryHeapStrategy<T> {
     }
 }
 
-impl<T: Eq + Copy + Hash> Intersect<HashSet<T>> for BinaryHeapStrategy<T> {
-    fn intersect(mut self, other: &HashSet<T>) -> Self {
+impl<T: Eq + Copy + Hash, O: Set<T>> Intersect<O> for BinaryHeapStrategy<T> {
+    fn intersect(mut self, other: &O) -> Self {
         self.0
             .retain(|Reverse(StrategyItem(_, v))| other.contains(v));
         self

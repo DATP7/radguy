@@ -142,4 +142,3 @@ impl<
         write!(f, "E^({})", self.extension)
     }
 }
-

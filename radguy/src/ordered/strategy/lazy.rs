@@ -1,10 +1,8 @@
 use crate::{
-    ordered::strategy::{GetWeight, ResetWeights}, CopiedIter, Intersect, Union
+    CopiedIter, Intersect, Set, Union,
+    ordered::strategy::{GetWeight, ResetWeights},
 };
-use std::{
-    collections::{HashMap, HashSet},
-    hash::Hash,
-};
+use std::{collections::HashMap, hash::Hash};
 
 use crate::ordered::strategy::{
     Domain, IntersectBy, LeftSliced, Length, Retain, RightSliced, Singleton, SliceLeft, SliceRight,
@@ -79,8 +77,8 @@ impl<T: Copy, H> IntoIterator for &LazyHeap<T, H> {
     }
 }
 
-impl<T: Hash + Eq, H> Intersect<HashSet<T>> for LazyHeap<T, H> {
-    fn intersect(mut self, other: &HashSet<T>) -> Self {
+impl<T: Hash + Eq, H, O: Set<T>> Intersect<O> for LazyHeap<T, H> {
+    fn intersect(mut self, other: &O) -> Self {
         self.items_mut().retain(|v, _| other.contains(v));
         self
     }
