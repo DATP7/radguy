@@ -1,4 +1,9 @@
-use std::{collections::HashMap, fmt::{Debug, Display}, hash::Hash, marker::PhantomData};
+use std::{
+    collections::HashMap,
+    fmt::{Debug, Display},
+    hash::Hash,
+    marker::PhantomData,
+};
 
 use crate::{
     Assignment, Bottom, Cartesian, CopiedIter, Diagonal, Intersect, Set, Union, Universe, Visited,
@@ -121,16 +126,8 @@ impl<VarKey, VarValue, TermKey, VarName, VS, PairStrat, S, E> From<E>
     }
 }
 
-impl<
-    VarKey, 
-    VarValue, 
-    TermKey, 
-    VarName, 
-    VS, 
-    VarStrat,
-    S,
-    E: Clone,
-> Clone for StrategicExtensionOracle<VarKey, VarValue, TermKey, VarName, VS, VarStrat, S, E>
+impl<VarKey, VarValue, TermKey, VarName, VS, VarStrat, S, E: Clone> Clone
+    for StrategicExtensionOracle<VarKey, VarValue, TermKey, VarName, VS, VarStrat, S, E>
 {
     fn clone(&self) -> Self {
         Self {
@@ -140,19 +137,10 @@ impl<
     }
 }
 
-impl<
-    VarKey, 
-    VarValue, 
-    TermKey, 
-    VarName, 
-    VS, 
-    VarStrat,
-    S,
-    E: Display,
-> Display for StrategicExtensionOracle<VarKey, VarValue, TermKey, VarName, VS, VarStrat, S, E>
+impl<VarKey, VarValue, TermKey, VarName, VS, VarStrat, S, E: Display> Display
+    for StrategicExtensionOracle<VarKey, VarValue, TermKey, VarName, VS, VarStrat, S, E>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "StratE^({})", self.extension)
     }
 }
-

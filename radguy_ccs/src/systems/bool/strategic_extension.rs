@@ -121,16 +121,13 @@ impl<VS> Clone for StrategicBoolExtension<VS> {
     }
 }
 
-impl<VarKey, S> Display
-    for StrategicBoolExtension<HashSet<VarKey, S>>
-{
+impl<VarKey, S> Display for StrategicBoolExtension<HashSet<VarKey, S>> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "StrategicBool:hashset")
     }
 }
 
-impl<VarKey> Display 
-    for StrategicBoolExtension<BitSet<VarKey>>{
+impl<VarKey> Display for StrategicBoolExtension<BitSet<VarKey>> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "StrategicBool:bitset")
     }

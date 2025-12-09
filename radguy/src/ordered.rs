@@ -15,7 +15,7 @@ pub mod strategy;
 #[expect(clippy::similar_names)]
 pub fn kleene_local<
     VarKey: Copy + Eq + Debug + Hash,
-    VarValue: PartialOrd + Bottom + Copy + Debug,
+    VarValue: PartialOrd + Bottom + Copy,
     VarStrategy: Strategy<VarKey> + Intersect<HashSet<VarKey>> + Singleton<VarKey> + Debug,
     PairStrat: Strategy<(VarKey, VarKey)>
         + Clone
