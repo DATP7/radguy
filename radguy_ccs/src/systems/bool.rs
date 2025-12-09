@@ -14,6 +14,7 @@ use radguy::{
 };
 
 pub mod extension;
+pub mod strategic_extension;
 
 pub trait BoolSystem<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone>:
     TermSystem<V, bool, T>

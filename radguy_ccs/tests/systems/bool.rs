@@ -120,4 +120,11 @@ system_spec! {
         true => y = z;
         true => z = tt;
     };
+    rapport: {
+        true => x = (y || z);
+        true => y = tt;
+        true => z = u;
+        true => u = v;
+        true => v = tt;
+    };
 }

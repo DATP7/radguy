@@ -153,7 +153,7 @@ where
     Self: Sized,
 {
     /// Get a strategy where all values are of the form `(left, x)`
-    fn slice_left(self, left: T) -> S;
+    fn slice_left(&self, left: T) -> S;
 }
 
 pub trait SliceRight<T, U: Eq, S>: Strategy<(T, U)> + RightSliced<T, U, SlicedRight = S>
@@ -161,7 +161,7 @@ where
     Self: Sized,
 {
     /// Get a strategy where all values are of the form `(x, right)`
-    fn slice_right(self, right: U) -> S;
+    fn slice_right(&self, right: U) -> S;
 }
 
 pub trait IntersectBy<T: Eq, Other: Strategy<T> = Self> {
@@ -202,4 +202,12 @@ pub trait ResetWeights {
 
 pub trait GetWeight<T> {
     fn get_weight(&self, element: T) -> Option<StrategyWeight>;
+}
+
+pub trait UnionWithBy<T: Eq, Other: Strategy<T> = Self> {
+    fn union_with_by(
+        &mut self,
+        other: Other,
+        f: impl Fn(StrategyWeight, StrategyWeight) -> StrategyWeight,
+    );
 }

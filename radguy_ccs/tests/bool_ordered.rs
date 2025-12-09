@@ -11,6 +11,7 @@ use radguy::{
     },
 };
 use radguy_ccs::systems::bool::extension::BoolExtension;
+use radguy_ccs::systems::bool::strategic_extension::StrategicBoolExtension;
 
 pub mod systems;
 
@@ -257,4 +258,6 @@ test_oracles_ordered! {
     StrategicNonStuckOracle::hashset(), nonstuck_hashset;
     StrategicNonStuckOracle::bitset().then(SMax::bitset().ordered()), nonstuck_bitset_then_smax;
     StrategicNonStuckOracle::hashset().then(SMax::hashset().ordered()), nonstuck_hashset_then_smax;
+    StrategicBoolExtension::bitset().as_oracle(), strategic_bool_extension_bitset;
+    StrategicBoolExtension::hashset().as_oracle(), strategic_bool_extension_hashset;
 }

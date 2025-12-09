@@ -1,13 +1,13 @@
-use crate::{Intersect, ordered::strategy::ResetWeights};
+use crate::{CopiedIter, Intersect, Set, Union, ordered::strategy::ResetWeights};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     hash::Hash,
     ops::{Deref, DerefMut},
 };
 
 use crate::ordered::strategy::{
     Domain, GetWeight, IntersectBy, LeftSliced, Length, Retain, RightSliced, Singleton, SliceLeft,
-    SliceRight, Strategy, StrategyItem, StrategyWeight,
+    SliceRight, Strategy, StrategyItem, StrategyWeight, UnionWithBy,
 };
 
 #[derive(Default, Clone, Debug)]
@@ -60,6 +60,14 @@ impl<T: Copy> IntoIterator for &HashMapStrategy<T> {
     }
 }
 
+impl<'a, T: Copy + 'a> CopiedIter<'a, StrategyItem<T>> for HashMapStrategy<T> {
+    type IterCopied = impl Iterator<Item = StrategyItem<T>>;
+
+    fn copied_iter(&'a self) -> Self::IterCopied {
+        self.0.iter().map(|(v, w)| StrategyItem(*w, *v))
+    }
+}
+
 impl<T: Copy + Eq + Hash> Strategy<T> for HashMapStrategy<T> {
     fn extract_min(&mut self) -> Option<T> {
         let key = self.0.iter().min_by_key(|(_, w)| **w).map(|(v, _)| *v);
@@ -76,8 +84,8 @@ impl<T: Eq + Hash> GetWeight<T> for HashMapStrategy<T> {
     }
 }
 
-impl<T: Eq + Copy + Hash> Intersect<HashSet<T>> for HashMapStrategy<T> {
-    fn intersect(mut self, other: &HashSet<T>) -> Self {
+impl<T: Eq + Copy + Hash, O: Set<T>> Intersect<O> for HashMapStrategy<T> {
+    fn intersect(mut self, other: &O) -> Self {
         self.0.retain(|v, _| other.contains(v));
         self
     }
@@ -96,6 +104,30 @@ impl<T: Eq + Copy + Hash> IntersectBy<T, Self> for HashMapStrategy<T> {
             })
         });
         self
+    }
+}
+
+impl<T: Eq + Hash + Copy> Union for HashMapStrategy<T> {
+    fn union(mut self, other: Self) -> Self {
+        self.0.extend(other.0);
+        self
+    }
+}
+
+impl<T: Eq + Hash + Copy> UnionWithBy<T, Self> for HashMapStrategy<T> {
+    fn union_with_by(
+        &mut self,
+        mut other: Self,
+        f: impl Fn(StrategyWeight, StrategyWeight) -> StrategyWeight,
+    ) {
+        let mut to_add = Vec::new();
+        self.0.retain(|v, w| {
+            other.remove(v).is_none_or(|w_other| {
+                to_add.push(StrategyItem(f(*w, w_other), *v));
+                false
+            })
+        });
+        self.extend(to_add.into_iter().chain(other.iter()));
     }
 }
 
@@ -118,11 +150,11 @@ impl<T: Eq + Hash, U: Copy + Eq + Hash> SliceLeft<T, U, HashMapStrategy<U>>
 where
     (T, U): Copy,
 {
-    fn slice_left(self, left: T) -> HashMapStrategy<U> {
+    fn slice_left(&self, left: T) -> HashMapStrategy<U> {
         let heap = self
             .0
-            .into_iter()
-            .filter_map(|((t, u), v)| if t == left { Some((u, v)) } else { None })
+            .iter()
+            .filter_map(|((t, u), v)| if *t == left { Some((*u, *v)) } else { None })
             .collect();
         HashMapStrategy(heap)
     }
@@ -133,11 +165,11 @@ impl<T: Copy + Hash + Eq, U: Eq + Hash> SliceRight<T, U, HashMapStrategy<T>>
 where
     (T, U): Copy,
 {
-    fn slice_right(self, right: U) -> HashMapStrategy<T> {
+    fn slice_right(&self, right: U) -> HashMapStrategy<T> {
         let heap = self
             .0
-            .into_iter()
-            .filter_map(|((t, u), v)| if u == right { Some((t, v)) } else { None })
+            .iter()
+            .filter_map(|((t, u), v)| if *u == right { Some((*t, *v)) } else { None })
             .collect();
         HashMapStrategy(heap)
     }

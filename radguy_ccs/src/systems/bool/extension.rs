@@ -1,9 +1,9 @@
 use radguy::{
     Assignment, Set, SliceRight, Union, Universe,
-    arena::Key,
     extension::{ExtensionOracle, LocalExtension},
     set::bitset::BitSet,
 };
+
 use std::{
     collections::{HashMap, HashSet},
     fmt::{Debug, Display},
@@ -11,7 +11,7 @@ use std::{
     marker::PhantomData,
 };
 
-use crate::systems::bool::{BoolSystem, BoolTerm};
+use crate::systems::bool::{BoolSystem, BoolTerm, Key};
 
 pub struct BoolExtension<TermKey, VarName, VarSet>(PhantomData<(TermKey, VarName, VarSet)>);
 

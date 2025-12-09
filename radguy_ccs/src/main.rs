@@ -298,7 +298,7 @@ fn run_unordered_kleene<
 
 fn run_ordered_kleene<
     VarKey: Copy + Eq + Debug + Hash + Default + Sync,
-    VarValue: PartialOrd + Bottom + Copy,
+    VarValue: PartialOrd + Bottom + Copy + Debug,
     S: System<VarKey, VarValue>
         + Arguments<VarKey, HashSet<VarKey>>
         + Universe<HashSet<VarKey>>
