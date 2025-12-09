@@ -17,6 +17,7 @@ use radguy::{
 };
 
 use crate::ordered::strategy::LazyHeap;
+use radguy_ccs::systems::bool::strategic_extension::StrategicBoolExtension;
 
 use radguy_ccs::systems::{
     bool::extension::BoolExtension,
@@ -105,6 +106,26 @@ macro_rules! weak_bisim_system_ordered_composed_unordered {
     }
 }
 
+macro_rules! weak_bisim_system_ordered_composed_unordered_const_1 {
+    ($file_path:expr, $name:ident, $left:expr, $right:expr => $ccs:expr, [$($strategic_oracle:expr),*]) => {
+        $(
+            weak_bisim_system_ordered! {
+                $file_path, $name, $left, $right => $ccs,
+                BoolExtension::bitset().as_oracle().constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+                SMax::bitset().then(BoolExtension::bitset().as_oracle()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+                LocalMaxR::bitset().then(BoolExtension::bitset().as_oracle()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().and(SMax::bitset()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().and(LocalMaxR::bitset()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+                SMax::bitset().constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+                LocalMaxR::bitset().constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().then(SMax::bitset()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().then(LocalMaxR::bitset()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+            }
+        )*
+    }
+}
+
 macro_rules! weak_bisim_oracles {
     ($file_path:expr, $($name:ident: $left:expr, $right:expr => $ccs:expr;)*) => {
         $({
@@ -141,16 +162,25 @@ macro_rules! weak_bisim_oracles {
             ArgumentsOracle::bitset().ordered().then(InverseDependencyCountOracle::default()),
             DependencyCountOracle::default().and_by(BoolExtension::bitset().as_oracle().ordered(), std::cmp::min),
             InverseDependencyCountOracle::default().and_by(BoolExtension::bitset().as_oracle().ordered(), std::cmp::min),
+            StrategicArgumentsOracle::default().then(StrategicBoolExtension::bitset().as_oracle()),
         }
 
         weak_bisim_system_ordered_composed_unordered!(
             $file_path, $name, $left, $right => $ccs,
             [
-                SiblingsOracle,
-                SiblingsOracleInv,
                 DependencyCountOracle::default(),
                 InverseDependencyCountOracle::default(),
-                StrategicNonStuckOracle::bitset()
+                StrategicNonStuckOracle::bitset(),
+                StrategicArgumentsOracle::default().then(StrategicBoolExtension::bitset().as_oracle()),
+                DependencyCountOracle::default().then(StrategicBoolExtension::bitset().as_oracle())
+            ]
+        );
+        weak_bisim_system_ordered_composed_unordered_const_1!(
+            $file_path, $name, $left, $right => $ccs,
+            [
+                SiblingsOracle,
+                SiblingsOracleInv,
+                StrategicBoolExtension::bitset().as_oracle()
             ]
         );
         })*
@@ -214,6 +244,26 @@ macro_rules! wctl_system_ordered_composed_unordered {
     }
 }
 
+macro_rules! wctl_system_ordered_composed_unordered_const_1 {
+    ($file_path:expr, $name:ident: $proc:expr, $formula:expr => $wccs:expr, [$($strategic_oracle:expr),*]) => {
+        $(
+            wctl_system_ordered! {
+                $file_path, $name: $proc, $formula => $wccs,
+                WeightedDepOracle::bitset().constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+                SMax::bitset().then(WeightedDepOracle::bitset()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+                LocalMaxR::bitset().then(WeightedDepOracle::bitset()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().and(SMax::bitset()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().and(LocalMaxR::bitset()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+                SMax::bitset().constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+                LocalMaxR::bitset().constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().then(SMax::bitset()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().then(LocalMaxR::bitset()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+            }
+        )*
+    }
+}
+
 macro_rules! wctl_oracles {
     ($file_path:expr, $($name:ident: $proc:expr, $formula:expr => $wccs:expr;)*) => {
         $({
@@ -256,11 +306,17 @@ macro_rules! wctl_oracles {
         wctl_system_ordered_composed_unordered!(
             $file_path, $name: $proc, $formula => $wccs,
             [
-                SiblingsOracle,
-                SiblingsOracleInv,
                 DependencyCountOracle::default(),
                 InverseDependencyCountOracle::default(),
                 StrategicNonStuckOracle::bitset()
+            ]
+        );
+
+        wctl_system_ordered_composed_unordered_const_1!(
+            $file_path, $name: $proc, $formula => $wccs,
+            [
+                SiblingsOracle,
+                SiblingsOracleInv
             ]
         );
         })*
