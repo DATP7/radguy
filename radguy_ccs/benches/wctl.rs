@@ -8,12 +8,16 @@ use radguy::ordered::strategy::HashMapStrategy;
 use radguy::ordered::strategy::OrxStrategy;
 use radguy::{
     kleene_local,
-    oracle::{LocalMaxR, SMax, WeightedDepOracle},
+    oracle::{
+        ArgumentsOracle, IdentityOracle, LocalMaxR, LocalOracle, SMax, TrivialOracle,
+        WeightedDepOracle,
+    },
     ordered::{
         self,
         oracle::{
-            DependencyCountOracle, InverseDependencyCountOracle, SiblingsOracle,
-            StrategicLocalOracle, ToConstant,
+            DependencyCountOracle, InverseDependencyCountOracle, SiblingsOracle, SiblingsOracleInv,
+            StrategicArgumentsOracle, StrategicLocalOracle, StrategicNonStuckOracle, ToConstant,
+            ToOrdered,
         },
         strategy::StrategyWeight,
     },
@@ -125,53 +129,68 @@ macro_rules! wctl_bench_oracles_unordered {
 macro_rules! wctl_bench_problem_ordered {
     ($name:ident: using $c:expr, strategy $s:ty; $sname:literal; bench $process_name:expr, $formula_str:expr => $sat:literal in $wccs:expr) => {
         let wccs = $wccs;
-
         wctl_bench_oracles_ordered! {
             $name: using $c, strategy $s; $sname; bench $process_name, $formula_str => $sat in wccs, with
-            WeightedDepOracle::default().constant(StrategyWeight::Num(1)).then(SiblingsOracle::default()),
-            SMax::hashset().constant(StrategyWeight::Num(1)).then(SiblingsOracle::default()),
-            SMax::hashset().constant(StrategyWeight::Infinity),
-            LocalMaxR::hashset().constant(StrategyWeight::Infinity).then(DependencyCountOracle::default()),
-            LocalMaxR::hashset().constant(StrategyWeight::Infinity).then(InverseDependencyCountOracle::default()),
-            // StrategicArgumentsOracle::default(),
-            // StrategicArgumentsOracle::default().and_by(CountOracle::default(), std::cmp::min),
-            // StrategicArgumentsOracle::default().and_by(InverseCountOracle::default(), std::cmp::min),
-            // CountOracle::default().then(StrategicArgumentsOracle::default()),
-            // InverseCountOracle::default().then(StrategicArgumentsOracle::default()),
-            // StrategicArgumentsOracle::successors().then(CountOracle::default()),
-            // StrategicArgumentsOracle::successors().then(InverseCountOracle::default()),
-            // StrategicArgumentsOracle::successors().and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(CountOracle::default()),
-            // StrategicArgumentsOracle::successors().and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(InverseCountOracle::default()),
-            // StrategicArgumentsOracle::ancestors().then(CountOracle::default()),
-            // StrategicArgumentsOracle::ancestors().then(InverseCountOracle::default()),
-            // StrategicArgumentsOracle::ancestors().and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(CountOracle::default()),
-            // StrategicArgumentsOracle::ancestors().and_by(SMax::default().constant(StrategyWeight::Infinity), std::cmp::min).then(InverseCountOracle::default()),
-        };
-    };
-}
+            IdentityOracle::bitset().ordered(),
+            TrivialOracle::bitset().ordered(),
 
-macro_rules! wctl_bench_suite_problem {
-    ($name:ident: using $c:expr, $process_name:expr, $formula_str:expr => $sat:literal in $wccs:expr) => {
-        let wccs = $wccs;
-        wctl_bench_oracles_unordered!($name: using $c, bench $process_name, $formula_str => $sat in wccs, with
-            SMax::bitset(),
-            SMax::hashset(),
-            LocalMaxR::bitset(),
-            LocalMaxR::hashset(),
-            WeightedDepOracle::default(),
-            // ArgumentsOracle::default(),
-            // ArgumentsOracle::default().then(SMax::default()),
-            // ArgumentsOracle::default().then(LocalMaxR::default()),
-            // ArgumentsOracle::default().and(SMax::default()),
-            // ArgumentsOracle::default().and(LocalMaxR::default()),
-            // BoolExtension::oracle(),
-            // SMax::default().then(BoolExtension::oracle()),
-            // LocalMaxR::default().then(BoolExtension::oracle()),
+            SMax::bitset().ordered(),
+            SMax::bitset().ordered().and_by(StrategicNonStuckOracle::bitset(), std::cmp::min),
+            SMax::bitset().ordered().and_by(StrategicNonStuckOracle::bitset(), std::cmp::max),
+            SMax::bitset().constant(StrategyWeight::Infinity),
+            SMax::bitset().constant(StrategyWeight::Infinity).and_by(StrategicNonStuckOracle::bitset(), std::cmp::min),
+            SMax::bitset().constant(StrategyWeight::Infinity).and_by(StrategicNonStuckOracle::bitset(), std::cmp::max),
+            StrategicArgumentsOracle::default(),
+            StrategicArgumentsOracle::default().and_by(StrategicNonStuckOracle::bitset(), std::cmp::min),
+            StrategicArgumentsOracle::default().and_by(StrategicNonStuckOracle::bitset(), std::cmp::max),
+            StrategicArgumentsOracle::default().and_by(SMax::bitset().ordered(), std::cmp::min),
+            StrategicArgumentsOracle::default().and_by(SMax::bitset().ordered(), std::cmp::min).and_by(StrategicNonStuckOracle::bitset(), std::cmp::min),
+            StrategicArgumentsOracle::default().and_by(SMax::bitset().ordered(), std::cmp::min).and_by(StrategicNonStuckOracle::bitset(), std::cmp::max),
+            StrategicArgumentsOracle::default().then(SMax::bitset().ordered()),
+            StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by(StrategicNonStuckOracle::bitset(), std::cmp::min),
+            StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by(StrategicNonStuckOracle::bitset(), std::cmp::max),
+            StrategicArgumentsOracle::default().then(LocalMaxR::bitset().ordered()),
+            StrategicArgumentsOracle::default().then(LocalMaxR::bitset().ordered()).and_by(StrategicNonStuckOracle::bitset(), std::cmp::min),
+            StrategicArgumentsOracle::default().then(LocalMaxR::bitset().ordered()).and_by(StrategicNonStuckOracle::bitset(), std::cmp::max),
+            StrategicArgumentsOracle::default().then(WeightedDepOracle::bitset().ordered()),
+            StrategicArgumentsOracle::default().then(WeightedDepOracle::bitset().ordered()).and_by(StrategicNonStuckOracle::bitset(), std::cmp::min),
+            StrategicArgumentsOracle::default().then(WeightedDepOracle::bitset().ordered()).and_by(StrategicNonStuckOracle::bitset(), std::cmp::max),
+            StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by(DependencyCountOracle::default(), std::cmp::min),
+            StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by(DependencyCountOracle::default(), std::cmp::min).and_by(StrategicNonStuckOracle::bitset(), std::cmp::min),
+            StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by(DependencyCountOracle::default(), std::cmp::min).and_by(StrategicNonStuckOracle::bitset(), std::cmp::max),
+            StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by(InverseDependencyCountOracle::default(), std::cmp::min),
+            StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by(InverseDependencyCountOracle::default(), std::cmp::min).and_by(StrategicNonStuckOracle::bitset(), std::cmp::min),
+            StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by(InverseDependencyCountOracle::default(), std::cmp::min).and_by(StrategicNonStuckOracle::bitset(), std::cmp::max),
+            ArgumentsOracle::bitset().ordered().then(DependencyCountOracle::default()),
+            ArgumentsOracle::bitset().ordered().then(DependencyCountOracle::default()).and_by(StrategicNonStuckOracle::bitset(), std::cmp::min),
+            ArgumentsOracle::bitset().ordered().then(DependencyCountOracle::default()).and_by(StrategicNonStuckOracle::bitset(), std::cmp::max),
+            ArgumentsOracle::bitset().ordered().then(InverseDependencyCountOracle::default()),
+            ArgumentsOracle::bitset().ordered().then(InverseDependencyCountOracle::default()).and_by(StrategicNonStuckOracle::bitset(), std::cmp::min),
+            ArgumentsOracle::bitset().ordered().then(InverseDependencyCountOracle::default()).and_by(StrategicNonStuckOracle::bitset(), std::cmp::max),
+            DependencyCountOracle::default().and_by(WeightedDepOracle::bitset().ordered(), std::cmp::min),
+            DependencyCountOracle::default().and_by(WeightedDepOracle::bitset().ordered(), std::cmp::min).and_by(StrategicNonStuckOracle::bitset(), std::cmp::min),
+            DependencyCountOracle::default().and_by(WeightedDepOracle::bitset().ordered(), std::cmp::min).and_by(StrategicNonStuckOracle::bitset(), std::cmp::max),
+            InverseDependencyCountOracle::default().and_by(WeightedDepOracle::bitset().ordered(), std::cmp::min),
+            InverseDependencyCountOracle::default().and_by(WeightedDepOracle::bitset().ordered(), std::cmp::min).and_by(StrategicNonStuckOracle::bitset(), std::cmp::min),
+            InverseDependencyCountOracle::default().and_by(WeightedDepOracle::bitset().ordered(), std::cmp::min).and_by(StrategicNonStuckOracle::bitset(), std::cmp::max),
+        }
+
+        wctl_system_ordered_composed_unordered!(
+            $name: using $c, strategy $s; $sname; bench $process_name, $formula_str => $sat in wccs,
+            [
+                DependencyCountOracle::default(),
+                InverseDependencyCountOracle::default(),
+                StrategicNonStuckOracle::bitset()
+            ]
         );
 
-        wctl_bench_problem_ordered!($name: using $c, strategy BinaryHeapStrategy<_>; "std_binary"; bench $process_name, $formula_str => $sat in wccs);
-        wctl_bench_problem_ordered!($name: using $c, strategy HashMapStrategy<_>; "hashmap"; bench $process_name, $formula_str => $sat in wccs);
-        wctl_bench_problem_ordered!($name: using $c, strategy OrxStrategy<_, DaryHeapWithMap<_, _, 4>>; "orx_quad"; bench $process_name, $formula_str => $sat in wccs);
+        wctl_system_ordered_composed_unordered_const_1!(
+            $name: using $c, strategy $s; $sname; bench $process_name, $formula_str => $sat in wccs,
+            [
+                SiblingsOracle,
+                SiblingsOracleInv
+            ]
+        );
     };
 }
 
@@ -179,15 +198,73 @@ macro_rules! wctl_bench_suite {
     ($($name:ident: $process_name:expr, $formula_str:expr => $sat:literal in $wccs:expr;)*) => {
         $(
         fn $name(c: &mut Criterion) {
-            wctl_bench_suite_problem!($name: using c, $process_name, $formula_str => $sat in $wccs);
+            let wccs = $wccs;
+            wctl_bench_oracles_unordered! {
+                $name: using c, bench $process_name, $formula_str => $sat in wccs, with
+                IdentityOracle::bitset(),
+                TrivialOracle::bitset(),
+                WeightedDepOracle::bitset(),
+                SMax::bitset().then(WeightedDepOracle::bitset()),
+                LocalMaxR::bitset().then(WeightedDepOracle::bitset()),
+                ArgumentsOracle::bitset().and(SMax::bitset()),
+                ArgumentsOracle::bitset().and(LocalMaxR::bitset()),
+                SMax::bitset(),
+                LocalMaxR::bitset(),
+                ArgumentsOracle::bitset(),
+                ArgumentsOracle::bitset().then(SMax::bitset()),
+                ArgumentsOracle::bitset().then(LocalMaxR::bitset()),
+            }
+            wctl_bench_problem_ordered!($name: using c, strategy BinaryHeapStrategy<_>; "std_binary"; bench $process_name, $formula_str => $sat in wccs);
+            wctl_bench_problem_ordered!($name: using c, strategy HashMapStrategy<_>; "hashmap"; bench $process_name, $formula_str => $sat in wccs);
+            wctl_bench_problem_ordered!($name: using c, strategy OrxStrategy<_, DaryHeapWithMap<_, _, 4>>; "orx_quad"; bench $process_name, $formula_str => $sat in wccs);
         }
         )*
         criterion_group!(
             name = benches;
-            config = Criterion::default(); //.sample_size(20);
+            config = Criterion::default().sample_size(20).measurement_time(std::time::Duration::from_secs(10));
             targets = $($name),*
         );
     };
+}
+
+macro_rules! wctl_system_ordered_composed_unordered {
+    ($name:ident: using $c:expr, strategy $s:ty; $sname:literal; bench $proc:expr, $formula:expr => $sat:literal in $wccs:expr, [$($strategic_oracle:expr),*]) => {
+        $(
+            wctl_bench_oracles_ordered! {
+                $name: using $c, strategy $s; $sname; bench $proc, $formula => $sat in $wccs, with
+                WeightedDepOracle::bitset().ordered().then($strategic_oracle.clone()),
+                SMax::bitset().then(WeightedDepOracle::bitset()).ordered().then($strategic_oracle.clone()),
+                LocalMaxR::bitset().then(WeightedDepOracle::bitset()).ordered().then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().and(SMax::bitset()).ordered().then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().and(LocalMaxR::bitset()).ordered().then($strategic_oracle.clone()),
+                SMax::bitset().ordered().then($strategic_oracle.clone()),
+                LocalMaxR::bitset().ordered().then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().ordered().then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().then(SMax::bitset()).ordered().then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().then(LocalMaxR::bitset()).ordered().then($strategic_oracle.clone()),
+            }
+        )*
+    }
+}
+
+macro_rules! wctl_system_ordered_composed_unordered_const_1 {
+    ($name:ident: using $c:expr, strategy $s:ty; $sname:literal; bench $proc:expr, $formula:expr => $sat:literal in $wccs:expr, [$($strategic_oracle:expr),*]) => {
+        $(
+            wctl_bench_oracles_ordered! {
+                $name: using $c, strategy $s; $sname; bench $proc, $formula => $sat in $wccs, with
+                WeightedDepOracle::bitset().constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+                SMax::bitset().then(WeightedDepOracle::bitset()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+                LocalMaxR::bitset().then(WeightedDepOracle::bitset()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().and(SMax::bitset()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().and(LocalMaxR::bitset()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+                SMax::bitset().constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+                LocalMaxR::bitset().constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().then(SMax::bitset()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+                ArgumentsOracle::bitset().then(LocalMaxR::bitset()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+            }
+        )*
+    }
 }
 
 wctl_bench_suite! {
