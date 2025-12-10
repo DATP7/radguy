@@ -6,3 +6,8 @@ resolver = "3"
 radguy = {path = "radguy"}
 orx-priority-queue = { git = "https://github.com/TheMagzuz/orx-priority-queue.git" }
 fixedbitset = "0.5.7"
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+panic = "abort"
