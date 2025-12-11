@@ -15,6 +15,9 @@ pub mod oracle;
 pub mod ordered;
 pub mod set;
 
+#[cfg(feature = "timeout")]
+pub const KLEENE_TIMEOUT: chrono::TimeDelta = chrono::TimeDelta::minutes(2);
+
 pub trait Extract<T> {
     /// Extracts an arbitrary element from the set and removes it.
     fn extract(&mut self) -> Option<T>;
@@ -346,7 +349,7 @@ pub fn kleene_local<
     system: &mut S,
     target: K,
     oracle: &impl LocalOracle<K, V, PS, S>,
-) -> (V, (u32, u32))
+) -> Option<(V, (u32, u32))>
 where
     HashSet<K>: Cartesian<Output = HashSet<(K, K)>> + Cartesian<VS, Output = PS> + IsSubset<VS>,
 {
@@ -357,12 +360,19 @@ where
 
     let mut variable_iterations = 0;
     let mut oracle_iterations = 0;
+    #[cfg(feature = "timeout")]
+    let start_time = chrono::Utc::now();
+
     while let Some(x) = todo.extract() {
         debug_assert!(discovered.contains(&x), "discovered should contain {x:?}");
         variable_iterations += 1;
         let evaluated = system.evaluate(x, &assignment);
         let args = system.arguments(x);
         if assignment.get_assignment(&x) != evaluated || !IsSubset::is_subset(&args, &discovered) {
+            #[cfg(feature = "timeout")]
+            if (chrono::Utc::now() - start_time) >= KLEENE_TIMEOUT {
+                return None;
+            }
             oracle_iterations += 1;
             assignment.update_assignment(x, evaluated);
             // At this point `rel` is D x D with some elements pruned by oracles
@@ -383,10 +393,10 @@ where
         }
     }
 
-    (
+    Some((
         assignment.get_assignment(&target),
         (variable_iterations, oracle_iterations),
-    )
+    ))
 }
 
 fn local_dependencies<

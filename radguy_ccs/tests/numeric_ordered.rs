@@ -31,7 +31,8 @@ macro_rules! test_oracle_system_strategy_numerical_fast {
                             &mut system,
                             start,
                             &$oracle,
-                        );
+                        )
+                        .expect("kleene should not time out");
                     assert_eq!(result, goal, "{var} did not have the expected value");
                 }
             }
@@ -54,7 +55,8 @@ macro_rules! test_oracle_system_strategy_numerical_fast {
                             &mut system,
                             start,
                             &$oracle,
-                        );
+                        )
+                        .expect("kleene should not time out");
                     assert_eq!(result, goal, "{var} did not have the expected value");
                 }
             }
@@ -82,7 +84,8 @@ macro_rules! test_oracle_system_strategy_numerical_slow {
                             &mut system,
                             start,
                             &$oracle,
-                        );
+                        )
+                        .expect("kleene should not time out");
                     assert_eq!(result, goal, "{var} did not have the expected value");
                 }
             }
@@ -106,7 +109,8 @@ macro_rules! test_oracle_system_strategy_numerical_slow {
                             &mut system,
                             start,
                             &$oracle,
-                        );
+                        )
+                        .expect("kleene should not time out");
                     assert_eq!(result, goal, "{var} did not have the expected value");
                 }
             }

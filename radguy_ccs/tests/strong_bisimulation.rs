@@ -21,7 +21,7 @@ macro_rules! strong_bisim_test {
 
 
                     let oracle = SMax::bitset();
-                    let (result, _) = kleene_local(&mut sys, start, &oracle);
+                    let (result, _) = kleene_local(&mut sys, start, &oracle).expect("kleene should not time out");
                     assert_eq!($eq, !result, "{} and {} should{} be bisimilar in{}", $left, $right, if !$eq { " not" } else {""}, $ccs);
                 }
             )*

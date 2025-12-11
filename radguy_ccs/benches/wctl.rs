@@ -22,6 +22,20 @@ use radguy::{
         strategy::StrategyWeight,
     },
 };
+use std::{fs::OpenOptions, io::Write, path::Path};
+
+const SKIPPED_PATH: &str = "wctl_skipped_benches.txt";
+
+fn append_skipped(record: &str) {
+    let mut file = OpenOptions::new()
+        .append(true)
+        .open(Path::new(SKIPPED_PATH))
+        .expect("File should be created before this function call");
+
+    if let Err(e) = writeln!(file, "{record}") {
+        panic!("Couldn't write to file: {e}");
+    }
+}
 
 use radguy_ccs::systems::numeric::Number;
 use radguy_ccs::systems::wccs;
@@ -48,7 +62,7 @@ macro_rules! wctl_bench_oracles_ordered {
         let mut group = $c.benchmark_group(stringify!($name));
         $(
         {
-
+            let mut skipped = false;
             let oracle = $oracle;
             group.bench_with_input(BenchmarkId::new("ordered", format!("{}/{}", $sname, &oracle)), &oracle, |b, o| {
                 b.iter_batched(
@@ -56,9 +70,16 @@ macro_rules! wctl_bench_oracles_ordered {
                         (sys.clone(), (*o).clone())
                     },
                     |(mut sys, o)| {
+                        if skipped {
+                            return;
+                        }
                         let process_key = sys.get_process_definition($process_name).expect("Process name should be bound");
                         let target = sys.get_var(process_key, formula_key);
-                        let (result, _) = ordered::kleene_local::<_, _, $s, $s, _>(&mut sys, target, &o);
+                        let Some((result, _)) = ordered::kleene_local::<_, _, $s, $s, _>(&mut sys, target, &o) else {
+                            skipped = true;
+                            append_skipped(&format!("{}/ordered/{}/{}", stringify!($name), $sname, &o));
+                            return;
+                        };
                         assert_eq!(
                             $sat,
                             result == Number::Val(0),
@@ -97,6 +118,7 @@ macro_rules! wctl_bench_oracles_unordered {
                 let sys = WCTLSystem::<usize, usize, usize, usize, usize>::new(wccs_system);
 
                 let formula_key = sys.insert_ast_formula(formula.clone());
+                let mut skipped = false;
                 let oracle = $oracle;
                 group.bench_with_input(BenchmarkId::new("unordered", &oracle), &oracle, |b, o| {
                     b.iter_batched(
@@ -104,9 +126,16 @@ macro_rules! wctl_bench_oracles_unordered {
                             (sys.clone(), (*o).clone())
                         },
                         |(mut sys, o)| {
+                            if skipped {
+                                return;
+                            }
                             let process_key = sys.get_process_definition($process_name).expect("Process name should be bound");
                             let target = sys.get_var(process_key, formula_key);
-                            let (result, _) = kleene_local(&mut sys, target, &o);
+                            let Some((result, _)) = kleene_local(&mut sys, target, &o) else {
+                                skipped = true;
+                                append_skipped(&format!("{}/unordered/{}", stringify!($name), &o));
+                                return;
+                            };
                             assert_eq!(
                                 $sat,
                                 result == Number::Val(0),
@@ -215,8 +244,9 @@ macro_rules! wctl_bench_suite {
                 ArgumentsOracle::bitset().then(LocalMaxR::bitset()),
             }
             wctl_bench_problem_ordered!($name: using c, strategy BinaryHeapStrategy<_>; "std_binary"; bench $process_name, $formula_str => $sat in wccs);
-            wctl_bench_problem_ordered!($name: using c, strategy HashMapStrategy<_>; "hashmap"; bench $process_name, $formula_str => $sat in wccs);
             wctl_bench_problem_ordered!($name: using c, strategy OrxStrategy<_, DaryHeapWithMap<_, _, 4>>; "orx_quad"; bench $process_name, $formula_str => $sat in wccs);
+            wctl_bench_problem_ordered!($name: using c, strategy LazyHeap<_, BinaryHeapStrategy<_>>; "std_binary_lazy"; bench $process_name, $formula_str => $sat in wccs);
+            wctl_bench_problem_ordered!($name: using c, strategy LazyHeap<_, OrxStrategy<_, DaryHeapWithMap<_, _, 4>>>; "orx_quad_lazy"; bench $process_name, $formula_str => $sat in wccs);
         }
         )*
         criterion_group!(

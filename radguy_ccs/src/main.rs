@@ -449,13 +449,17 @@ fn run_unordered_kleene<
         .collect::<Vec<_>>();
     let iterations: Vec<_> = pairs
         .into_par_iter()
-        .map(|(oracle, mut system)| {
-            let (_, iteration) = kleene_local(&mut system, target, &oracle);
+        .filter_map(|(oracle, mut system)| {
+            let Some((_, iteration)) = kleene_local(&mut system, target, &oracle) else {
+                let c = counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                println!("{c}/{ITERATIONS} skipped at {}", chrono::Local::now());
+                return None;
+            };
 
             let c = counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             println!("{c}/{ITERATIONS} finished at {}", chrono::Local::now());
 
-            iteration
+            Some(iteration)
         })
         .collect();
 
@@ -506,19 +510,23 @@ fn run_ordered_kleene<
         .collect::<Vec<_>>();
     let iterations: Vec<_> = pairs
         .into_par_iter()
-        .map(|(oracle, mut system)| {
-            let (_, iteration) = ordered::kleene_local::<
+        .filter_map(|(oracle, mut system)| {
+            let Some((_, iteration)) = ordered::kleene_local::<
                 _,
                 _,
                 LazyHeap<_, BinaryHeapStrategy<_>>,
                 LazyHeap<_, BinaryHeapStrategy<_>>,
                 _,
-            >(&mut system, target, &oracle);
+            >(&mut system, target, &oracle) else {
+                let c = counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                println!("{c}/{ITERATIONS} skipped at {}", chrono::Local::now());
+                return None;
+            };
 
             let c = counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             println!("{c}/{ITERATIONS} finished at {}", chrono::Local::now());
 
-            iteration
+            Some(iteration)
         })
         .collect();
 

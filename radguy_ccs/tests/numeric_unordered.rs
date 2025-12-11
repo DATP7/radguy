@@ -18,7 +18,7 @@ macro_rules! test_numerical_oracle_system_unordered {
                     } = $crate::systems::numeric::$spec();
                     for (var, goal) in variables.into_iter().zip(goal.into_iter()) {
                         let start = system.names.get_or_insert_key(var);
-                        let (result, _) = ::radguy::kleene_local(&mut system, start, &$oracle);
+                        let (result, _) = ::radguy::kleene_local(&mut system, start, &$oracle).expect("kleene should not time out");
                         assert_eq!(result, goal, "{var} did not have the expected value");
                     }
                 }
@@ -32,7 +32,7 @@ macro_rules! test_numerical_oracle_system_unordered {
                     let mut system: radguy_ccs::systems::numeric::numeric_system::LazyNumericSystem<_,_,_> = system.into();
                     for (var, goal) in variables.into_iter().zip(goal.into_iter()) {
                         let start = system.init_target(var);
-                        let (result, _) =::radguy::kleene_local(&mut system, start, &$oracle);
+                        let (result, _) =::radguy::kleene_local(&mut system, start, &$oracle).expect("kleene should not time out");
                         assert_eq!(result, goal, "{var} did not have the expected value");
                     }
                 }

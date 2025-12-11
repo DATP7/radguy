@@ -31,7 +31,7 @@ macro_rules! weak_bisim_test_fast {
                 let mut sys = BisimulationSystem::<usize, usize, usize, WeakTransitionSystem<usize>>::new(weak_transition_system);
                 let start = sys.specify_comparison($left, $right);
 
-                let (result, _) = kleene_local::<_, _, $strategy_type, $strategy_type, _>(&mut sys, start, &$oracle);
+                let (result, _) = kleene_local::<_, _, $strategy_type, $strategy_type, _>(&mut sys, start, &$oracle).expect("kleene should not time out");
                 assert_eq!($eq, !result, "{} and {} should{} be bisimilar in{}", $left, $right, if !$eq { " not" } else {""}, $ccs);
             }
         )*
@@ -55,7 +55,7 @@ macro_rules! weak_bisim_test_slow {
                 let mut sys = BisimulationSystem::<usize, usize, usize, WeakTransitionSystem<usize>>::new(weak_transition_system);
                 let start = sys.specify_comparison($left, $right);
 
-                let (result, _) = kleene_local::<_, _, $strategy_type, $strategy_type, _>(&mut sys, start, &$oracle);
+                let (result, _) = kleene_local::<_, _, $strategy_type, $strategy_type, _>(&mut sys, start, &$oracle).expect("kleene should not time out");
                 assert_eq!($eq, !result, "{} and {} should{} be bisimilar in{}", $left, $right, if !$eq { " not" } else {""}, $ccs);
             }
         )*

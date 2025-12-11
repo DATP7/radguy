@@ -20,6 +20,20 @@ use radguy_ccs::systems::{
         transition_system::TransitionSystem, weak_transition_system::WeakTransitionSystem,
     },
 };
+use std::{fs::OpenOptions, io::Write, path::Path};
+
+const SKIPPED_PATH: &str = "bisim_skipped_benches.txt";
+
+fn append_skipped(record: &str) {
+    let mut file = OpenOptions::new()
+        .append(true)
+        .open(Path::new(SKIPPED_PATH))
+        .expect("File should be created before this function call");
+
+    if let Err(e) = writeln!(file, "{record}") {
+        panic!("Couldn't write to file: {e}");
+    }
+}
 
 macro_rules! weak_bisim_system_ordered_composed_unordered {
     ($name:ident: using $c:expr, strategy $s:ty; $sname:literal; bench $left:expr, $right:expr => $eq:literal in $ccs:expr, [$($strategic_oracle:expr),*]) => {
@@ -69,6 +83,7 @@ macro_rules! bisim_bench_oracles_ordered {
         $(
         {
             let oracle = $oracle;
+            let mut skipped = false;
             group.bench_with_input(BenchmarkId::new("ordered", format!("{}/{}", $sname, &oracle)), &oracle, |b, o| {
                 b.iter_batched(
                     || {
@@ -77,8 +92,15 @@ macro_rules! bisim_bench_oracles_ordered {
                         (BisimulationSystem::<usize, usize, usize, _>::new(lts), (*o).clone())
                     },
                     |(mut sys, o)| {
+                        if skipped {
+                            return;
+                        }
                         let target = sys.specify_comparison($left, $right);
-                        let (result, _) = ordered::kleene_local::<_, _, $s, $s, _>(&mut sys, target, &o);
+                        let Some((result, _)) = ordered::kleene_local::<_, _, $s, $s, _>(&mut sys, target, &o) else {
+                            skipped = true;
+                            append_skipped(&format!("{}/ordered/{}/{}", stringify!($name), $sname, &o));
+                            return;
+                        };
                         assert_eq!(
                             $eq,
                             !result,
@@ -110,6 +132,7 @@ macro_rules! bisim_bench_oracles_unordered {
         let mut group = $c.benchmark_group(name);
         $(
         {
+            let mut skipped = false;
             let oracle = $oracle;
             group.bench_with_input(BenchmarkId::new("unordered", &oracle), &oracle, |b, o| {
                 b.iter_batched(
@@ -119,8 +142,15 @@ macro_rules! bisim_bench_oracles_unordered {
                         (BisimulationSystem::<usize, usize, usize, _>::new(lts), (*o).clone())
                     },
                     |(mut sys, o)| {
+                        if skipped {
+                            return;
+                        }
                         let target = sys.specify_comparison($left, $right);
-                        let (result, _) = kleene_local(&mut sys, target, &o);
+                        let Some((result, _)) = kleene_local(&mut sys, target, &o) else {
+                            skipped = true;
+                            append_skipped(&format!("{}/unordered/{}", stringify!($name), &o));
+                            return;
+                        };
                         assert_eq!(
                             $eq,
                             !result,

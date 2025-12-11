@@ -23,7 +23,7 @@ macro_rules! test_oracle_system_unordered {
                     } = $crate::systems::bool::$spec();
                     for (var, goal) in variables.into_iter().zip(goal.into_iter()) {
                         let start = system.names.get_or_insert_key(var);
-                        let (result, _) = ::radguy::kleene_local::<_, _, HashSet<_>, HashSet<_>, _>(&mut system, start, &$oracle);
+                        let (result, _) = ::radguy::kleene_local::<_, _, HashSet<_>, HashSet<_>, _>(&mut system, start, &$oracle).expect("kleene should not time out");
                         assert_eq!(result, goal, "{var} did not have the expected value");
                     }
                 }
@@ -38,7 +38,7 @@ macro_rules! test_oracle_system_unordered {
                     let mut system: radguy_ccs::systems::bool::LazyBoolSystem<_,_,_> = system.into();
                     for (var, goal) in variables.into_iter().zip(goal.into_iter()) {
                         let start = system.init_target(var);
-                        let (result, _) = ::radguy::kleene_local::<_, _, HashSet<_>, HashSet<_>, _>(&mut system, start, &$oracle);
+                        let (result, _) = ::radguy::kleene_local::<_, _, HashSet<_>, HashSet<_>, _>(&mut system, start, &$oracle).expect("kleene should not time out");
                         assert_eq!(result, goal, "{var} did not have the expected value");
                     }
                 }
@@ -52,7 +52,7 @@ macro_rules! test_oracle_system_unordered {
                     } = $crate::systems::bool::$spec();
                     for (var, goal) in variables.into_iter().zip(goal.into_iter()) {
                         let start = system.names.get_or_insert_key(var);
-                        let (result, _) = ::radguy::kleene_local::<_, _, BitSet<_>, BitsetRelation<_, _>, _>(&mut system, start, &$oracle);
+                        let (result, _) = ::radguy::kleene_local::<_, _, BitSet<_>, BitsetRelation<_, _>, _>(&mut system, start, &$oracle).expect("kleene should not time out");
                         assert_eq!(result, goal, "{var} did not have the expected value");
                     }
                 }
@@ -67,7 +67,7 @@ macro_rules! test_oracle_system_unordered {
                     let mut system: radguy_ccs::systems::bool::LazyBoolSystem<_,_,_> = system.into();
                     for (var, goal) in variables.into_iter().zip(goal.into_iter()) {
                         let start = system.init_target(var);
-                        let (result, _) = ::radguy::kleene_local::<_, _, BitSet<_>, BitsetRelation<_, _>, _>(&mut system, start, &$oracle);
+                        let (result, _) = ::radguy::kleene_local::<_, _, BitSet<_>, BitsetRelation<_, _>, _>(&mut system, start, &$oracle).expect("kleene should not time out");
                         assert_eq!(result, goal, "{var} did not have the expected value");
                     }
                 }

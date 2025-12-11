@@ -40,7 +40,7 @@ macro_rules! wctl_test_fast {
                     let formula_key = sys.insert_ast_formula(formula.clone());
                     let start = sys.get_var(process_key, formula_key);
 
-                    let (result, _) = ordered::kleene_local::<_, _, $strategy_type, $strategy_type, _>(&mut sys, start, &$oracle);
+                    let (result, _) = ordered::kleene_local::<_, _, $strategy_type, $strategy_type, _>(&mut sys, start, &$oracle).expect("kleene should not time out");
                     assert_eq!($eq, result == Number::Val(0), "{} should{} satisfy {} in {}", $process_name, if !$eq { " not" } else {""}, $formula_str, $wccs);
                 )*
             }
@@ -73,7 +73,7 @@ macro_rules! wctl_test_slow {
                     let formula_key = sys.insert_ast_formula(formula.clone());
                     let start = sys.get_var(process_key, formula_key);
 
-                    let (result, _) = ordered::kleene_local::<_, _, $strategy_type, $strategy_type, _>(&mut sys, start, &$oracle);
+                    let (result, _) = ordered::kleene_local::<_, _, $strategy_type, $strategy_type, _>(&mut sys, start, &$oracle).expect("kleene should not time out");
                     assert_eq!($eq, result == Number::Val(0), "{} should{} satisfy {} in {}", $process_name, if !$eq { " not" } else {""}, $formula_str, $wccs);
                 )*
             }

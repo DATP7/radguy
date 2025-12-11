@@ -33,7 +33,7 @@ pub fn kleene_local<
     system: &mut S,
     target: VarKey,
     oracle: &impl StrategicLocalOracle<VarKey, VarValue, PairStrat, S>,
-) -> (VarValue, (u32, u32))
+) -> Option<(VarValue, (u32, u32))>
 where
     for<'a> &'a PairStrat: IntoIterator<Item = StrategyItem<(VarKey, VarKey)>>,
 {
@@ -50,6 +50,10 @@ where
 
     let mut variable_iterations = 0;
     let mut oracle_iterations = 0;
+
+    #[cfg(feature = "timeout")]
+    let start_time = chrono::Utc::now();
+
     while let Some(x) = todo.extract_min() {
         debug_assert!(discovered.contains(&x), "discovered should contain {x:?}");
         variable_iterations += 1;
@@ -57,6 +61,10 @@ where
         let evaluated = system.evaluate(x, &assignment);
         let args = system.arguments(x);
         if assignment.get_assignment(&x) != evaluated || !args.is_subset(&discovered) {
+            #[cfg(feature = "timeout")]
+            if (chrono::Utc::now() - start_time) >= crate::KLEENE_TIMEOUT {
+                return None;
+            }
             oracle_iterations += 1;
             assignment.update_assignment(x, evaluated);
             // At this point `rel` is D x D with some elements pruned by oracles
@@ -86,8 +94,8 @@ where
         }
     }
 
-    (
+    Some((
         assignment.get_assignment(&target),
         (variable_iterations, oracle_iterations),
-    )
+    ))
 }
