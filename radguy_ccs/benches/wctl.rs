@@ -5,6 +5,7 @@ use criterion::criterion_group;
 use criterion::criterion_main;
 use orx_priority_queue::DaryHeapWithMap;
 use radguy::ordered::strategy::HashMapStrategy;
+use radguy::ordered::strategy::LazyHeap;
 use radguy::ordered::strategy::OrxStrategy;
 use radguy::{
     kleene_local,
