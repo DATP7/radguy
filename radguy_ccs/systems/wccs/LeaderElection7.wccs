@@ -1,0 +1,42 @@
+#### Ring-based Leader Election Protocol
+# This example has processes P1 to P7, each process have several states denoted by process
+# name underscore largest rank received. E.g. P1_2 is P1 in a state where it has received a
+# message with rank 2.
+# Messages are on the form 'm:receiver r:rank'
+P1 := <m7r1!,1>.P1 + <m1r1>.leader:0 + <m1r2>.P1_2 + <m1r3>.P1_3 + <m1r4>.P1_4 + <m1r5>.P1_5 + <m1r6>.P1_6 + <m1r7>.P1_7;
+P1_2 := <m7r2!,1>.P1_2 + <m1r1>.leader:0 + <m1r2>.P1_2 + <m1r3>.P1_3 + <m1r4>.P1_4 + <m1r5>.P1_5 + <m1r6>.P1_6 + <m1r7>.P1_7;
+P1_3 := <m7r3!,1>.P1_3 + <m1r1>.leader:0 + <m1r2>.P1_3 + <m1r3>.P1_3 + <m1r4>.P1_4 + <m1r5>.P1_5 + <m1r6>.P1_6 + <m1r7>.P1_7;
+P1_4 := <m7r4!,1>.P1_4 + <m1r1>.leader:0 + <m1r2>.P1_4 + <m1r3>.P1_4 + <m1r4>.P1_4 + <m1r5>.P1_5 + <m1r6>.P1_6 + <m1r7>.P1_7;
+P1_5 := <m7r5!,1>.P1_5 + <m1r1>.leader:0 + <m1r2>.P1_5 + <m1r3>.P1_5 + <m1r4>.P1_5 + <m1r5>.P1_5 + <m1r6>.P1_6 + <m1r7>.P1_7;
+P1_6 := <m7r6!,1>.P1_6 + <m1r1>.leader:0 + <m1r2>.P1_6 + <m1r3>.P1_6 + <m1r4>.P1_6 + <m1r5>.P1_6 + <m1r6>.P1_6 + <m1r7>.P1_7;
+P1_7 := <m7r7!,1>.P1_7 + <m1r1>.leader:0 + <m1r2>.P1_7 + <m1r3>.P1_7 + <m1r4>.P1_7 + <m1r5>.P1_7 + <m1r6>.P1_7 + <m1r7>.P1_7;
+
+P2 := <m1r2!,1>.P2 + <m2r1>.P2 + <m2r2>.leader:0 + <m2r3>.P2_3 + <m2r4>.P2_4 + <m2r5>.P2_5 + <m2r6>.P2_6 + <m2r7>.P2_7;
+P2_3 := <m1r3!,1>.P2_3 + <m2r2>.leader:0 + <m2r1>.P2_3 + <m2r3>.P2_3 + <m2r4>.P2_4 + <m2r5>.P2_5 + <m2r6>.P2_6 + <m2r7>.P2_7;
+P2_4 := <m1r4!,1>.P2_4 + <m2r2>.leader:0 + <m2r1>.P2_4 + <m2r3>.P2_4 + <m2r4>.P2_4 + <m2r5>.P2_5 + <m2r6>.P2_6 + <m2r7>.P2_7;
+P2_5 := <m1r5!,1>.P2_5 + <m2r2>.leader:0 + <m2r1>.P2_5 + <m2r3>.P2_5 + <m2r4>.P2_5 + <m2r5>.P2_5 + <m2r6>.P2_6 + <m2r7>.P2_7;
+P2_6 := <m1r6!,1>.P2_6 + <m2r2>.leader:0 + <m2r1>.P2_6 + <m2r3>.P2_6 + <m2r4>.P2_6 + <m2r5>.P2_6 + <m2r6>.P2_6 + <m2r7>.P2_7;
+P2_7 := <m1r7!,1>.P2_7 + <m2r2>.leader:0 + <m2r1>.P2_7 + <m2r3>.P2_7 + <m2r4>.P2_7 + <m2r5>.P2_7 + <m2r6>.P2_7 + <m2r7>.P2_7;
+
+P3 := <m2r3!,1>.P3 + <m3r1>.P3 + <m3r2>.P3 + <m3r3>.leader:0 + <m3r4>.P3_4 + <m3r5>.P3_5 + <m3r6>.P3_6 + <m3r7>.P3_7;
+P3_4 := <m2r4!,1>.P3_4 + <m3r3>.leader:0 + <m3r1>.P3_4 + <m3r2>.P3_4 + <m3r4>.P3_4 + <m3r5>.P3_5 + <m3r6>.P3_6 + <m3r7>.P3_7;
+P3_5 := <m2r5!,1>.P3_5 + <m3r3>.leader:0 + <m3r1>.P3_5 + <m3r2>.P3_5 + <m3r4>.P3_5 + <m3r5>.P3_5 + <m3r6>.P3_6 + <m3r7>.P3_7;
+P3_6 := <m2r6!,1>.P3_6 + <m3r3>.leader:0 + <m3r1>.P3_6 + <m3r2>.P3_6 + <m3r4>.P3_6 + <m3r5>.P3_6 + <m3r6>.P3_6 + <m3r7>.P3_7;
+P3_7 := <m2r7!,1>.P3_7 + <m3r3>.leader:0 + <m3r1>.P3_7 + <m3r2>.P3_7 + <m3r4>.P3_7 + <m3r5>.P3_7 + <m3r6>.P3_7 + <m3r7>.P3_7;
+
+P4 := <m3r4!,1>.P4 + <m4r1>.P4 + <m4r2>.P4 + <m4r3>.P4 + <m4r4>.leader:0 + <m4r5>.P4_5 + <m4r6>.P4_6 + <m4r7>.P4_7;
+P4_5 := <m3r5!,1>.P4_5 + <m4r4>.leader:0 + <m4r1>.P4_5 + <m4r2>.P4_5 + <m4r3>.P4_5 + <m4r5>.P4_5 + <m4r6>.P4_6 + <m4r7>.P4_7;
+P4_6 := <m3r6!,1>.P4_6 + <m4r4>.leader:0 + <m4r1>.P4_6 + <m4r2>.P4_6 + <m4r3>.P4_6 + <m4r5>.P4_6 + <m4r6>.P4_6 + <m4r7>.P4_7;
+P4_7 := <m3r7!,1>.P4_7 + <m4r4>.leader:0 + <m4r1>.P4_7 + <m4r2>.P4_7 + <m4r3>.P4_7 + <m4r5>.P4_7 + <m4r6>.P4_7 + <m4r7>.P4_7;
+
+P5 := <m4r5!,1>.P5 + <m5r1>.P5 + <m5r2>.P5 + <m5r3>.P5 + <m5r4>.P5 + <m5r5>.leader:0 + <m5r6>.P5_6 + <m5r7>.P5_7;
+P5_6 := <m4r6!,1>.P5_6 + <m5r5>.leader:0 + <m5r1>.P5_6 + <m5r2>.P5_6 + <m5r3>.P5_6 + <m5r4>.P5_6 + <m5r6>.P5_6 + <m5r7>.P5_7;
+P5_7 := <m4r7!,1>.P5_7 + <m5r5>.leader:0 + <m5r1>.P5_7 + <m5r2>.P5_7 + <m5r3>.P5_7 + <m5r4>.P5_7 + <m5r6>.P5_7 + <m5r7>.P5_7;
+
+P6 := <m5r6!,1>.P6 + <m6r1>.P6 + <m6r2>.P6 + <m6r3>.P6 + <m6r4>.P6 + <m6r5>.P6 + <m6r6>.leader:0 + <m6r7>.P6_7;
+P6_7 := <m5r7!,1>.P6_7 + <m6r6>.leader:0 + <m6r1>.P6_7 + <m6r2>.P6_7 + <m6r3>.P6_7 + <m6r4>.P6_7 + <m6r5>.P6_7 + <m6r7>.P6_7;
+
+P7 := <m6r7!,1>.P7 + <m7r1>.P7 + <m7r2>.P7 + <m7r3>.P7 + <m7r4>.P7 + <m7r5>.P7 + <m7r6>.P7 + <m7r7>.leader:0;
+
+Ring := (P1 | P2 | P3 | P4 | P5 | P6 | P7)
+        \ {m1r1, m1r2, m1r3, m1r4, m1r5, m1r6, m1r7, m2r1, m2r2, m2r3, m2r4, m2r5, m2r6, m2r7, m3r1, m3r2, m3r3, m3r4, m3r5, m3r6, m3r7, m4r1, m4r2, m4r3, m4r4, m4r5, m4r6, m4r7, m5r1, m5r2, m5r3, m5r4, m5r5, m5r6, m5r7, m6r1, m6r2, m6r3, m6r4, m6r5, m6r6, m6r7, m7r1, m7r2, m7r3, m7r4, m7r5, m7r6, m7r7};

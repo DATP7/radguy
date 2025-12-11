@@ -588,8 +588,14 @@ fn main() {
     ";
         leader_election_6: "Ring", "EF leader" => include_str!("../systems/wccs/LeaderElection6.wccs");
         leader_election_neg_6: "Ring", "EF leader > 1" => include_str!("../systems/wccs/LeaderElection6.wccs");
+        leader_election_7: "Ring", "EF leader" => include_str!("../systems/wccs/LeaderElection7.wccs");
+        leader_election_neg_7: "Ring", "EF leader > 1" => include_str!("../systems/wccs/LeaderElection7.wccs");
+        leader_election_8: "Ring", "EF leader" => include_str!("../systems/wccs/LeaderElection8.wccs");
+        leader_election_neg_8: "Ring", "EF leader > 1" => include_str!("../systems/wccs/LeaderElection8.wccs");
         semaphore_3_5_fail: "System", "EF critical_section > 3" => include_str!("../systems/wccs/Semaphore_3_5.wccs");
         semaphore_3_5_succ: "System", "EF critical_section == 3" => include_str!("../systems/wccs/Semaphore_3_5.wccs");
+        semaphore_4_5_fail: "System", "EF critical_section > 4" => include_str!("../systems/wccs/Semaphore_4_5.wccs");
+        semaphore_4_5_succ: "System", "EF critical_section == 4" => include_str!("../systems/wccs/Semaphore_4_5.wccs");
         client_server_failed_5: "System", "E True U[<=5] failed" => include_str!("../systems/wccs/ClientServer.wccs");
         client_server_deliver_7: "System", "E True U[<=8] delivered" => include_str!("../systems/wccs/ClientServer.wccs");
         client_server_big: "System", "E True U[<=10] (A True U[<=1] failed)" => include_str!("../systems/wccs/ClientServer.wccs");

@@ -1,0 +1,20 @@
+#### Semaphore Example
+# In this is example a semaphore with an initial value of 4 ensures that at most 4
+# of 5 parallel threads enter the critical section at the same time.
+# The semaphore has 4 cells, where each cell can be locked and unlocked.
+# The number of cells limits the access to the critical section.
+
+# System consists of a semaphore and a collection of threads
+System     := (Semaphore | Threads) \ {lock, unlock};
+
+# A thread enters its critical section after locking, and exits by unlocking
+Thread     := <lock!>.critical_section:<unlock!>.Thread;
+
+# A semaphore cell (used for building a semaphore)
+Cell       := <lock>.<unlock>.Cell;
+
+# A semaphore with value counted by number of cells
+Semaphore  := Cell | Cell | Cell | Cell;
+
+# Threads is set of parallel threads
+Threads    := Thread | Thread | Thread | Thread | Thread;
