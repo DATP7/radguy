@@ -26,6 +26,7 @@ const SKIPPED_PATH: &str = "bisim_skipped_benches.txt";
 
 fn append_skipped(record: &str) {
     let mut file = OpenOptions::new()
+        .create(true)
         .append(true)
         .open(Path::new(SKIPPED_PATH))
         .expect("File should be created before this function call");
