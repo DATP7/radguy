@@ -135,44 +135,44 @@ macro_rules! wctl_bench_problem_ordered {
             TrivialOracle::bitset().ordered(),
 
             SMax::bitset().ordered(),
-            SMax::bitset().ordered().and_by(StrategicNonStuckOracle::bitset(), std::cmp::min),
-            SMax::bitset().ordered().and_by(StrategicNonStuckOracle::bitset(), std::cmp::max),
+            SMax::bitset().ordered().and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::min, "min"),
+            SMax::bitset().ordered().and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::max, "max"),
             SMax::bitset().constant(StrategyWeight::Infinity),
-            SMax::bitset().constant(StrategyWeight::Infinity).and_by(StrategicNonStuckOracle::bitset(), std::cmp::min),
-            SMax::bitset().constant(StrategyWeight::Infinity).and_by(StrategicNonStuckOracle::bitset(), std::cmp::max),
+            SMax::bitset().constant(StrategyWeight::Infinity).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::min, "min"),
+            SMax::bitset().constant(StrategyWeight::Infinity).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::max, "max"),
             StrategicArgumentsOracle::default(),
-            StrategicArgumentsOracle::default().and_by(StrategicNonStuckOracle::bitset(), std::cmp::min),
-            StrategicArgumentsOracle::default().and_by(StrategicNonStuckOracle::bitset(), std::cmp::max),
+            StrategicArgumentsOracle::default().and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::min, "min"),
+            StrategicArgumentsOracle::default().and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::max, "max"),
             StrategicArgumentsOracle::default().and_by(SMax::bitset().ordered(), std::cmp::min),
-            StrategicArgumentsOracle::default().and_by(SMax::bitset().ordered(), std::cmp::min).and_by(StrategicNonStuckOracle::bitset(), std::cmp::min),
-            StrategicArgumentsOracle::default().and_by(SMax::bitset().ordered(), std::cmp::min).and_by(StrategicNonStuckOracle::bitset(), std::cmp::max),
+            StrategicArgumentsOracle::default().and_by(SMax::bitset().ordered(), std::cmp::min).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::min, "min"),
+            StrategicArgumentsOracle::default().and_by(SMax::bitset().ordered(), std::cmp::min).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::max, "max"),
             StrategicArgumentsOracle::default().then(SMax::bitset().ordered()),
-            StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by(StrategicNonStuckOracle::bitset(), std::cmp::min),
-            StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by(StrategicNonStuckOracle::bitset(), std::cmp::max),
+            StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::min, "min"),
+            StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::max, "max"),
             StrategicArgumentsOracle::default().then(LocalMaxR::bitset().ordered()),
-            StrategicArgumentsOracle::default().then(LocalMaxR::bitset().ordered()).and_by(StrategicNonStuckOracle::bitset(), std::cmp::min),
-            StrategicArgumentsOracle::default().then(LocalMaxR::bitset().ordered()).and_by(StrategicNonStuckOracle::bitset(), std::cmp::max),
+            StrategicArgumentsOracle::default().then(LocalMaxR::bitset().ordered()).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::min, "min"),
+            StrategicArgumentsOracle::default().then(LocalMaxR::bitset().ordered()).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::max, "max"),
             StrategicArgumentsOracle::default().then(WeightedDepOracle::bitset().ordered()),
-            StrategicArgumentsOracle::default().then(WeightedDepOracle::bitset().ordered()).and_by(StrategicNonStuckOracle::bitset(), std::cmp::min),
-            StrategicArgumentsOracle::default().then(WeightedDepOracle::bitset().ordered()).and_by(StrategicNonStuckOracle::bitset(), std::cmp::max),
+            StrategicArgumentsOracle::default().then(WeightedDepOracle::bitset().ordered()).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::min, "min"),
+            StrategicArgumentsOracle::default().then(WeightedDepOracle::bitset().ordered()).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::max, "max"),
             StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by(DependencyCountOracle::default(), std::cmp::min),
-            StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by(DependencyCountOracle::default(), std::cmp::min).and_by(StrategicNonStuckOracle::bitset(), std::cmp::min),
-            StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by(DependencyCountOracle::default(), std::cmp::min).and_by(StrategicNonStuckOracle::bitset(), std::cmp::max),
+            StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by(DependencyCountOracle::default(), std::cmp::min).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::min, "min"),
+            StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by(DependencyCountOracle::default(), std::cmp::min).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::max, "max"),
             StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by(InverseDependencyCountOracle::default(), std::cmp::min),
-            StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by(InverseDependencyCountOracle::default(), std::cmp::min).and_by(StrategicNonStuckOracle::bitset(), std::cmp::min),
-            StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by(InverseDependencyCountOracle::default(), std::cmp::min).and_by(StrategicNonStuckOracle::bitset(), std::cmp::max),
+            StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by(InverseDependencyCountOracle::default(), std::cmp::min).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::min, "min"),
+            StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by(InverseDependencyCountOracle::default(), std::cmp::min).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::max, "max"),
             ArgumentsOracle::bitset().ordered().then(DependencyCountOracle::default()),
-            ArgumentsOracle::bitset().ordered().then(DependencyCountOracle::default()).and_by(StrategicNonStuckOracle::bitset(), std::cmp::min),
-            ArgumentsOracle::bitset().ordered().then(DependencyCountOracle::default()).and_by(StrategicNonStuckOracle::bitset(), std::cmp::max),
+            ArgumentsOracle::bitset().ordered().then(DependencyCountOracle::default()).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::min, "min"),
+            ArgumentsOracle::bitset().ordered().then(DependencyCountOracle::default()).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::max, "max"),
             ArgumentsOracle::bitset().ordered().then(InverseDependencyCountOracle::default()),
-            ArgumentsOracle::bitset().ordered().then(InverseDependencyCountOracle::default()).and_by(StrategicNonStuckOracle::bitset(), std::cmp::min),
-            ArgumentsOracle::bitset().ordered().then(InverseDependencyCountOracle::default()).and_by(StrategicNonStuckOracle::bitset(), std::cmp::max),
+            ArgumentsOracle::bitset().ordered().then(InverseDependencyCountOracle::default()).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::min, "min"),
+            ArgumentsOracle::bitset().ordered().then(InverseDependencyCountOracle::default()).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::max, "max"),
             DependencyCountOracle::default().and_by(WeightedDepOracle::bitset().ordered(), std::cmp::min),
-            DependencyCountOracle::default().and_by(WeightedDepOracle::bitset().ordered(), std::cmp::min).and_by(StrategicNonStuckOracle::bitset(), std::cmp::min),
-            DependencyCountOracle::default().and_by(WeightedDepOracle::bitset().ordered(), std::cmp::min).and_by(StrategicNonStuckOracle::bitset(), std::cmp::max),
+            DependencyCountOracle::default().and_by(WeightedDepOracle::bitset().ordered(), std::cmp::min).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::min, "min"),
+            DependencyCountOracle::default().and_by(WeightedDepOracle::bitset().ordered(), std::cmp::min).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::max, "max"),
             InverseDependencyCountOracle::default().and_by(WeightedDepOracle::bitset().ordered(), std::cmp::min),
-            InverseDependencyCountOracle::default().and_by(WeightedDepOracle::bitset().ordered(), std::cmp::min).and_by(StrategicNonStuckOracle::bitset(), std::cmp::min),
-            InverseDependencyCountOracle::default().and_by(WeightedDepOracle::bitset().ordered(), std::cmp::min).and_by(StrategicNonStuckOracle::bitset(), std::cmp::max),
+            InverseDependencyCountOracle::default().and_by(WeightedDepOracle::bitset().ordered(), std::cmp::min).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::min, "min"),
+            InverseDependencyCountOracle::default().and_by(WeightedDepOracle::bitset().ordered(), std::cmp::min).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::max, "max"),
         }
 
         wctl_system_ordered_composed_unordered!(
@@ -268,36 +268,13 @@ macro_rules! wctl_system_ordered_composed_unordered_const_1 {
 }
 
 wctl_bench_suite! {
-    mower_example:
-        "S0", "A mow U[<=6] dump" => true
-        in r"
-        S0 := mow:(<go,2>.S1 + <go,2>.S2 + <go,2>.S3);
-        S1 := mow:<go,1>.S4;
-        S2 := mow:<go,2>.S4;
-        S3 := mow:<go,1>.S5;
-        S4 := mow:(<go,0>.S5 + <go,1>.S6);
-        S5 := mow:<go,2>.S6;
-        S6 := dump:<go,0>.S6;
-    ";
-    mower_example_neg: "S0", "A mow U[<=4] dump" => false
-        in r"
-        S0 := mow:(<go,2>.S1 + <go,2>.S2 + <go,2>.S3);
-        S1 := mow:<go,1>.S4;
-        S2 := mow:<go,2>.S4;
-        S3 := mow:<go,1>.S5;
-        S4 := mow:(<go,0>.S5 + <go,1>.S6);
-        S5 := mow:<go,2>.S6;
-        S6 := dump:<go,0>.S6;
-    ";
-    proposition: "S", "mow" => true in "S := mow:0;";
-    proposition_multiple: "S", "mow && dump" => true in "S := mow:dump:0;";
-    proposition_multiple_neg: "S", "mow && dump && dud" => false in "S := mow:dump:0;";
-    linear_universal_final: "S", "AF dump" => true in "S := <go>.<go>.<go>.<go>.dump:0;";
-    recursive: "S", "AF dump" => true in "S := <go>.dump:S;";
-    recursive_neg: "S", "AF mow" => false in "S := <go>.dump:S;";
-    compare: "S", "mow == 4" => true in "S := mow:0 + mow:0 + mow:0 + mow:0;";
-    leader_election: "Ring", "EF leader" => true in include_str!("../systems/wccs/LeaderElection2.wccs");
-    leader_election_neg: "Ring", "EF leader > 1" => false in include_str!("../systems/wccs/LeaderElection2.wccs");
+    leader_election_6: "Ring", "EF leader" => true in include_str!("../systems/wccs/LeaderElection6.wccs");
+    leader_election_neg_6: "Ring", "EF leader > 1" => false in include_str!("../systems/wccs/LeaderElection6.wccs");
+    semaphore_3_5_fail: "System", "EF critical_section > 3" => true in include_str!("../systems/wccs/Semaphore_3_5.wccs");
+    semaphore_3_5_succ: "System", "EF critical_section == 3" => false in include_str!("../systems/wccs/Semaphore_3_5.wccs");
+    client_server_failed_5: "System", "E True U[<=5] failed" => true in include_str!("../systems/wccs/ClientServer.wccs");
+    client_server_deliver_7: "System", "E True U[<=8] delivered" => false in include_str!("../systems/wccs/ClientServer.wccs");
+    client_server_big: "System", "E True U[<=10] (A True U[<=1] failed)" => true in include_str!("../systems/wccs/ClientServer.wccs");
 }
 
 criterion_main!(benches);
