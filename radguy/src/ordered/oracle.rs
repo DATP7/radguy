@@ -60,6 +60,30 @@ pub trait StrategicLocalOracle<
             left: self,
             right: other,
             f,
+            name: None,
+            _phantom_data: PhantomData,
+        }
+    }
+
+    #[must_use]
+    fn and_by_with_name<
+        O: StrategicLocalOracle<K, V, PairStrategy, S>,
+        F: Fn(StrategyWeight, StrategyWeight) -> StrategyWeight,
+    >(
+        self,
+        other: O,
+        f: F,
+        name: &'static str,
+    ) -> IntersectByStrategic<K, V, PairStrategy, S, Self, O, F>
+    where
+        Self: std::marker::Sized,
+        PairStrategy: IntersectBy<(K, K)>,
+    {
+        IntersectByStrategic {
+            left: self,
+            right: other,
+            f,
+            name: Some(name),
             _phantom_data: PhantomData,
         }
     }
@@ -263,6 +287,7 @@ pub struct IntersectByStrategic<
 > {
     left: T,
     right: U,
+    name: Option<&'static str>,
     f: F,
     _phantom_data: PhantomData<(K, V, PairStrategy, S)>,
 }
@@ -305,7 +330,13 @@ impl<
 > Display for IntersectByStrategic<K, V, PairStrategy, S, T, U, F>
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "({} ∩_f {})", self.left, self.right)
+        write!(
+            f,
+            "({} ∩_{} {})",
+            self.left,
+            self.name.unwrap_or("f"),
+            self.right
+        )
     }
 }
 
@@ -327,6 +358,7 @@ impl<
             left: self.left.clone(),
             right: self.right.clone(),
             f: self.f.clone(),
+            name: self.name,
             _phantom_data: self._phantom_data,
         }
     }
