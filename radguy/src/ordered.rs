@@ -46,11 +46,6 @@ where
         .map(|(x, y)| StrategyItem::infinite((x, y)));
     strategy.extend(initial_pairs);
     strategy = oracle.get_strategy(&assignment, &strategy, system);
-    // We do this since not all oracle implementations are sound for V=Ø
-    // TODO: Ensure those implementations are also sound.
-    if (&strategy).into_iter().next().is_none() {
-        strategy = PairStrat::singleton((target, target));
-    }
     let mut todo = strategy.slice_right(target).intersect(&discovered);
 
     let mut variable_iterations = 0;

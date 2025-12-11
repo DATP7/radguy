@@ -153,7 +153,7 @@ impl<K> Display for SMax<BitsetRelation<K, K>> {
 // TODO: Make this more general than HashSet
 impl<
     K: Hash + Eq + Copy + Debug,
-    V: Maximal + Bottom + Clone,
+    V: Maximal + Bottom + Clone + Debug,
     S: System<K, V>,
     PS: for<'a> CopiedIter<'a, (K, K)> + FromIterator<(K, K)>,
 > LocalOracle<K, V, PS, S> for SMax<PS>
@@ -511,11 +511,14 @@ impl<
         + Default
         + Clone,
     PS: UnionWith + FromLefts<K, VS> + Default + Clone,
-    S: System<K, V> + Arguments<K, HashSet<K>> + Visited<VS>,
+    S: System<K, V> + Arguments<K, HashSet<K>> + Visited<VS> + PairUniverse<PS>,
 > LocalOracle<K, V, PS, S> for ArgumentsOracle<K, VS, PS>
 {
     fn approximate_flow(&self, _assignment: &HashMap<K, V>, _relation: &PS, system: &S) -> PS {
         let visited = system.visited();
+        if visited.is_empty() {
+            return system.pair_universe();
+        }
         self.get_updated_closure(&visited, system)
     }
 }

@@ -137,6 +137,8 @@ wctl_test_oracles! {
     LocalMaxR::bitset().then(SMax::bitset()), localmaxr_then_smax_bitset;
     LocalMaxR::bitset().then(TrivialOracle::bitset()), localmaxr_then_trivialoracle_bitset;
     ArgumentsOracle::bitset(), arguments_bitset;
+    ArgumentsOracle::bitset().and(SMax::bitset()), args_and_smax_bitset;
+    ArgumentsOracle::bitset().then(SMax::bitset()), args_then_smax_bitset;
     SMax::hashset(), smax_hashset;
     WeightedDepOracle::hashset(), wctl_oracle_hashset;
     TrivialOracle::hashset(), trivialoracle_hashset;
@@ -152,4 +154,6 @@ wctl_test_oracles! {
     LocalMaxR::hashset().then(SMax::hashset()), localmaxr_then_smax_hashset;
     LocalMaxR::hashset().then(TrivialOracle::hashset()), localmaxr_then_trivialoracle_hashset;
     ArgumentsOracle::hashset(), arguments_hashset;
+    ArgumentsOracle::hashset().and(SMax::hashset()), args_and_smax_hashset;
+    ArgumentsOracle::bitset().then(SMax::bitset()), args_then_smax_hashset;
 }

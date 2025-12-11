@@ -405,16 +405,17 @@ fn generate_wctl_system(wccs: &str) -> WCTLSystem<usize, usize, usize, usize, us
 
 fn run_unordered_kleene<
     K: Copy + Hash + Eq + Debug + Sync,
-    V: Eq + PartialOrd + Bottom + Clone,
+    V: Eq + PartialOrd + Bottom + Clone + Debug,
     VS: Set<K>
         + Intersect
         + Extract<K>
         + Default
+        + Debug
         + Cartesian<HashSet<K>, Output = PS>
         + Cartesian<Output = PS>
         + Union<HashSet<K>>
         + for<'a> CopiedIter<'a, K>,
-    PS: Set<(K, K)> + Union + SliceRight<K, K, VS> + Union<HashSet<(K, K)>>,
+    PS: Set<(K, K)> + Union + SliceRight<K, K, VS> + Union<HashSet<(K, K)>> + Debug,
     S: System<K, V>
         + PairUniverse<PS>
         + Arguments<K, HashSet<K>>

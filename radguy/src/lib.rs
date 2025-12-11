@@ -330,16 +330,17 @@ impl<K: Hash + Eq, V: Bottom + Clone, S: std::hash::BuildHasher> Assignment<K, V
 #[expect(clippy::similar_names)]
 pub fn kleene_local<
     K: Copy + Hash + Eq + Debug,
-    V: Eq + PartialOrd + Bottom + Clone,
+    V: Eq + PartialOrd + Bottom + Clone + Debug,
     VS: Set<K>
         + Intersect
         + Extract<K>
         + Default
+        + Debug
         + Cartesian<HashSet<K>, Output = PS>
         + Cartesian<Output = PS>
         + Union<HashSet<K>>
         + for<'a> CopiedIter<'a, K>,
-    PS: Set<(K, K)> + Union + SliceRight<K, K, VS> + Union<HashSet<(K, K)>>,
+    PS: Set<(K, K)> + Union + SliceRight<K, K, VS> + Union<HashSet<(K, K)>> + Debug,
     S: System<K, V> + PairUniverse<PS> + Arguments<K, HashSet<K>> + Universe<VS> + Visited<VS>,
 >(
     system: &mut S,
@@ -353,11 +354,6 @@ where
     let mut discovered = system.universe();
     let mut rel = discovered.cartesian(&discovered);
     let mut todo = local_dependencies(target, &assignment, oracle, system, &mut rel);
-    // HACK: some oracles don't correctly return target in `todo` when visited is empty, so we just
-    // insert it if it isn't there
-    if !todo.contains(&target) {
-        todo.insert(target);
-    }
 
     let mut variable_iterations = 0;
     let mut oracle_iterations = 0;
@@ -397,7 +393,7 @@ fn local_dependencies<
     K: Hash + Copy + Eq,
     V: PartialOrd,
     VS: Set<K> + Intersect + for<'a> CopiedIter<'a, K>,
-    PS: Set<(K, K)> + SliceRight<K, K, VS>,
+    PS: Set<(K, K)> + SliceRight<K, K, VS> + Debug,
     S: System<K, V>,
 >(
     variable: K,

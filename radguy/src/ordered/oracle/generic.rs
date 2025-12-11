@@ -12,8 +12,8 @@ use std::{
 use orx_priority_queue::PriorityQueueDecKey;
 
 use crate::{
-    Arguments, Assignment, Bottom, CopiedIter, DependencyGraphSystem, Set, System, Universe,
-    Visited,
+    Arguments, Assignment, Bottom, CopiedIter, DependencyGraphSystem, PairUniverse, Set, System,
+    Universe, Visited,
     arena::{Key, SecondaryArena},
     ordered::{
         StrategicLocalOracle,
@@ -413,12 +413,27 @@ impl<K: Eq + Copy + Hash + Debug, H: PriorityQueueDecKey<(K, K), StrategyWeight>
 impl<
     K: Eq + Copy + Hash + Debug,
     V: PartialOrd,
-    PS: Strategy<(K, K)> + Retain<(K, K)> + Extend<StrategyItem<(K, K)>> + Clone,
-    S: System<K, V> + Arguments<K, HashSet<K>> + Universe<HashSet<K>> + Visited<HashSet<K>>,
+    PS: Strategy<(K, K)>
+        + Retain<(K, K)>
+        + Extend<StrategyItem<(K, K)>>
+        + Clone
+        + FromIterator<StrategyItem<(K, K)>>,
+    S: System<K, V>
+        + Arguments<K, HashSet<K>>
+        + Universe<HashSet<K>>
+        + Visited<HashSet<K>>
+        + PairUniverse<HashSet<(K, K)>>,
 > StrategicLocalOracle<K, V, PS, S> for StrategicArgumentsOracle<K, PS>
 {
     fn get_strategy(&self, _assignment: &HashMap<K, V>, _strategy: &PS, system: &S) -> PS {
         let visited = system.visited();
+        if visited.is_empty() {
+            return system
+                .pair_universe()
+                .into_iter()
+                .map(StrategyItem::infinite)
+                .collect();
+        }
         self.get_updated_closure_generic(&visited, system)
     }
 }
@@ -427,8 +442,12 @@ impl<
 impl<
     K: Eq + Copy + Hash + Debug,
     V: PartialOrd,
-    H: PriorityQueueDecKey<(K, K), StrategyWeight> + Clone + Debug,
-    S: System<K, V> + Arguments<K, HashSet<K>> + Universe<HashSet<K>> + Visited<HashSet<K>>,
+    H: PriorityQueueDecKey<(K, K), StrategyWeight> + Clone + Debug + Default,
+    S: System<K, V>
+        + Arguments<K, HashSet<K>>
+        + Universe<HashSet<K>>
+        + Visited<HashSet<K>>
+        + PairUniverse<HashSet<(K, K)>>,
 > StrategicLocalOracle<K, V, OrxStrategy<(K, K), H>, S>
     for StrategicArgumentsOracle<K, OrxStrategy<(K, K), H>>
 {
@@ -439,6 +458,13 @@ impl<
         system: &S,
     ) -> OrxStrategy<(K, K), H> {
         let visited = system.visited();
+        if visited.is_empty() {
+            return system
+                .pair_universe()
+                .into_iter()
+                .map(StrategyItem::infinite)
+                .collect();
+        }
         self.get_updated_closure_orx(&visited, system)
     }
 }

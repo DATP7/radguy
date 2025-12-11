@@ -129,4 +129,6 @@ test_oracles_unordered! {
     SMax::default().and(ExtensionOracle::from(BoolExtension::default())), smax_and_bool_extension;
     LocalMaxR::default().then(ExtensionOracle::from(BoolExtension::default())), localmaxr_then_bool_extension;
     ArgumentsOracle::default(), arguments;
+    ArgumentsOracle::default().and(SMax::default()), arguments_and_smax;
+    ArgumentsOracle::default().and(IdentityOracle::default()), arguments_and_identity;
 }
