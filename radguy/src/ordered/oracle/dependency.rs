@@ -27,16 +27,19 @@ where
     for<'a> &'a PS: IntoIterator<Item = StrategyItem<(K, K)>>,
 {
     fn get_strategy(&self, _assignment: &HashMap<K, V>, strategy: &PS, _system: &S) -> PS {
-        let mut lens = HashMap::<K, u64>::new();
+        let mut lens = HashMap::<K, u32>::new();
         strategy
             .into_iter()
             .map(|StrategyItem(_, (x, y))| {
                 StrategyItem(
-                    StrategyWeight::Num(
-                        *lens
-                            .entry(x)
-                            .or_insert_with(|| strategy.clone().slice_right(x).length() as u64),
-                    ),
+                    StrategyWeight::Num(*lens.entry(x).or_insert_with(|| {
+                        strategy
+                            .clone()
+                            .slice_right(x)
+                            .length()
+                            .try_into()
+                            .expect("cast overflowed")
+                    })),
                     (x, y),
                 )
             })
@@ -64,13 +67,15 @@ where
     for<'a> &'a PS: IntoIterator<Item = StrategyItem<(K, K)>>,
 {
     fn get_strategy(&self, _assignment: &HashMap<K, V>, strategy: &PS, _system: &S) -> PS {
-        let mut lens = HashMap::<K, u64>::new();
+        let mut lens = HashMap::<K, u32>::new();
         strategy
             .into_iter()
             .map(|StrategyItem(_, (x, y))| {
                 StrategyItem(
                     StrategyWeight::Num(*lens.entry(x).or_insert_with(|| {
-                        u64::MAX - (strategy.clone().slice_right(x).length() as u64)
+                        u32::MAX
+                            - u32::try_from(strategy.clone().slice_right(x).length())
+                                .expect("cast overflowed")
                     })),
                     (x, y),
                 )
@@ -99,16 +104,19 @@ where
     for<'a> &'a PS: IntoIterator<Item = StrategyItem<(K, K)>>,
 {
     fn get_strategy(&self, _assignment: &HashMap<K, V>, strategy: &PS, _system: &S) -> PS {
-        let mut lens = HashMap::<K, u64>::new();
+        let mut lens = HashMap::<K, u32>::new();
         strategy
             .into_iter()
             .map(|StrategyItem(_, (x, y))| {
                 StrategyItem(
-                    StrategyWeight::Num(
-                        *lens
-                            .entry(x)
-                            .or_insert_with(|| strategy.clone().slice_left(x).length() as u64),
-                    ),
+                    StrategyWeight::Num(*lens.entry(x).or_insert_with(|| {
+                        strategy
+                            .clone()
+                            .slice_left(x)
+                            .length()
+                            .try_into()
+                            .expect("cast overflowed")
+                    })),
                     (x, y),
                 )
             })
@@ -136,13 +144,15 @@ where
     for<'a> &'a PS: IntoIterator<Item = StrategyItem<(K, K)>>,
 {
     fn get_strategy(&self, _assignment: &HashMap<K, V>, strategy: &PS, _system: &S) -> PS {
-        let mut lens = HashMap::<K, u64>::new();
+        let mut lens = HashMap::<K, u32>::new();
         strategy
             .into_iter()
             .map(|StrategyItem(_, (x, y))| {
                 StrategyItem(
                     StrategyWeight::Num(*lens.entry(x).or_insert_with(|| {
-                        u64::MAX - (strategy.clone().slice_left(x).length() as u64)
+                        u32::MAX
+                            - u32::try_from(strategy.clone().slice_left(x).length())
+                                .expect("cast overflowed")
                     })),
                     (x, y),
                 )

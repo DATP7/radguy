@@ -88,7 +88,7 @@ where
             .into_iter()
             .map(|StrategyItem(weight, (x, y))| {
                 let Some(hyper_edges) = system.get_hyperedges(y) else {
-                    return StrategyItem(StrategyWeight::Num(u64::MAX) - weight, (x, y));
+                    return StrategyItem(StrategyWeight::Num(u32::MAX) - weight, (x, y));
                 };
 
                 let out_weight = weight
@@ -108,7 +108,7 @@ where
                         .min()
                         .unwrap_or(StrategyWeight::Infinity);
 
-                StrategyItem(StrategyWeight::Num(u64::MAX) - out_weight, (x, y))
+                StrategyItem(StrategyWeight::Num(u32::MAX) - out_weight, (x, y))
             })
             .collect()
     }
@@ -274,16 +274,19 @@ impl<
         let max_weight = max(visited.len(), system.universe().len());
         strategy.extend(to_add.into_iter().map(|(x, y)| {
             StrategyItem(
-                StrategyWeight::Num(match self.strategy {
-                    ArgumentsStrategy::Ancestors => ancestors.get(&x).map_or(1, HashSet::len),
-                    ArgumentsStrategy::Successors => successors.get(&x).map_or(1, HashSet::len),
-                    ArgumentsStrategy::AncestorsInverted => {
-                        max_weight - ancestors.get(&x).map_or(1, HashSet::len) + 1
-                    }
-                    ArgumentsStrategy::SuccessorsInverted => {
-                        max_weight - successors.get(&x).map_or(1, HashSet::len) + 1
-                    }
-                } as u64),
+                StrategyWeight::Num(
+                    u32::try_from(match self.strategy {
+                        ArgumentsStrategy::Ancestors => ancestors.get(&x).map_or(1, HashSet::len),
+                        ArgumentsStrategy::Successors => successors.get(&x).map_or(1, HashSet::len),
+                        ArgumentsStrategy::AncestorsInverted => {
+                            max_weight - ancestors.get(&x).map_or(1, HashSet::len) + 1
+                        }
+                        ArgumentsStrategy::SuccessorsInverted => {
+                            max_weight - successors.get(&x).map_or(1, HashSet::len) + 1
+                        }
+                    })
+                    .expect("cast overflowed"),
+                ),
                 (x, y),
             )
         }));
@@ -390,16 +393,19 @@ impl<K: Eq + Copy + Hash + Debug, H: PriorityQueueDecKey<(K, K), StrategyWeight>
         for (x, y) in to_update {
             strategy.update_key_or_push(
                 &(x, y),
-                StrategyWeight::Num(match self.strategy {
-                    ArgumentsStrategy::Ancestors => ancestors.get(&x).map_or(1, HashSet::len),
-                    ArgumentsStrategy::Successors => successors.get(&x).map_or(1, HashSet::len),
-                    ArgumentsStrategy::AncestorsInverted => {
-                        max_weight - ancestors.get(&x).map_or(1, HashSet::len) + 1
-                    }
-                    ArgumentsStrategy::SuccessorsInverted => {
-                        max_weight - successors.get(&x).map_or(1, HashSet::len) + 1
-                    }
-                } as u64),
+                StrategyWeight::Num(
+                    u32::try_from(match self.strategy {
+                        ArgumentsStrategy::Ancestors => ancestors.get(&x).map_or(1, HashSet::len),
+                        ArgumentsStrategy::Successors => successors.get(&x).map_or(1, HashSet::len),
+                        ArgumentsStrategy::AncestorsInverted => {
+                            max_weight - ancestors.get(&x).map_or(1, HashSet::len) + 1
+                        }
+                        ArgumentsStrategy::SuccessorsInverted => {
+                            max_weight - successors.get(&x).map_or(1, HashSet::len) + 1
+                        }
+                    })
+                    .expect("cast overflowed"),
+                ),
             );
         }
 

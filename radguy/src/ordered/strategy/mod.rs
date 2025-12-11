@@ -19,7 +19,7 @@ pub use orx::OrxStrategy;
 #[derive(PartialEq, Eq, Clone, Copy, Hash, Debug)]
 pub enum StrategyWeight {
     Infinity,
-    Num(u64),
+    Num(u32),
 }
 
 impl Ord for StrategyWeight {
