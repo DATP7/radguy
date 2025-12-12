@@ -302,8 +302,8 @@ macro_rules! wctl_system_ordered_composed_unordered_const_1 {
 wctl_bench_suite! {
     leader_election_6: "Ring", "EF leader" => true in include_str!("../systems/wccs/LeaderElection6.wccs");
     leader_election_neg_6: "Ring", "EF leader > 1" => false in include_str!("../systems/wccs/LeaderElection6.wccs");
-    semaphore_3_5_fail: "System", "EF critical_section > 3" => true in include_str!("../systems/wccs/Semaphore_3_5.wccs");
-    semaphore_3_5_succ: "System", "EF critical_section == 3" => false in include_str!("../systems/wccs/Semaphore_3_5.wccs");
+    semaphore_3_5_fail: "System", "EF critical_section > 3" => false in include_str!("../systems/wccs/Semaphore_3_5.wccs");
+    semaphore_3_5_succ: "System", "EF critical_section == 3" => true in include_str!("../systems/wccs/Semaphore_3_5.wccs");
     client_server_failed_5: "System", "E True U[<=5] failed" => true in include_str!("../systems/wccs/ClientServer.wccs");
     client_server_deliver_7: "System", "E True U[<=8] delivered" => false in include_str!("../systems/wccs/ClientServer.wccs");
     client_server_big: "System", "E True U[<=10] (A True U[<=1] failed)" => true in include_str!("../systems/wccs/ClientServer.wccs");
