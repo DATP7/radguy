@@ -269,6 +269,10 @@ bisim_bench_suite! {
     abpl_bad_3: "SPEC", "ABPl_3" => false in include_str!("../systems/ccs/abp_bad.ccs");
     leader_election_bad_6: "Spec", "Ring" => false in include_str!("../systems/ccs/leader_election_bad_6.ccs");
     leader_election_ok_6: "Spec", "Ring" => true in include_str!("../systems/ccs/leader_election_ok_6.ccs");
+    leader_election_bad_7: "Spec", "Ring" => false in include_str!("../systems/ccs/leader_election_bad_7.ccs");
+    leader_election_ok_7: "Spec", "Ring" => true in include_str!("../systems/ccs/leader_election_ok_7.ccs");
+    leader_election_bad_8: "Spec", "Ring" => false in include_str!("../systems/ccs/leader_election_bad_8.ccs");
+    leader_election_ok_8: "Spec", "Ring" => true in include_str!("../systems/ccs/leader_election_ok_8.ccs");
 
     dekker_mutual_exclusion: "Dekker-2", "Spec" => true in include_str!("../systems/ccs/dekkers_mutual_exclusion.ccs");
 }
