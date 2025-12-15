@@ -558,10 +558,10 @@ fn main() {
         abpl_bad_2: "SPEC", "ABPl_2" => include_str!("../systems/ccs/abp_bad.ccs");
         leader_election_ok_6: "Spec", "Ring" => include_str!("../systems/ccs/leader_election_ok_6.ccs");
         leader_election_bad_6: "Spec", "Ring" => include_str!("../systems/ccs/leader_election_bad_6.ccs");
-        leader_election_bad_7: "Spec", "Ring" in include_str!("../systems/ccs/leader_election_bad_7.ccs");
-        leader_election_ok_7: "Spec", "Ring" in include_str!("../systems/ccs/leader_election_ok_7.ccs");
-        leader_election_bad_8: "Spec", "Ring" in include_str!("../systems/ccs/leader_election_bad_8.ccs");
-        leader_election_ok_8: "Spec", "Ring" in include_str!("../systems/ccs/leader_election_ok_8.ccs");
+        // leader_election_bad_7: "Spec", "Ring" in include_str!("../systems/ccs/leader_election_bad_7.ccs");
+        // leader_election_ok_7: "Spec", "Ring" in include_str!("../systems/ccs/leader_election_ok_7.ccs");
+        // leader_election_bad_8: "Spec", "Ring" in include_str!("../systems/ccs/leader_election_bad_8.ccs");
+        // leader_election_ok_8: "Spec", "Ring" in include_str!("../systems/ccs/leader_election_ok_8.ccs");
         dekker_mutual_exclusion: "Dekker-2", "Spec" => include_str!("../systems/ccs/dekkers_mutual_exclusion.ccs");
 
         // NOTE: these two actually *are* weakly bisimilar, so should not be used
