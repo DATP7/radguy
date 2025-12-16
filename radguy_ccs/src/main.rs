@@ -55,7 +55,9 @@ fn append_record(file_path: &Path, record: &str) {
 }
 
 fn record_exists(path: &Path, problem: &str, system: &str, oracle: &str) -> bool {
-    let file = BufReader::new(File::open(path).expect("could not open file"));
+    let Ok(file) = File::open(path).map(BufReader::new) else {
+        return false;
+    };
     let pattern = format!("{problem},{system},{oracle}");
     file.lines()
         .any(|line| line.expect("could not read line").starts_with(&pattern))
@@ -504,7 +506,7 @@ fn run_ordered_kleene<
                 let c = counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 println!("{c}/{ITERATIONS} timed out at {}", chrono::Local::now());
                 append_record(
-                    &Path::new("skipped.txt"),
+                    Path::new("skipped.txt"),
                     &format!("{problem},{name},{oracle},true"),
                 );
                 return None;
