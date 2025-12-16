@@ -194,7 +194,7 @@ macro_rules! wctl_bench_problem_ordered {
             // StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by(InverseDependencyCountOracle::default(), std::cmp::min).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::max, "max"),
             // ArgumentsOracle::bitset().ordered().then(DependencyCountOracle::default()).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::min, "min"),
             // ArgumentsOracle::bitset().ordered().then(DependencyCountOracle::default()).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::max, "max"),
-            ArgumentsOracle::bitset().ordered().then(InverseDependencyCountOracle::default()),
+            // ArgumentsOracle::bitset().ordered().then(InverseDependencyCountOracle::default()),
             // ArgumentsOracle::bitset().ordered().then(InverseDependencyCountOracle::default()).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::min, "min"),
             // ArgumentsOracle::bitset().ordered().then(InverseDependencyCountOracle::default()).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::max, "max"),
             // DependencyCountOracle::default().and_by(WeightedDepOracle::bitset().ordered(), std::cmp::min),
