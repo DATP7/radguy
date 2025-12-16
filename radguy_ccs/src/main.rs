@@ -84,7 +84,7 @@ fn create_csv() -> std::io::Result<PathBuf> {
     let mut file = File::create(&new_file_path)?;
     writeln!(
         file,
-        "Problem,System,Oracle,Ordered,VariableIterations,OracleIterations"
+        "Problem,System,Oracle,Ordered,VariableIterations,OracleIterations,SystemSize"
     )?;
     Ok(new_file_path)
 }
@@ -422,10 +422,10 @@ fn run_unordered_kleene<
     let pairs = (1..=ITERATIONS)
         .map(|_| ((*oracle).clone(), (*system).clone()))
         .collect::<Vec<_>>();
-    let iterations: Vec<_> = pairs
+    let results: Vec<_> = pairs
         .into_par_iter()
         .filter_map(|(oracle, mut system)| {
-            let Some((_, iteration)) = kleene_local(&mut system, target, &oracle) else {
+            let Some((_, results)) = kleene_local(&mut system, target, &oracle) else {
                 let c = counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 println!("{c}/{ITERATIONS} timed out at {}", chrono::Local::now());
                 append_record(
@@ -438,13 +438,14 @@ fn run_unordered_kleene<
             let c = counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             println!("{c}/{ITERATIONS} finished at {}", chrono::Local::now());
 
-            Some(iteration)
+            Some(results)
         })
         .collect();
 
-    for (variable_iterations, oracle_iterations) in iterations {
-        let record =
-            format!("{problem},{name},{oracle},false,{variable_iterations},{oracle_iterations}");
+    for (variable_iterations, oracle_iterations, system_size) in results {
+        let record = format!(
+            "{problem},{name},{oracle},false,{variable_iterations},{oracle_iterations},{system_size}"
+        );
         append_record(file_path, &record);
     }
 }
@@ -493,10 +494,10 @@ fn run_ordered_kleene<
     let pairs = (1..=ITERATIONS)
         .map(|_| ((*oracle).clone(), (*system).clone()))
         .collect::<Vec<_>>();
-    let iterations: Vec<_> = pairs
+    let results: Vec<_> = pairs
         .into_par_iter()
         .filter_map(|(oracle, mut system)| {
-            let Some((_, iteration)) = ordered::kleene_local::<
+            let Some((_, results)) = ordered::kleene_local::<
                 _,
                 _,
                 LazyHeap<_, BinaryHeapStrategy<_>>,
@@ -515,13 +516,14 @@ fn run_ordered_kleene<
             let c = counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             println!("{c}/{ITERATIONS} finished at {}", chrono::Local::now());
 
-            Some(iteration)
+            Some(results)
         })
         .collect();
 
-    for (variable_iterations, oracle_iterations) in iterations {
-        let record =
-            format!("{problem},{name},{oracle},true,{variable_iterations},{oracle_iterations}");
+    for (variable_iterations, oracle_iterations, system_size) in results {
+        let record = format!(
+            "{problem},{name},{oracle},true,{variable_iterations},{oracle_iterations},{system_size}"
+        );
         append_record(file_path, &record);
     }
 }
@@ -543,15 +545,15 @@ fn main() {
         &file_path,
         leader_election_6: "Ring", "EF leader" => include_str!("../systems/wccs/LeaderElection6.wccs");
         leader_election_neg_6: "Ring", "EF leader > 1" => include_str!("../systems/wccs/LeaderElection6.wccs");
-        leader_election_7: "Ring", "EF leader" => include_str!("../systems/wccs/LeaderElection7.wccs");
-        leader_election_neg_7: "Ring", "EF leader > 1" => include_str!("../systems/wccs/LeaderElection7.wccs");
-        leader_election_8: "Ring", "EF leader" => include_str!("../systems/wccs/LeaderElection8.wccs");
-        leader_election_neg_8: "Ring", "EF leader > 1" => include_str!("../systems/wccs/LeaderElection8.wccs");
         semaphore_3_5_fail: "System", "EF critical_section > 3" => include_str!("../systems/wccs/Semaphore_3_5.wccs");
         semaphore_3_5_succ: "System", "EF critical_section == 3" => include_str!("../systems/wccs/Semaphore_3_5.wccs");
         semaphore_4_5_fail: "System", "EF critical_section > 4" => include_str!("../systems/wccs/Semaphore_4_5.wccs");
         semaphore_4_5_succ: "System", "EF critical_section == 4" => include_str!("../systems/wccs/Semaphore_4_5.wccs");
         client_server_failed_5: "System", "E True U[<=5] failed" => include_str!("../systems/wccs/ClientServer.wccs");
+        leader_election_7: "Ring", "EF leader" => include_str!("../systems/wccs/LeaderElection7.wccs");
+        leader_election_neg_7: "Ring", "EF leader > 1" => include_str!("../systems/wccs/LeaderElection7.wccs");
+        leader_election_8: "Ring", "EF leader" => include_str!("../systems/wccs/LeaderElection8.wccs");
+        leader_election_neg_8: "Ring", "EF leader > 1" => include_str!("../systems/wccs/LeaderElection8.wccs");
         client_server_deliver_7: "System", "E True U[<=8] delivered" => include_str!("../systems/wccs/ClientServer.wccs");
         client_server_big: "System", "E True U[<=10] (A True U[<=1] failed)" => include_str!("../systems/wccs/ClientServer.wccs");
     }
