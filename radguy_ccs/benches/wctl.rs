@@ -3,10 +3,6 @@ use criterion::BenchmarkId;
 use criterion::Criterion;
 use criterion::criterion_group;
 use criterion::criterion_main;
-use orx_priority_queue::DaryHeapWithMap;
-use radguy::ordered::strategy::HashMapStrategy;
-use radguy::ordered::strategy::LazyHeap;
-use radguy::ordered::strategy::OrxStrategy;
 use radguy::{
     kleene_local,
     oracle::{
@@ -16,11 +12,9 @@ use radguy::{
     ordered::{
         self,
         oracle::{
-            DependencyCountOracle, InverseDependencyCountOracle, SiblingsOracle, SiblingsOracleInv,
-            StrategicArgumentsOracle, StrategicLocalOracle, StrategicNonStuckOracle, ToConstant,
-            ToOrdered,
+            DependencyCountOracle, InverseDependencyCountOracle, StrategicArgumentsOracle,
+            StrategicLocalOracle, StrategicNonStuckOracle, ToOrdered,
         },
-        strategy::StrategyWeight,
     },
 };
 use std::{fs::OpenOptions, io::Write, path::Path};
@@ -177,10 +171,10 @@ macro_rules! wctl_bench_problem_ordered {
             // StrategicArgumentsOracle::default().and_by(SMax::bitset().ordered(), std::cmp::min),
             StrategicArgumentsOracle::default().and_by(SMax::bitset().ordered(), std::cmp::min).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::min, "min"),
             // StrategicArgumentsOracle::default().and_by(SMax::bitset().ordered(), std::cmp::min).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::max, "max"),
-            StrategicArgumentsOracle::default().then(SMax::bitset().ordered()),
+            // StrategicArgumentsOracle::default().then(SMax::bitset().ordered()),
             StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::min, "min"),
             // StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::max, "max"),
-            StrategicArgumentsOracle::default().then(LocalMaxR::bitset().ordered()),
+            // StrategicArgumentsOracle::default().then(LocalMaxR::bitset().ordered()),
             StrategicArgumentsOracle::default().then(LocalMaxR::bitset().ordered()).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::min, "min"),
             // StrategicArgumentsOracle::default().then(LocalMaxR::bitset().ordered()).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::max, "max"),
             // StrategicArgumentsOracle::default().then(WeightedDepOracle::bitset().ordered()),
@@ -190,7 +184,7 @@ macro_rules! wctl_bench_problem_ordered {
             StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by(DependencyCountOracle::default(), std::cmp::min).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::min, "min"),
             // StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by(DependencyCountOracle::default(), std::cmp::min).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::max, "max"),
             // StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by(InverseDependencyCountOracle::default(), std::cmp::min),
-            StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by(InverseDependencyCountOracle::default(), std::cmp::min).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::min, "min"),
+            // StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by(InverseDependencyCountOracle::default(), std::cmp::min).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::min, "min"),
             // StrategicArgumentsOracle::default().then(SMax::bitset().ordered()).and_by(InverseDependencyCountOracle::default(), std::cmp::min).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::max, "max"),
             // ArgumentsOracle::bitset().ordered().then(DependencyCountOracle::default()).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::min, "min"),
             // ArgumentsOracle::bitset().ordered().then(DependencyCountOracle::default()).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::max, "max"),
@@ -208,12 +202,12 @@ macro_rules! wctl_bench_problem_ordered {
             // WeightedDepOracle::bitset().ordered().then(DependencyCountOracle::default()),
             // SMax::bitset().then(WeightedDepOracle::bitset()).ordered().then(DependencyCountOracle::default()),
             // LocalMaxR::bitset().then(WeightedDepOracle::bitset()).ordered().then(DependencyCountOracle::default()),
-            ArgumentsOracle::bitset().and(SMax::bitset()).ordered().then(DependencyCountOracle::default()),
-            ArgumentsOracle::bitset().and(LocalMaxR::bitset()).ordered().then(DependencyCountOracle::default()),
+            // ArgumentsOracle::bitset().and(SMax::bitset()).ordered().then(DependencyCountOracle::default()),
+            // ArgumentsOracle::bitset().and(LocalMaxR::bitset()).ordered().then(DependencyCountOracle::default()),
             // SMax::bitset().ordered().then(DependencyCountOracle::default()),
             // LocalMaxR::bitset().ordered().then(DependencyCountOracle::default()),
-            ArgumentsOracle::bitset().ordered().then(DependencyCountOracle::default()),
-            ArgumentsOracle::bitset().then(SMax::bitset()).ordered().then(DependencyCountOracle::default()),
+            // ArgumentsOracle::bitset().ordered().then(DependencyCountOracle::default()),
+            // ArgumentsOracle::bitset().then(SMax::bitset()).ordered().then(DependencyCountOracle::default()),
             // ArgumentsOracle::bitset().then(LocalMaxR::bitset()).ordered().then(DependencyCountOracle::default()),
 
             // WeightedDepOracle::bitset().ordered().then(InverseDependencyCountOracle::default()),
@@ -223,7 +217,7 @@ macro_rules! wctl_bench_problem_ordered {
             ArgumentsOracle::bitset().and(LocalMaxR::bitset()).ordered().then(InverseDependencyCountOracle::default()),
             // SMax::bitset().ordered().then(InverseDependencyCountOracle::default()),
             // LocalMaxR::bitset().ordered().then(InverseDependencyCountOracle::default()),
-            ArgumentsOracle::bitset().ordered().then(InverseDependencyCountOracle::default()),
+            // ArgumentsOracle::bitset().ordered().then(InverseDependencyCountOracle::default()),
             ArgumentsOracle::bitset().then(SMax::bitset()).ordered().then(InverseDependencyCountOracle::default()),
             // ArgumentsOracle::bitset().then(LocalMaxR::bitset()).ordered().then(InverseDependencyCountOracle::default()),
 
@@ -231,29 +225,29 @@ macro_rules! wctl_bench_problem_ordered {
             // SMax::bitset().then(WeightedDepOracle::bitset()).ordered().then(StrategicNonStuckOracle::bitset()),
             // LocalMaxR::bitset().then(WeightedDepOracle::bitset()).ordered().then(StrategicNonStuckOracle::bitset()),
             // ArgumentsOracle::bitset().and(SMax::bitset()).ordered().then(StrategicNonStuckOracle::bitset()),
-            ArgumentsOracle::bitset().and(LocalMaxR::bitset()).ordered().then(StrategicNonStuckOracle::bitset()),
+            // ArgumentsOracle::bitset().and(LocalMaxR::bitset()).ordered().then(StrategicNonStuckOracle::bitset()),
             // SMax::bitset().ordered().then(StrategicNonStuckOracle::bitset()),
-            LocalMaxR::bitset().ordered().then(StrategicNonStuckOracle::bitset()),
-            ArgumentsOracle::bitset().ordered().then(StrategicNonStuckOracle::bitset()),
-            ArgumentsOracle::bitset().then(SMax::bitset()).ordered().then(StrategicNonStuckOracle::bitset()),
+            // LocalMaxR::bitset().ordered().then(StrategicNonStuckOracle::bitset()),
+            // ArgumentsOracle::bitset().ordered().then(StrategicNonStuckOracle::bitset()),
+            // ArgumentsOracle::bitset().then(SMax::bitset()).ordered().then(StrategicNonStuckOracle::bitset()),
             // ArgumentsOracle::bitset().then(LocalMaxR::bitset()).ordered().then(StrategicNonStuckOracle::bitset()),
 
             // Composed Siblings
             // WeightedDepOracle::bitset().constant(StrategyWeight::Num(1)).then(SiblingsOracle),
             // SMax::bitset().then(WeightedDepOracle::bitset()).constant(StrategyWeight::Num(1)).then(SiblingsOracle),
-            LocalMaxR::bitset().then(WeightedDepOracle::bitset()).constant(StrategyWeight::Num(1)).then(SiblingsOracle),
-            ArgumentsOracle::bitset().and(SMax::bitset()).constant(StrategyWeight::Num(1)).then(SiblingsOracle),
-            ArgumentsOracle::bitset().and(LocalMaxR::bitset()).constant(StrategyWeight::Num(1)).then(SiblingsOracle),
+            // LocalMaxR::bitset().then(WeightedDepOracle::bitset()).constant(StrategyWeight::Num(1)).then(SiblingsOracle),
+            // ArgumentsOracle::bitset().and(SMax::bitset()).constant(StrategyWeight::Num(1)).then(SiblingsOracle),
+            // ArgumentsOracle::bitset().and(LocalMaxR::bitset()).constant(StrategyWeight::Num(1)).then(SiblingsOracle),
             // SMax::bitset().constant(StrategyWeight::Num(1)).then(SiblingsOracle),
-            LocalMaxR::bitset().constant(StrategyWeight::Num(1)).then(SiblingsOracle),
+            // LocalMaxR::bitset().constant(StrategyWeight::Num(1)).then(SiblingsOracle),
             // ArgumentsOracle::bitset().constant(StrategyWeight::Num(1)).then(SiblingsOracle),
-            ArgumentsOracle::bitset().then(SMax::bitset()).constant(StrategyWeight::Num(1)).then(SiblingsOracle),
-            ArgumentsOracle::bitset().then(LocalMaxR::bitset()).constant(StrategyWeight::Num(1)).then(SiblingsOracle),
+            // ArgumentsOracle::bitset().then(SMax::bitset()).constant(StrategyWeight::Num(1)).then(SiblingsOracle),
+            // ArgumentsOracle::bitset().then(LocalMaxR::bitset()).constant(StrategyWeight::Num(1)).then(SiblingsOracle),
 
             // WeightedDepOracle::bitset().constant(StrategyWeight::Num(1)).then(SiblingsOracleInv),
             // SMax::bitset().then(WeightedDepOracle::bitset()).constant(StrategyWeight::Num(1)).then(SiblingsOracleInv),
             // LocalMaxR::bitset().then(WeightedDepOracle::bitset()).constant(StrategyWeight::Num(1)).then(SiblingsOracleInv),
-            ArgumentsOracle::bitset().and(SMax::bitset()).constant(StrategyWeight::Num(1)).then(SiblingsOracleInv),
+            // ArgumentsOracle::bitset().and(SMax::bitset()).constant(StrategyWeight::Num(1)).then(SiblingsOracleInv),
             // ArgumentsOracle::bitset().and(LocalMaxR::bitset()).constant(StrategyWeight::Num(1)).then(SiblingsOracleInv),
             // SMax::bitset().constant(StrategyWeight::Num(1)).then(SiblingsOracleInv),
             // LocalMaxR::bitset().constant(StrategyWeight::Num(1)).then(SiblingsOracleInv),
