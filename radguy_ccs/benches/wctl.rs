@@ -285,9 +285,9 @@ macro_rules! wctl_bench_suite {
                 ArgumentsOracle::bitset().then(LocalMaxR::bitset()),
             }
             wctl_bench_problem_ordered!($name: using c, strategy BinaryHeapStrategy<_>; "std_binary"; bench $process_name, $formula_str => $sat in wccs);
-            wctl_bench_problem_ordered!($name: using c, strategy OrxStrategy<_, DaryHeapWithMap<_, _, 4>>; "orx_quad"; bench $process_name, $formula_str => $sat in wccs);
-            wctl_bench_problem_ordered!($name: using c, strategy LazyHeap<_, BinaryHeapStrategy<_>>; "std_binary_lazy"; bench $process_name, $formula_str => $sat in wccs);
-            wctl_bench_problem_ordered!($name: using c, strategy LazyHeap<_, OrxStrategy<_, DaryHeapWithMap<_, _, 4>>>; "orx_quad_lazy"; bench $process_name, $formula_str => $sat in wccs);
+            // wctl_bench_problem_ordered!($name: using c, strategy OrxStrategy<_, DaryHeapWithMap<_, _, 4>>; "orx_quad"; bench $process_name, $formula_str => $sat in wccs);
+            // wctl_bench_problem_ordered!($name: using c, strategy LazyHeap<_, BinaryHeapStrategy<_>>; "std_binary_lazy"; bench $process_name, $formula_str => $sat in wccs);
+            // wctl_bench_problem_ordered!($name: using c, strategy LazyHeap<_, OrxStrategy<_, DaryHeapWithMap<_, _, 4>>>; "orx_quad_lazy"; bench $process_name, $formula_str => $sat in wccs);
         }
         )*
         criterion_group!(
@@ -343,8 +343,8 @@ wctl_bench_suite! {
     // leader_election_neg_6: "Ring", "EF leader > 1" => false in include_str!("../systems/wccs/LeaderElection6.wccs");
     // semaphore_3_5_fail: "System", "EF critical_section > 3" => false in include_str!("../systems/wccs/Semaphore_3_5.wccs");
     // semaphore_3_5_succ: "System", "EF critical_section == 3" => true in include_str!("../systems/wccs/Semaphore_3_5.wccs");
-    client_server_failed_5: "System", "E True U[<=5] failed" => true in include_str!("../systems/wccs/ClientServer.wccs");
-    client_server_deliver_8: "System", "E True U[<=8] delivered" => true in include_str!("../systems/wccs/ClientServer.wccs");
+    // client_server_failed_5: "System", "E True U[<=5] failed" => true in include_str!("../systems/wccs/ClientServer.wccs");
+    // client_server_deliver_8: "System", "E True U[<=8] delivered" => true in include_str!("../systems/wccs/ClientServer.wccs");
     client_server_big: "System", "E True U[<=10] (A True U[<=1] failed)" => true in include_str!("../systems/wccs/ClientServer.wccs");
     leader_election_7: "Ring", "EF leader" => true in include_str!("../systems/wccs/LeaderElection7.wccs");
     leader_election_neg_7: "Ring", "EF leader > 1" => false in include_str!("../systems/wccs/LeaderElection7.wccs");
