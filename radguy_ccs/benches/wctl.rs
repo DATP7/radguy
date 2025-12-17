@@ -267,15 +267,15 @@ macro_rules! wctl_bench_suite {
                 $name: using c, bench $process_name, $formula_str => $sat in wccs, with
                 IdentityOracle::bitset(),
                 TrivialOracle::bitset(),
-                WeightedDepOracle::bitset(),
-                SMax::bitset().then(WeightedDepOracle::bitset()),
-                LocalMaxR::bitset().then(WeightedDepOracle::bitset()),
-                ArgumentsOracle::bitset().and(SMax::bitset()),
+                // WeightedDepOracle::bitset(),
+                // SMax::bitset().then(WeightedDepOracle::bitset()),
+                // LocalMaxR::bitset().then(WeightedDepOracle::bitset()),
+                // ArgumentsOracle::bitset().and(SMax::bitset()),
                 ArgumentsOracle::bitset().and(LocalMaxR::bitset()),
-                SMax::bitset(),
+                // SMax::bitset(),
                 LocalMaxR::bitset(),
-                ArgumentsOracle::bitset(),
-                ArgumentsOracle::bitset().then(SMax::bitset()),
+                // ArgumentsOracle::bitset(),
+                // ArgumentsOracle::bitset().then(SMax::bitset()),
                 ArgumentsOracle::bitset().then(LocalMaxR::bitset()),
             }
             wctl_bench_problem_ordered!($name: using c, strategy BinaryHeapStrategy<_>; "std_binary"; bench $process_name, $formula_str => $sat in wccs);
@@ -292,45 +292,45 @@ macro_rules! wctl_bench_suite {
     };
 }
 
-macro_rules! wctl_system_ordered_composed_unordered {
-    ($name:ident: using $c:expr, strategy $s:ty; $sname:literal; bench $proc:expr, $formula:expr => $sat:literal in $wccs:expr, [$($strategic_oracle:expr),*]) => {
-        $(
-            wctl_bench_oracles_ordered! {
-                $name: using $c, strategy $s; $sname; bench $proc, $formula => $sat in $wccs, with
-                WeightedDepOracle::bitset().ordered().then($strategic_oracle.clone()),
-                SMax::bitset().then(WeightedDepOracle::bitset()).ordered().then($strategic_oracle.clone()),
-                LocalMaxR::bitset().then(WeightedDepOracle::bitset()).ordered().then($strategic_oracle.clone()),
-                ArgumentsOracle::bitset().and(SMax::bitset()).ordered().then($strategic_oracle.clone()),
-                ArgumentsOracle::bitset().and(LocalMaxR::bitset()).ordered().then($strategic_oracle.clone()),
-                SMax::bitset().ordered().then($strategic_oracle.clone()),
-                LocalMaxR::bitset().ordered().then($strategic_oracle.clone()),
-                ArgumentsOracle::bitset().ordered().then($strategic_oracle.clone()),
-                ArgumentsOracle::bitset().then(SMax::bitset()).ordered().then($strategic_oracle.clone()),
-                ArgumentsOracle::bitset().then(LocalMaxR::bitset()).ordered().then($strategic_oracle.clone()),
-            }
-        )*
-    }
-}
+// macro_rules! wctl_system_ordered_composed_unordered {
+//     ($name:ident: using $c:expr, strategy $s:ty; $sname:literal; bench $proc:expr, $formula:expr => $sat:literal in $wccs:expr, [$($strategic_oracle:expr),*]) => {
+//         $(
+//             wctl_bench_oracles_ordered! {
+//                 $name: using $c, strategy $s; $sname; bench $proc, $formula => $sat in $wccs, with
+//                 WeightedDepOracle::bitset().ordered().then($strategic_oracle.clone()),
+//                 SMax::bitset().then(WeightedDepOracle::bitset()).ordered().then($strategic_oracle.clone()),
+//                 LocalMaxR::bitset().then(WeightedDepOracle::bitset()).ordered().then($strategic_oracle.clone()),
+//                 ArgumentsOracle::bitset().and(SMax::bitset()).ordered().then($strategic_oracle.clone()),
+//                 ArgumentsOracle::bitset().and(LocalMaxR::bitset()).ordered().then($strategic_oracle.clone()),
+//                 SMax::bitset().ordered().then($strategic_oracle.clone()),
+//                 LocalMaxR::bitset().ordered().then($strategic_oracle.clone()),
+//                 ArgumentsOracle::bitset().ordered().then($strategic_oracle.clone()),
+//                 ArgumentsOracle::bitset().then(SMax::bitset()).ordered().then($strategic_oracle.clone()),
+//                 ArgumentsOracle::bitset().then(LocalMaxR::bitset()).ordered().then($strategic_oracle.clone()),
+//             }
+//         )*
+//     }
+// }
 
-macro_rules! wctl_system_ordered_composed_unordered_const_1 {
-    ($name:ident: using $c:expr, strategy $s:ty; $sname:literal; bench $proc:expr, $formula:expr => $sat:literal in $wccs:expr, [$($strategic_oracle:expr),*]) => {
-        $(
-            wctl_bench_oracles_ordered! {
-                $name: using $c, strategy $s; $sname; bench $proc, $formula => $sat in $wccs, with
-                WeightedDepOracle::bitset().constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
-                SMax::bitset().then(WeightedDepOracle::bitset()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
-                LocalMaxR::bitset().then(WeightedDepOracle::bitset()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
-                ArgumentsOracle::bitset().and(SMax::bitset()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
-                ArgumentsOracle::bitset().and(LocalMaxR::bitset()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
-                SMax::bitset().constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
-                LocalMaxR::bitset().constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
-                ArgumentsOracle::bitset().constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
-                ArgumentsOracle::bitset().then(SMax::bitset()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
-                ArgumentsOracle::bitset().then(LocalMaxR::bitset()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
-            }
-        )*
-    }
-}
+// macro_rules! wctl_system_ordered_composed_unordered_const_1 {
+//     ($name:ident: using $c:expr, strategy $s:ty; $sname:literal; bench $proc:expr, $formula:expr => $sat:literal in $wccs:expr, [$($strategic_oracle:expr),*]) => {
+//         $(
+//             wctl_bench_oracles_ordered! {
+//                 $name: using $c, strategy $s; $sname; bench $proc, $formula => $sat in $wccs, with
+//                 WeightedDepOracle::bitset().constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+//                 SMax::bitset().then(WeightedDepOracle::bitset()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+//                 LocalMaxR::bitset().then(WeightedDepOracle::bitset()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+//                 ArgumentsOracle::bitset().and(SMax::bitset()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+//                 ArgumentsOracle::bitset().and(LocalMaxR::bitset()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+//                 SMax::bitset().constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+//                 LocalMaxR::bitset().constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+//                 ArgumentsOracle::bitset().constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+//                 ArgumentsOracle::bitset().then(SMax::bitset()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+//                 ArgumentsOracle::bitset().then(LocalMaxR::bitset()).constant(StrategyWeight::Num(1)).then($strategic_oracle.clone()),
+//             }
+//         )*
+//     }
+// }
 
 wctl_bench_suite! {
     // leader_election_6: "Ring", "EF leader" => true in include_str!("../systems/wccs/LeaderElection6.wccs");
