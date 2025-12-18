@@ -1,0 +1,16 @@
+# Client/Server set-up
+System := ClientA | ClientB | Server \ {request};
+
+# Requests data and unpacks response
+ClientA := Client | Client;
+ClientB := Client;
+Client := <request!,0>.<response,0>.(failed:<timeout,0>.Client + DeliverData);
+
+#Deliver the data package
+DeliverData := <unpack,0>.<deliver,0>.delivered:Client;
+
+# Server responds or fails
+Server := <request,0>.Response + congested:<timeout!,0>.Server;
+
+#Send response to client
+Response := <response!,0>.Server;
