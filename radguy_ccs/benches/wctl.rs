@@ -270,21 +270,21 @@ macro_rules! wctl_bench_suite {
         $(
         fn $name(c: &mut Criterion) {
             let wccs = $wccs;
-            wctl_bench_oracles_unordered! {
-                $name: using c, bench $process_name, $formula_str => $sat in wccs, with
-                IdentityOracle::bitset(),
-                TrivialOracle::bitset(),
+            // wctl_bench_oracles_unordered! {
+            //     $name: using c, bench $process_name, $formula_str => $sat in wccs, with
+                // IdentityOracle::bitset(),
+                // TrivialOracle::bitset(),
                 // WeightedDepOracle::bitset(),
                 // SMax::bitset().then(WeightedDepOracle::bitset()),
                 // LocalMaxR::bitset().then(WeightedDepOracle::bitset()),
                 // ArgumentsOracle::bitset().and(SMax::bitset()),
-                ArgumentsOracle::bitset().and(LocalMaxR::bitset()),
+                // ArgumentsOracle::bitset().and(LocalMaxR::bitset()),
                 // SMax::bitset(),
-                LocalMaxR::bitset(),
+                // LocalMaxR::bitset(),
                 // ArgumentsOracle::bitset(),
                 // ArgumentsOracle::bitset().then(SMax::bitset()),
-                ArgumentsOracle::bitset().then(LocalMaxR::bitset()),
-            }
+                // ArgumentsOracle::bitset().then(LocalMaxR::bitset()),
+            // }
             wctl_bench_problem_ordered!($name: using c, strategy BinaryHeapStrategy<_>; "std_binary"; bench $process_name, $formula_str => $sat in wccs);
             // wctl_bench_problem_ordered!($name: using c, strategy OrxStrategy<_, DaryHeapWithMap<_, _, 4>>; "orx_quad"; bench $process_name, $formula_str => $sat in wccs);
             // wctl_bench_problem_ordered!($name: using c, strategy LazyHeap<_, BinaryHeapStrategy<_>>; "std_binary_lazy"; bench $process_name, $formula_str => $sat in wccs);
