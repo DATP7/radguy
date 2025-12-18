@@ -10,7 +10,7 @@ use radguy::{
         self,
         oracle::{
             ArgumentsStrategy, DependencyCountOracle, StrategicArgumentsOracle,
-            StrategicLocalOracle, StrategicNonStuckOracle, ToOrdered,
+            StrategicIdentityOracle, StrategicLocalOracle, StrategicNonStuckOracle, ToOrdered,
         },
     },
 };
@@ -153,7 +153,7 @@ macro_rules! wctl_bench_problem_ordered {
         let wccs = $wccs;
         wctl_bench_oracles_ordered! {
             $name: using $c, strategy $s; $sname; bench $process_name, $formula_str => $sat in wccs, with
-            StrategicIdentityOracle
+            StrategicIdentityOracle,
             // IdentityOracle::bitset().ordered(),
             // TrivialOracle::bitset().ordered(),
 
