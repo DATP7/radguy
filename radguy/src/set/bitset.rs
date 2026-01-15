@@ -94,6 +94,10 @@ where
         ret
     }
 
+    fn remove(&mut self, x: &K) -> bool {
+        self.bitset.remove(&x.index())
+    }
+
     fn len(&self) -> usize {
         self.bitset.len()
     }

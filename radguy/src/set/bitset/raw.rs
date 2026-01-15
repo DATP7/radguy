@@ -94,6 +94,15 @@ impl Set<usize> for RawBitSet<FixedBitSet> {
         ret
     }
 
+    fn remove(&mut self, x: &usize) -> bool {
+        let r = self.bitset.contains(*x);
+        // Remove panics if bit is out of bounds
+        if r {
+            self.bitset.remove(*x);
+        }
+        r
+    }
+
     fn len(&self) -> usize {
         self.bitset.count_ones(..)
     }

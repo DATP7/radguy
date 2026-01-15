@@ -19,6 +19,7 @@ pub trait Set<T> {
     fn contains(&self, item: &T) -> bool;
     fn insert(&mut self, item: T) -> bool;
     fn len(&self) -> usize;
+    fn remove(&mut self, x: &T) -> bool;
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -166,6 +167,10 @@ impl<T: Eq + Hash, S: ::std::hash::BuildHasher + Default> Set<T> for HashSet<T, 
 
     fn contains(&self, item: &T) -> bool {
         self.contains(item)
+    }
+
+    fn remove(&mut self, x: &T) -> bool {
+        self.remove(x)
     }
 
     fn len(&self) -> usize {
