@@ -33,7 +33,7 @@ pub fn kleene_local<
     system: &mut S,
     target: VarKey,
     oracle: &impl StrategicLocalOracle<VarKey, VarValue, PairStrat, S>,
-) -> Option<(VarValue, (u32, u32))>
+) -> Option<(VarValue, (u32, u32, usize))>
 where
     for<'a> &'a PairStrat: IntoIterator<Item = StrategyItem<(VarKey, VarKey)>>,
 {
@@ -96,6 +96,10 @@ where
 
     Some((
         assignment.get_assignment(&target),
-        (variable_iterations, oracle_iterations),
+        (
+            variable_iterations,
+            oracle_iterations,
+            system.universe().len(),
+        ),
     ))
 }

@@ -685,6 +685,28 @@ impl<K> Display for StrategicNonStuckOracle<BitSet<K>> {
     }
 }
 
+#[derive(Default, Clone)]
+pub struct StrategicIdentityOracle;
+
+impl<K: Eq + Copy, V: PartialOrd, PairStrategy: Strategy<(K, K)> + Clone, S: System<K, V>>
+    StrategicLocalOracle<K, V, PairStrategy, S> for StrategicIdentityOracle
+{
+    fn get_strategy(
+        &self,
+        _assignment: &HashMap<K, V>,
+        strategy: &PairStrategy,
+        _system: &S,
+    ) -> PairStrategy {
+        strategy.clone()
+    }
+}
+
+impl Display for StrategicIdentityOracle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Identity_s")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{

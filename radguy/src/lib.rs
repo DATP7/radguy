@@ -354,7 +354,7 @@ pub fn kleene_local<
     system: &mut S,
     target: K,
     oracle: &impl LocalOracle<K, V, PS, S>,
-) -> Option<(V, (u32, u32))>
+) -> Option<(V, (u32, u32, usize))>
 where
     HashSet<K>: Cartesian<Output = HashSet<(K, K)>> + Cartesian<VS, Output = PS> + IsSubset<VS>,
 {
@@ -400,7 +400,11 @@ where
 
     Some((
         assignment.get_assignment(&target),
-        (variable_iterations, oracle_iterations),
+        (
+            variable_iterations,
+            oracle_iterations,
+            system.universe().len(),
+        ),
     ))
 }
 
