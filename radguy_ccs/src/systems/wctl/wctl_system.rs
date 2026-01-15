@@ -28,12 +28,17 @@ pub struct WCTLSystem<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key,
     pub(crate) expresions: RefCell<BiArena<ExprKey, FlatExpr<'a, ExprKey>>>,
     locked: bool,
     hyper_edge_cache: RefCell<HyperedgeMap<VarKey>>,
+    target: Option<VarKey>,
 }
 impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
     WCTLSystem<'a, ProcKey, FormKey, ExprKey, VarKey, TermKey>
 {
     pub fn get_process_definition(&self, process_name: &'a str) -> Option<ProcKey> {
         self.wccs_system.get_definition(process_name)
+    }
+
+    pub const fn set_target(&mut self, target: VarKey) {
+        self.target = Some(target);
     }
 
     pub fn new(wccs_system: WCCSSystem<'a, ProcKey>) -> Self {
@@ -44,6 +49,7 @@ impl<'a, ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key>
             expresions: RefCell::new(BiArena::default()),
             locked: false,
             hyper_edge_cache: RefCell::default(),
+            target: None,
         }
     }
     fn insert_term(&self, term: NumericTerm<VarKey, TermKey>) -> TermKey {
@@ -313,6 +319,10 @@ impl<ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key> System
 
     fn unlock(&mut self) {
         self.locked = false;
+    }
+
+    fn target(&self) -> Option<VarKey> {
+        self.target
     }
 }
 impl<ProcKey: Key, FormKey: Key, ExprKey: Key, VarKey: Key, TermKey: Key, S> Visited<S>

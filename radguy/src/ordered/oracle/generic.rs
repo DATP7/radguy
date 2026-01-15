@@ -6,18 +6,21 @@ use std::{
     collections::{HashMap, HashSet},
     fmt::{Debug, Display},
     hash::Hash,
+    iter,
     marker::PhantomData,
 };
 
 use orx_priority_queue::PriorityQueueDecKey;
 
 use crate::{
-    Arguments, Assignment, Bottom, CopiedIter, DependencyGraphSystem, PairUniverse, Set, System,
-    Universe, Visited,
+    Arguments, Assignment, Bottom, CopiedIter, DependencyGraphSystem, IsSubset, Maximal,
+    PairUniverse, Set, System, Universe, Visited,
     arena::{Key, SecondaryArena},
     ordered::{
         StrategicLocalOracle,
-        strategy::{GetWeight, OrxStrategy, Retain, Strategy, StrategyItem, StrategyWeight},
+        strategy::{
+            GetWeight, OrxStrategy, Retain, Singleton, Strategy, StrategyItem, StrategyWeight,
+        },
     },
     set::bitset::BitSet,
 };
@@ -682,6 +685,340 @@ impl<K, S: ::std::hash::BuildHasher> Display for StrategicNonStuckOracle<HashSet
 impl<K> Display for StrategicNonStuckOracle<BitSet<K>> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "NS:bitset")
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct StrategicMaxStuckOracle<VS>(PhantomData<VS>);
+
+#[expect(
+    clippy::implicit_hasher,
+    reason = "we don't want to specify the hasher everytime we construct MaxStuck"
+)]
+impl<K> StrategicMaxStuckOracle<HashSet<K>> {
+    #[must_use]
+    pub fn hashset() -> Self {
+        Self::default()
+    }
+}
+
+impl<K> StrategicMaxStuckOracle<BitSet<K>> {
+    #[must_use]
+    pub fn bitset() -> Self {
+        Self::default()
+    }
+}
+
+impl<
+    K: Key,
+    V: PartialOrd + Eq + Bottom + Clone + Maximal + Copy,
+    VS: for<'a> CopiedIter<'a, K> + Set<K>,
+    PairStrategy: Strategy<(K, K)> + FromIterator<StrategyItem<(K, K)>>,
+    S: System<K, V> + Universe<VS> + Visited<VS>,
+> StrategicLocalOracle<K, V, PairStrategy, S> for StrategicMaxStuckOracle<VS>
+{
+    fn get_strategy(
+        &self,
+        assignment: &HashMap<K, V>,
+        _strategy: &PairStrategy,
+        system: &S,
+    ) -> PairStrategy {
+        let universe: Vec<(K, V)> = system
+            .universe()
+            .copied_iter()
+            .filter_map(|x| {
+                let ass = assignment.get_assignment(&x);
+                if ass.is_maximal() {
+                    None
+                } else {
+                    Some((x, ass))
+                }
+            })
+            .collect();
+
+        let visited = system.visited();
+        universe
+            .iter()
+            .filter_map(|&(x, ass)| {
+                if ass.is_maximal() {
+                    return None;
+                }
+                let weight = if visited.contains(&x) && ass != system.evaluate(x, assignment) {
+                    StrategyWeight::Num(0)
+                } else {
+                    StrategyWeight::Infinity
+                };
+                Some(
+                    universe
+                        .iter()
+                        .map(move |(y, _)| StrategyItem(weight, (x, *y))),
+                )
+            })
+            .flatten()
+            .collect()
+    }
+}
+
+impl<K, S: ::std::hash::BuildHasher> Display for StrategicMaxStuckOracle<HashSet<K, S>> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MS:hashset")
+    }
+}
+
+impl<K> Display for StrategicMaxStuckOracle<BitSet<K>> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MS:bitset")
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct StrategicMaxStuckPrimeOracle<VS>(PhantomData<VS>);
+
+#[expect(
+    clippy::implicit_hasher,
+    reason = "we don't want to specify the hasher everytime we construct MaxStuckPrime"
+)]
+impl<K> StrategicMaxStuckPrimeOracle<HashSet<K>> {
+    #[must_use]
+    pub fn hashset() -> Self {
+        Self::default()
+    }
+}
+
+impl<K> StrategicMaxStuckPrimeOracle<BitSet<K>> {
+    #[must_use]
+    pub fn bitset() -> Self {
+        Self::default()
+    }
+}
+
+impl<
+    K: Key,
+    V: PartialOrd + Eq + Bottom + Clone + Maximal + Copy,
+    VS: for<'a> CopiedIter<'a, K> + Set<K>,
+    PairStrategy: Strategy<(K, K)> + FromIterator<StrategyItem<(K, K)>>,
+    S: System<K, V> + Universe<VS> + Visited<VS>,
+> StrategicLocalOracle<K, V, PairStrategy, S> for StrategicMaxStuckPrimeOracle<VS>
+{
+    fn get_strategy(
+        &self,
+        assignment: &HashMap<K, V>,
+        _strategy: &PairStrategy,
+        system: &S,
+    ) -> PairStrategy {
+        let universe: Vec<(K, V)> = system
+            .universe()
+            .copied_iter()
+            .filter_map(|x| {
+                let ass = assignment.get_assignment(&x);
+                if ass.is_maximal() {
+                    None
+                } else {
+                    Some((x, ass))
+                }
+            })
+            .collect();
+
+        let visited = system.visited();
+        universe
+            .iter()
+            .filter_map(|&(x, ass)| {
+                if ass.is_maximal() {
+                    return None;
+                }
+                let weight = if !visited.contains(&x) {
+                    StrategyWeight::Num(1)
+                } else if ass != system.evaluate(x, assignment) {
+                    StrategyWeight::Num(0)
+                } else {
+                    StrategyWeight::Infinity
+                };
+                Some(
+                    universe
+                        .iter()
+                        .map(move |(y, _)| StrategyItem(weight, (x, *y))),
+                )
+            })
+            .flatten()
+            .collect()
+    }
+}
+
+impl<K, S: ::std::hash::BuildHasher> Display for StrategicMaxStuckPrimeOracle<HashSet<K, S>> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MSP:hashset")
+    }
+}
+
+impl<K> Display for StrategicMaxStuckPrimeOracle<BitSet<K>> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "MSP:bitset")
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct UnsoundMaxStuckOracle<VS> {
+    maximal: bool,
+    phantom_data: PhantomData<VS>,
+}
+
+#[expect(
+    clippy::implicit_hasher,
+    reason = "we don't want to specify the hasher everytime we construct MaxStuckPrime"
+)]
+impl<K> UnsoundMaxStuckOracle<HashSet<K>> {
+    #[must_use]
+    pub fn hashset(maximal: bool) -> Self {
+        Self {
+            maximal,
+            ..Default::default()
+        }
+    }
+}
+
+impl<K> UnsoundMaxStuckOracle<BitSet<K>> {
+    #[must_use]
+    pub fn bitset(maximal: bool) -> Self {
+        Self {
+            maximal,
+            ..Default::default()
+        }
+    }
+}
+
+impl<
+    K: Key,
+    V: PartialOrd + Eq + Bottom + Clone + Maximal + Copy,
+    VS: for<'a> CopiedIter<'a, K> + Set<K>,
+    PairStrategy: Strategy<(K, K)> + FromIterator<StrategyItem<(K, K)>>,
+    S: System<K, V> + Universe<VS> + Visited<VS>,
+> StrategicLocalOracle<K, V, PairStrategy, S> for UnsoundMaxStuckOracle<VS>
+{
+    fn get_strategy(
+        &self,
+        assignment: &HashMap<K, V>,
+        _strategy: &PairStrategy,
+        system: &S,
+    ) -> PairStrategy {
+        let visited = system.visited();
+        let target = system
+            .target()
+            .expect("UnsoundMaxStuckOracle requires a target");
+
+        system
+            .universe()
+            .copied_iter()
+            .filter_map(|x| {
+                let ass = assignment.get_assignment(&x);
+                if self.maximal && ass.is_maximal() {
+                    return None;
+                }
+                let weight = if !visited.contains(&x) {
+                    StrategyWeight::Num(1)
+                } else if ass != system.evaluate(x, assignment) {
+                    StrategyWeight::Num(0)
+                } else {
+                    return None;
+                };
+                Some(StrategyItem(weight, (x, target)))
+            })
+            .collect()
+    }
+}
+
+impl<K, S: ::std::hash::BuildHasher> Display for UnsoundMaxStuckOracle<HashSet<K, S>> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "UMSP:{}hashset",
+            if self.maximal { "maximal:" } else { "" }
+        )
+    }
+}
+
+impl<K> Display for UnsoundMaxStuckOracle<BitSet<K>> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "UMSP:{}bitset",
+            if self.maximal { "maximal:" } else { "" }
+        )
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct UnholyMaxStuckOracle<VS> {
+    phantom_data: PhantomData<VS>,
+}
+
+#[expect(
+    clippy::implicit_hasher,
+    reason = "we don't want to specify the hasher everytime we construct MaxStuckPrime"
+)]
+impl<K> UnholyMaxStuckOracle<HashSet<K>> {
+    #[must_use]
+    pub fn hashset() -> Self {
+        Self::default()
+    }
+}
+
+impl<K> UnholyMaxStuckOracle<BitSet<K>> {
+    #[must_use]
+    pub fn bitset() -> Self {
+        Self::default()
+    }
+}
+
+impl<
+    K: Key + Debug,
+    V: PartialOrd + Eq + Bottom + Clone + Maximal + Copy,
+    VS: for<'a> CopiedIter<'a, K> + Set<K> + IsSubset,
+    PairStrategy: Strategy<(K, K)> + FromIterator<StrategyItem<(K, K)>> + Singleton<(K, K)> + Default,
+    S: System<K, V> + Universe<VS> + Visited<VS> + Arguments<K, VS>,
+> StrategicLocalOracle<K, V, PairStrategy, S> for UnholyMaxStuckOracle<VS>
+{
+    fn get_strategy(
+        &self,
+        assignment: &HashMap<K, V>,
+        _strategy: &PairStrategy,
+        system: &S,
+    ) -> PairStrategy {
+        let target = system
+            .target()
+            .expect("UnholyMaxStuckOracle requires a target");
+
+        let visited = system.visited();
+        let universe = system.universe();
+        let mut unvisited = vec![];
+
+        for x in universe.copied_iter() {
+            let ass = assignment.get_assignment(&x);
+            if ass.is_maximal() {
+                continue;
+            }
+
+            if !visited.contains(&x) {
+                unvisited.push(x);
+            } else if ass != system.evaluate(x, assignment) {
+                return PairStrategy::singleton((x, target));
+            }
+        }
+        unvisited
+            .iter()
+            .map(|x| StrategyItem(StrategyWeight::Infinity, (*x, target)))
+            .collect()
+    }
+}
+
+impl<K, S: ::std::hash::BuildHasher> Display for UnholyMaxStuckOracle<HashSet<K, S>> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "UnholyMSP:hashset",)
+    }
+}
+
+impl<K> Display for UnholyMaxStuckOracle<BitSet<K>> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "UnholyMSP:bitset",)
     }
 }
 

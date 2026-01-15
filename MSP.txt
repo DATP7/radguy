@@ -1,0 +1,189 @@
+     Running benches/wctl.rs (target/release/deps/wctl-764573eb98cb78d9)
+semaphore_3_5_succ/ordered/std_binary/(LocalMaxR:bitset↑ ∘ NS:bitset)
+                        time:   [676.04 µs 680.75 µs 685.93 µs]
+                        change: [−1.8762% −0.7698% +0.2924%] (p = 0.19 > 0.05)
+                        No change in performance detected.
+semaphore_3_5_succ/ordered/std_binary/MS:bitset
+                        time:   [394.52 µs 399.60 µs 404.82 µs]
+                        change: [−2.6731% −1.3343% −0.0198%] (p = 0.07 > 0.05)
+                        No change in performance detected.
+semaphore_3_5_succ/ordered/std_binary/((Args_c-anc ∩_f LocalMaxR:bitset↑) ∩_min NS:bitset)
+                        time:   [4.6309 ms 4.6752 ms 4.7208 ms]
+                        change: [−0.4196% +0.3845% +1.2972%] (p = 0.40 > 0.05)
+                        No change in performance detected.
+semaphore_3_5_succ/ordered/std_binary/(Args_c-anc ∩_min MS:bitset)
+                        time:   [3.4859 ms 3.5080 ms 3.5327 ms]
+                        change: [−1.2793% −0.4846% +0.3334%] (p = 0.27 > 0.05)
+                        No change in performance detected.
+Found 1 outliers among 20 measurements (5.00%)
+  1 (5.00%) high mild
+semaphore_3_5_succ/ordered/std_binary/MSP:bitset
+                        time:   [3.7420 ms 3.7704 ms 3.7991 ms]
+                        change: [−3.9220% −1.9966% −0.1513%] (p = 0.06 > 0.05)
+                        No change in performance detected.
+Found 1 outliers among 20 measurements (5.00%)
+  1 (5.00%) low mild
+
+Benchmarking client_server_failed_5/ordered/std_binary/(LocalMaxR:bitset↑ ∘ NS:bitset): Warming up for 3.0000 s
+Warning: Unable to complete 20 samples in 10.0s. You may wish to increase target time to 15.7s, or reduce sample count to 10.
+client_server_failed_5/ordered/std_binary/(LocalMaxR:bitset↑ ∘ NS:bitset)
+                        time:   [676.66 ms 720.63 ms 763.30 ms]
+                        change: [−7.1555% +1.3793% +10.649%] (p = 0.77 > 0.05)
+                        No change in performance detected.
+client_server_failed_5/ordered/std_binary/MS:bitset
+                        time:   [130.13 ms 133.74 ms 137.27 ms]
+                        change: [−6.4351% −2.1380% +2.1033%] (p = 0.35 > 0.05)
+                        No change in performance detected.
+client_server_failed_5/ordered/std_binary/((Args_c-anc ∩_f LocalMaxR:bitset↑) ∩_min NS:bitset)
+                        time:   [1.3257 ms 1.3370 ms 1.3489 ms]
+                        change: [−3.9495% −1.6960% +0.2843%] (p = 0.14 > 0.05)
+                        No change in performance detected.
+Found 2 outliers among 20 measurements (10.00%)
+  1 (5.00%) low mild
+  1 (5.00%) high mild
+client_server_failed_5/ordered/std_binary/(Args_c-anc ∩_min MS:bitset)
+                        time:   [863.63 µs 869.04 µs 875.40 µs]
+                        change: [−2.2408% −1.1635% +0.1896%] (p = 0.07 > 0.05)
+                        No change in performance detected.
+Found 1 outliers among 20 measurements (5.00%)
+  1 (5.00%) high severe
+client_server_failed_5/ordered/std_binary/MSP:bitset
+                        time:   [665.70 µs 672.18 µs 680.63 µs]
+Found 3 outliers among 20 measurements (15.00%)
+  1 (5.00%) high mild
+  2 (10.00%) high severe
+
+Benchmarking client_server_deliver_8/ordered/std_binary/(LocalMaxR:bitset↑ ∘ NS:bitset): Warming up for 3.0000 s
+Warning: Unable to complete 20 samples in 10.0s. You may wish to increase target time to 13.2s, or reduce sample count to 10.
+client_server_deliver_8/ordered/std_binary/(LocalMaxR:bitset↑ ∘ NS:bitset)
+                        time:   [655.05 ms 700.97 ms 745.67 ms]
+                        change: [−15.400% −7.8675% +0.2622%] (p = 0.07 > 0.05)
+                        No change in performance detected.
+client_server_deliver_8/ordered/std_binary/MS:bitset
+                        time:   [102.83 ms 106.58 ms 110.49 ms]
+                        change: [−6.8595% −2.8839% +1.5550%] (p = 0.21 > 0.05)
+                        No change in performance detected.
+client_server_deliver_8/ordered/std_binary/((Args_c-anc ∩_f LocalMaxR:bitset↑) ∩_min NS:bitset...
+                        time:   [7.9007 ms 8.0280 ms 8.1762 ms]
+                        change: [−1.1014% +0.9153% +2.9216%] (p = 0.40 > 0.05)
+                        No change in performance detected.
+client_server_deliver_8/ordered/std_binary/(Args_c-anc ∩_min MS:bitset)
+                        time:   [5.3050 ms 5.3790 ms 5.4360 ms]
+                        change: [−4.5605% −1.8083% +1.2425%] (p = 0.26 > 0.05)
+                        No change in performance detected.
+Found 1 outliers among 20 measurements (5.00%)
+  1 (5.00%) high severe
+client_server_deliver_8/ordered/std_binary/MSP:bitset
+                        time:   [43.466 ms 51.297 ms 57.953 ms]
+
+Benchmarking client_server_big/ordered/std_binary/(LocalMaxR:bitset↑ ∘ NS:bitset): Warming up for 3.0000 s
+Warning: Unable to complete 20 samples in 10.0s. You may wish to increase target time to 110.0s, or reduce sample count to 10.
+client_server_big/ordered/std_binary/(LocalMaxR:bitset↑ ∘ NS:bitset)
+                        time:   [3.1729 s 3.5370 s 3.9822 s]
+                        change: [−24.520% −13.658% −1.8575%] (p = 0.04 < 0.05)
+                        Performance has improved.
+Found 1 outliers among 20 measurements (5.00%)
+  1 (5.00%) high severe
+Benchmarking client_server_big/ordered/std_binary/MS:bitset: Warming up for 3.0000 s
+Warning: Unable to complete 20 samples in 10.0s. You may wish to increase target time to 15.2s, or reduce sample count to 10.
+client_server_big/ordered/std_binary/MS:bitset
+                        time:   [682.90 ms 758.09 ms 835.27 ms]
+                        change: [−19.938% −5.9944% +9.2013%] (p = 0.45 > 0.05)
+                        No change in performance detected.
+Benchmarking client_server_big/ordered/std_binary/((Args_c-anc ∩_f LocalMaxR:bitset↑) ∩_min NS:bitset): Warming up for 3.0000 s
+Warning: Unable to complete 20 samples in 10.0s. You may wish to increase target time to 12.1s, enable flat sampling, or reduce sample count to 10.
+client_server_big/ordered/std_binary/((Args_c-anc ∩_f LocalMaxR:bitset↑) ∩_min NS:bitset)
+                        time:   [48.302 ms 49.972 ms 51.968 ms]
+                        change: [−28.978% −19.528% −9.5602%] (p = 0.00 < 0.05)
+                        Performance has improved.
+client_server_big/ordered/std_binary/(Args_c-anc ∩_min MS:bitset)
+                        time:   [35.356 ms 36.561 ms 37.869 ms]
+                        change: [−8.4767% +6.8097% +30.785%] (p = 0.66 > 0.05)
+                        No change in performance detected.
+Found 3 outliers among 20 measurements (15.00%)
+  1 (5.00%) low mild
+  1 (5.00%) high mild
+  1 (5.00%) high severe
+client_server_big/ordered/std_binary/MSP:bitset
+                        time:   [26.244 ms 30.024 ms 34.646 ms]
+
+leader_election_6/ordered/std_binary/(LocalMaxR:bitset↑ ∘ NS:bitset)
+                        time:   [1.4820 ms 1.4937 ms 1.5035 ms]
+                        change: [−1.8539% −0.7323% +0.4001%] (p = 0.26 > 0.05)
+                        No change in performance detected.
+Found 1 outliers among 20 measurements (5.00%)
+  1 (5.00%) low mild
+leader_election_6/ordered/std_binary/MS:bitset
+                        time:   [975.96 µs 982.17 µs 989.41 µs]
+                        change: [−98.535% −98.507% −98.479%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 3 outliers among 20 measurements (15.00%)
+  1 (5.00%) low mild
+  2 (10.00%) high mild
+leader_election_6/ordered/std_binary/((Args_c-anc ∩_f LocalMaxR:bitset↑) ∩_min NS:bitset)
+                        time:   [155.63 ms 160.83 ms 165.80 ms]
+                        change: [−5.7854% −0.3421% +6.2645%] (p = 0.91 > 0.05)
+                        No change in performance detected.
+leader_election_6/ordered/std_binary/(Args_c-anc ∩_min MS:bitset)
+                        time:   [129.70 ms 134.34 ms 138.13 ms]
+                        change: [−73.738% −72.273% −70.704%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 1 outliers among 20 measurements (5.00%)
+  1 (5.00%) low severe
+leader_election_6/ordered/std_binary/MSP:bitset
+                        time:   [43.499 ms 44.710 ms 45.774 ms]
+
+leader_election_7/ordered/std_binary/(LocalMaxR:bitset↑ ∘ NS:bitset)
+                        time:   [2.6979 ms 2.7241 ms 2.7496 ms]
+                        change: [−2.1911% −0.5643% +1.3088%] (p = 0.56 > 0.05)
+                        No change in performance detected.
+Found 2 outliers among 20 measurements (10.00%)
+  1 (5.00%) low mild
+  1 (5.00%) high mild
+leader_election_7/ordered/std_binary/MS:bitset
+                        time:   [1.7916 ms 1.8090 ms 1.8296 ms]
+                        change: [−99.917% −99.912% −99.908%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Benchmarking leader_election_7/ordered/std_binary/((Args_c-anc ∩_f LocalMaxR:bitset↑) ∩_min NS:bitset): Warming up for 3.0000 s
+Warning: Unable to complete 20 samples in 10.0s. You may wish to increase target time to 61.6s, or reduce sample count to 10.
+leader_election_7/ordered/std_binary/((Args_c-anc ∩_f LocalMaxR:bitset↑) ∩_min NS:bitset)
+                        time:   [5.6417 s 6.2290 s 6.7136 s]
+                        change: [−12.628% −0.0502% +14.992%] (p = 0.99 > 0.05)
+                        No change in performance detected.
+Found 3 outliers among 20 measurements (15.00%)
+  3 (15.00%) low severe
+Benchmarking leader_election_7/ordered/std_binary/(Args_c-anc ∩_min MS:bitset): Warming up for 3.0000 s
+Warning: Unable to complete 20 samples in 10.0s. You may wish to increase target time to 140.0s, or reduce sample count to 10.
+leader_election_7/ordered/std_binary/(Args_c-anc ∩_min MS:bitset)
+                        time:   [5.3466 s 6.0211 s 6.5923 s]
+Found 4 outliers among 20 measurements (20.00%)
+  4 (20.00%) low severe
+Benchmarking leader_election_7/ordered/std_binary/MSP:bitset: Warming up for 3.0000 s
+Warning: Unable to complete 20 samples in 10.0s. You may wish to increase target time to 27.7s, or reduce sample count to 10.
+leader_election_7/ordered/std_binary/MSP:bitset
+                        time:   [1.0506 s 1.1715 s 1.2894 s]
+
+leader_election_8/ordered/std_binary/(LocalMaxR:bitset↑ ∘ NS:bitset)
+                        time:   [4.6639 ms 4.7279 ms 4.7835 ms]
+Found 2 outliers among 20 measurements (10.00%)
+  1 (5.00%) low mild
+  1 (5.00%) high mild
+leader_election_8/ordered/std_binary/MS:bitset
+                        time:   [3.0769 ms 3.0945 ms 3.1134 ms]
+Benchmarking leader_election_8/ordered/std_binary/((Args_c-anc ∩_f LocalMaxR:bitset↑) ∩_min NS:bitset): Warming up for 3.0000 s
+Warning: Unable to complete 20 samples in 10.0s. You may wish to increase target time to 2404.8s, or reduce sample count to 10.
+leader_election_8/ordered/std_binary/((Args_c-anc ∩_f LocalMaxR:bitset↑) ∩_min NS:bitset)
+                        time:   [2.9191 µs 3.2073 µs 3.6615 µs]
+Found 4 outliers among 20 measurements (20.00%)
+  1 (5.00%) high mild
+  3 (15.00%) high severe
+Benchmarking leader_election_8/ordered/std_binary/(Args_c-anc ∩_min MS:bitset): Warming up for 3.0000 s
+Warning: Unable to complete 20 samples in 10.0s. You may wish to increase target time to 2401.2s, or reduce sample count to 10.
+leader_election_8/ordered/std_binary/(Args_c-anc ∩_min MS:bitset)
+                        time:   [2.8986 µs 2.9847 µs 3.1356 µs]
+Found 3 outliers among 20 measurements (15.00%)
+  1 (5.00%) high mild
+  2 (10.00%) high severe
+Benchmarking leader_election_8/ordered/std_binary/MSP:bitset: Warming up for 3.0000 s
+Warning: Unable to complete 20 samples in 10.0s. You may wish to increase target time to 2166.0s, or reduce sample count to 10.
+Benchmarking leader_election_8/ordered/std_binary/MSP:bitset: Collecting 20 samples in estimated 2166.0 s (20 iterations)^CError: nu::shell::terminated_by_signal

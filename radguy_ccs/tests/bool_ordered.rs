@@ -5,7 +5,7 @@ use radguy::{
             ArgumentsStrategy, DependencyCountOracle, DependentCountOracle,
             InverseDependencyCountOracle, InverseDependentCountOracle, StrategicArgumentsOracle,
             StrategicHeightOracle, StrategicLocalOracle, StrategicNonStuckOracle, ToConstant,
-            ToInverse, ToOrdered,
+            ToInverse, ToOrdered, UnholyMaxStuckOracle,
         },
         strategy::StrategyWeight,
     },
@@ -29,6 +29,7 @@ macro_rules! test_oracle_system_strategy_fast {
                 } = $crate::systems::bool::$spec();
                 for (var, goal) in variables.into_iter().zip(goal.into_iter()) {
                     let start = system.names.get_or_insert_key(var);
+                    system.set_target(start);
                     let (result, _) =
                         ::radguy::ordered::kleene_local::<_, _, $strategy, $strategy, _>(
                             &mut system,
@@ -79,6 +80,7 @@ macro_rules! test_oracle_system_strategy_slow {
                 } = $crate::systems::bool::$spec();
                 for (var, goal) in variables.into_iter().zip(goal.into_iter()) {
                     let start = system.names.get_or_insert_key(var);
+                    system.set_target(start);
                     let (result, _) =
                         ::radguy::ordered::kleene_local::<_, _, $strategy, $strategy, _>(
                             &mut system,
@@ -264,4 +266,5 @@ test_oracles_ordered! {
     StrategicNonStuckOracle::hashset().then(SMax::hashset().ordered()), nonstuck_hashset_then_smax;
     StrategicBoolExtension::bitset().as_oracle(), strategic_bool_extension_bitset;
     StrategicBoolExtension::hashset().as_oracle(), strategic_bool_extension_hashset;
+    // UnholyMaxStuckOracle::hashset(), unholy_max_stuck_hashset;
 }

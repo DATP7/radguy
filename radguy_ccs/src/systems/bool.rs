@@ -29,6 +29,7 @@ pub struct BoolSystemImpl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone> {
     pub definitions: SecondaryArena<V, T>,
     pub terms: BiArena<T, BoolTerm<V, T>>,
     term_arguments_cache: RefCell<HashMap<T, BitSet<V>>>,
+    target: Option<V>,
 }
 
 impl<V: Key, T: Key + Hash, N: Hash + Eq + Clone> BoolSystemImpl<V, T, N> {
@@ -50,6 +51,10 @@ impl<V: Key, T: Key + Hash, N: Hash + Eq + Clone> BoolSystemImpl<V, T, N> {
             .insert(term_key, args.clone());
         debug_assert!(insert.is_none(), "term should not already be cached");
         args
+    }
+
+    pub const fn set_target(&mut self, target: V) {
+        self.target = Some(target);
     }
 }
 
@@ -121,6 +126,10 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone + Debug
 
     fn unlock(&mut self) {
         // Nothing to do
+    }
+
+    fn target(&self) -> Option<VarKey> {
+        self.target
     }
 }
 
@@ -227,6 +236,7 @@ impl<V: Key + Hash, T: Key + Hash, N: Hash + Eq + Clone + Debug> LazyBoolSystem<
         self.visited.replace(HashSet::new());
         self.discovered.replace(HashSet::new());
         let key = self.inner.borrow_mut().names.get_or_insert_key(target);
+        self.inner.borrow_mut().set_target(key);
         self.discovered.borrow_mut().insert(key);
         key
     }
@@ -283,6 +293,10 @@ impl<VarKey: Key + Hash, TermKey: Key + Hash, VarName: Hash + Eq + Clone + Debug
 
     fn unlock(&mut self) {
         self.inner.borrow_mut().unlock();
+    }
+
+    fn target(&self) -> Option<VarKey> {
+        self.inner.borrow().target()
     }
 }
 

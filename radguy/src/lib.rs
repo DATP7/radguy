@@ -1,7 +1,7 @@
 #![feature(impl_trait_in_assoc_type)]
 
 use itertools::iproduct;
-use std::fmt::Debug;
+use std::{collections::VecDeque, fmt::Debug};
 
 use crate::oracle::LocalOracle;
 use std::{
@@ -93,6 +93,11 @@ pub trait System<VarKey, VarValue: PartialOrd> {
     /// Unlocks the system after `self.lock()`, allowing changes to the set of visited and
     /// discovered variables.
     fn unlock(&mut self);
+
+    /// Returns the target variable of the system
+    fn target(&self) -> Option<VarKey> {
+        None
+    }
 }
 
 pub trait Visited<S> {
@@ -355,6 +360,8 @@ where
 {
     let mut assignment = system.bottom_assignment();
     let mut discovered = system.universe();
+    let mut visited = system.visited();
+    let mut unvisited = VS::default();
     let mut rel = discovered.cartesian(&discovered);
     let mut todo = local_dependencies(target, &assignment, oracle, system, &mut rel);
 
@@ -366,30 +373,46 @@ where
     while let Some(x) = todo.extract() {
         debug_assert!(discovered.contains(&x), "discovered should contain {x:?}");
         variable_iterations += 1;
-        let evaluated = system.evaluate(x, &assignment);
-        let args = system.arguments(x);
-        if assignment.get_assignment(&x) != evaluated || !IsSubset::is_subset(&args, &discovered) {
-            #[cfg(feature = "timeout")]
-            if (chrono::Utc::now() - start_time) >= KLEENE_TIMEOUT {
-                return None;
+        if visited.contains(&x) {
+            let evaluated = system.evaluate(x, &assignment);
+            if assignment.get_assignment(&x) != evaluated {
+                #[cfg(feature = "timeout")]
+                if (chrono::Utc::now() - start_time) >= KLEENE_TIMEOUT {
+                    return None;
+                }
+                oracle_iterations += 1;
+                assignment.update_assignment(x, evaluated);
+                todo = local_dependencies(target, &assignment, oracle, system, &mut rel);
+                unvisited = VS::default();
             }
-            oracle_iterations += 1;
-            assignment.update_assignment(x, evaluated);
-            // At this point `rel` is D x D with some elements pruned by oracles
-            // We expand it with args to create (D u A) x (D u A), still with those elements
-            // pruned, by unioning with the elements of the square below.
-            // +-------------+-------+
-            // | A x D       | A x A |
-            // +-------------+-------+
-            // | D x D (rel) | D x A |
-            // +-------------+-------+
-            let axa = args.cartesian(&args);
-            let axd = args.cartesian(&discovered);
-            let dxa = discovered.cartesian(&args);
-            rel = rel.union(axa).union(axd).union(dxa);
-            discovered = system.universe();
-
-            todo = local_dependencies(target, &assignment, oracle, system, &mut rel);
+        } else if !unvisited.contains(&x) {
+            unvisited.insert(x);
+            todo.push(x);
+        } else {
+            let args = system.arguments(x);
+            let evaluated = system.evaluate(x, &assignment);
+            if assignment.get_assignment(&x) != evaluated
+                || !IsSubset::is_subset(&args, &discovered)
+            {
+                oracle_iterations += 1;
+                assignment.update_assignment(x, evaluated);
+                // At this point `rel` is D x D with some elements pruned by oracles
+                // We expand it with args to create (D u A) x (D u A), still with those elements
+                // pruned, by unioning with the elements of the square below.
+                // +-------------+-------+
+                // | A x D       | A x A |
+                // +-------------+-------+
+                // | D x D (rel) | D x A |
+                // +-------------+-------+
+                let axa = args.cartesian(&args);
+                let axd = args.cartesian(&discovered);
+                let dxa = discovered.cartesian(&args);
+                rel = rel.union(axa).union(axd).union(dxa);
+                discovered = system.universe();
+                visited = system.visited();
+                unvisited = VS::default();
+                todo = local_dependencies(target, &assignment, oracle, system, &mut rel);
+            }
         }
     }
 
@@ -406,7 +429,7 @@ where
 fn local_dependencies<
     K: Hash + Copy + Eq,
     V: PartialOrd,
-    VS: Set<K> + Intersect + for<'a> CopiedIter<'a, K>,
+    VS: Set<K> + Intersect + for<'a> CopiedIter<'a, K> + Extract<K>,
     PS: Set<(K, K)> + SliceRight<K, K, VS> + Debug,
     S: System<K, V>,
 >(
@@ -415,13 +438,13 @@ fn local_dependencies<
     oracle: &impl LocalOracle<K, V, PS, S>,
     system: &mut S,
     rel: &mut PS,
-) -> VS
+) -> WrappingQueue<K, VS>
 where
 {
     system.lock();
     *rel = oracle.approximate_flow(assignment, rel, system);
     system.unlock();
-    rel.slice_right(variable)
+    rel.slice_right(variable).into()
 }
 
 pub trait Maximal: PartialOrd {
@@ -453,5 +476,39 @@ impl<T: Clone + Eq + Hash, S: ::std::hash::BuildHasher> Extract<T> for HashSet<T
                 Some(value)
             },
         )
+    }
+}
+
+struct WrappingQueue<T, E: Extract<T>> {
+    q: VecDeque<T>,
+    inner: E,
+}
+
+impl<T, E: Extract<T>> Extract<T> for WrappingQueue<T, E> {
+    fn extract(&mut self) -> Option<T> {
+        if let Some(v) = self.inner.extract() {
+            Some(v)
+        } else {
+            self.q.pop_front()
+        }
+    }
+}
+
+impl<T, E: Extract<T>> WrappingQueue<T, E> {
+    fn new(inner: E) -> Self {
+        Self {
+            q: VecDeque::default(),
+            inner,
+        }
+    }
+
+    fn push(&mut self, item: T) {
+        self.q.push_back(item);
+    }
+}
+
+impl<T, E: Extract<T>> From<E> for WrappingQueue<T, E> {
+    fn from(value: E) -> Self {
+        Self::new(value)
     }
 }

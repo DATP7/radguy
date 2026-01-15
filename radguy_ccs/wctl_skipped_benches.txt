@@ -1,0 +1,2 @@
+leader_election_8/ordered/std_binary/((Args_c-anc ∩_f LocalMaxR:bitset↑) ∩_min NS:bitset)
+leader_election_8/ordered/std_binary/(Args_c-anc ∩_min MS:bitset)

@@ -4,6 +4,10 @@ use criterion::BenchmarkId;
 use criterion::Criterion;
 use criterion::criterion_group;
 use criterion::criterion_main;
+use radguy::ordered::oracle::StrategicMaxStuckOracle;
+use radguy::ordered::oracle::StrategicMaxStuckPrimeOracle;
+use radguy::ordered::oracle::UnholyMaxStuckOracle;
+use radguy::ordered::oracle::UnsoundMaxStuckOracle;
 use radguy::{
     kleene_local,
     oracle::{ArgumentsOracle, IdentityOracle, LocalMaxR, LocalOracle, SMax, TrivialOracle},
@@ -70,6 +74,7 @@ macro_rules! wctl_bench_oracles_ordered {
                         }
                         let process_key = sys.get_process_definition($process_name).expect("Process name should be bound");
                         let target = sys.get_var(process_key, formula_key);
+                        sys.set_target(target);
                         let Some((result, _)) = ordered::kleene_local::<_, _, $s, $s, _>(&mut sys, target, &o) else {
                             skipped = true;
                             append_skipped(&format!("{}/ordered/{}/{}", stringify!($name), $sname, &o));
@@ -165,8 +170,11 @@ macro_rules! wctl_bench_problem_ordered {
             // SMax::bitset().constant(StrategyWeight::Infinity),
             // SMax::bitset().constant(StrategyWeight::Infinity).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::min, "min"),
             // SMax::bitset().constant(StrategyWeight::Infinity).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::max, "max"),
-            StrategicNonStuckOracle::bitset().then(SMax::bitset().ordered()),
-            StrategicNonStuckOracle::bitset().then(LocalMaxR::bitset().ordered()),
+            // StrategicNonStuckOracle::bitset().then(SMax::bitset().ordered()),
+
+            // StrategicNonStuckOracle::bitset().then(LocalMaxR::bitset().ordered()),
+            // StrategicMaxStuckOracle::bitset(),
+
             // StrategicArgumentsOracle::default(),
             // StrategicArgumentsOracle::default().and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::min, "min"), // Look here
             // StrategicArgumentsOracle::default().and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::max, "max"),
@@ -188,7 +196,17 @@ macro_rules! wctl_bench_problem_ordered {
             // StrategicArgumentsOracle::default().and_by(LocalMaxR::bitset().ordered(), std::cmp::min).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::max, "max"),
             // StrategicArgumentsOracle::with(ArgumentsStrategy::Ancestors).and_by(LocalMaxR::bitset().ordered(), std::cmp::min).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::max, "max"),
             // StrategicArgumentsOracle::default().and_by(LocalMaxR::bitset().ordered(), std::cmp::min).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::min, "min"),
+
             // StrategicArgumentsOracle::with(ArgumentsStrategy::Ancestors).and_by(LocalMaxR::bitset().ordered(), std::cmp::min).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::min, "min"),
+            // StrategicArgumentsOracle::with(ArgumentsStrategy::Ancestors).and_by(LocalMaxR::bitset().ordered(), std::cmp::min).and_by_with_name(StrategicMaxStuckOracle::bitset(), std::cmp::min, "min"),
+            // StrategicArgumentsOracle::with(ArgumentsStrategy::Ancestors).and_by_with_name(StrategicMaxStuckOracle::bitset(), std::cmp::min, "min"),
+            // StrategicMaxStuckOracle::bitset().and_by_with_name(StrategicArgumentsOracle::with(ArgumentsStrategy::Ancestors), std::cmp::min, "min"),
+            // StrategicMaxStuckPrimeOracle::bitset(),
+            // UnsoundMaxStuckOracle::bitset(true),
+            // UnsoundMaxStuckOracle::bitset(false),
+            // UnholyMaxStuckOracle::bitset(),
+            UnholyMaxStuckOracle::hashset(),
+
             // StrategicArgumentsOracle::default().then(WeightedDepOracle::bitset().ordered()),
             // StrategicArgumentsOracle::default().then(WeightedDepOracle::bitset().ordered()).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::min, "min"),
             // StrategicArgumentsOracle::default().then(WeightedDepOracle::bitset().ordered()).and_by_with_name(StrategicNonStuckOracle::bitset(), std::cmp::max, "max"),
@@ -277,9 +295,9 @@ macro_rules! wctl_bench_suite {
         $(
         fn $name(c: &mut Criterion) {
             let wccs = $wccs;
-            // wctl_bench_oracles_unordered! {
-            //     $name: using c, bench $process_name, $formula_str => $sat in wccs, with
-                // IdentityOracle::bitset(),
+            wctl_bench_oracles_unordered! {
+                $name: using c, bench $process_name, $formula_str => $sat in wccs, with
+                IdentityOracle::bitset(),
                 // TrivialOracle::bitset(),
                 // WeightedDepOracle::bitset(),
                 // SMax::bitset().then(WeightedDepOracle::bitset()),
@@ -291,7 +309,7 @@ macro_rules! wctl_bench_suite {
                 // ArgumentsOracle::bitset(),
                 // ArgumentsOracle::bitset().then(SMax::bitset()),
                 // ArgumentsOracle::bitset().then(LocalMaxR::bitset()),
-            // }
+            }
             wctl_bench_problem_ordered!($name: using c, strategy BinaryHeapStrategy<_>; "std_binary"; bench $process_name, $formula_str => $sat in wccs);
             // wctl_bench_problem_ordered!($name: using c, strategy OrxStrategy<_, DaryHeapWithMap<_, _, 4>>; "orx_quad"; bench $process_name, $formula_str => $sat in wccs);
             // wctl_bench_problem_ordered!($name: using c, strategy LazyHeap<_, BinaryHeapStrategy<_>>; "std_binary_lazy"; bench $process_name, $formula_str => $sat in wccs);
@@ -347,17 +365,17 @@ macro_rules! wctl_bench_suite {
 // }
 
 wctl_bench_suite! {
+    semaphore_3_5_fail: "System", "EF critical_section > 3" => false in include_str!("../systems/wccs/Semaphore_3_5.wccs");
+    semaphore_3_5_succ: "System", "EF critical_section == 3" => true in include_str!("../systems/wccs/Semaphore_3_5.wccs");
+    client_server_failed_5: "System", "E True U[<=5] failed" => true in include_str!("../systems/wccs/ClientServer.wccs");
+    client_server_deliver_8: "System", "E True U[<=8] delivered" => true in include_str!("../systems/wccs/ClientServer.wccs");
+    client_server_big: "System", "E True U[<=10] (A True U[<=1] failed)" => true in include_str!("../systems/wccs/ClientServer.wccs");
     leader_election_6: "Ring", "EF leader" => true in include_str!("../systems/wccs/LeaderElection6.wccs");
-    // leader_election_neg_6: "Ring", "EF leader > 1" => false in include_str!("../systems/wccs/LeaderElection6.wccs");
-    // semaphore_3_5_fail: "System", "EF critical_section > 3" => false in include_str!("../systems/wccs/Semaphore_3_5.wccs");
-    // semaphore_3_5_succ: "System", "EF critical_section == 3" => true in include_str!("../systems/wccs/Semaphore_3_5.wccs");
-    // client_server_failed_5: "System", "E True U[<=5] failed" => true in include_str!("../systems/wccs/ClientServer.wccs");
-    // client_server_deliver_8: "System", "E True U[<=8] delivered" => true in include_str!("../systems/wccs/ClientServer.wccs");
-    // client_server_big: "System", "E True U[<=10] (A True U[<=1] failed)" => true in include_str!("../systems/wccs/ClientServer.wccs");
+    leader_election_neg_6: "Ring", "EF leader > 1" => false in include_str!("../systems/wccs/LeaderElection6.wccs");
     leader_election_7: "Ring", "EF leader" => true in include_str!("../systems/wccs/LeaderElection7.wccs");
-    // leader_election_neg_7: "Ring", "EF leader > 1" => false in include_str!("../systems/wccs/LeaderElection7.wccs");
+    leader_election_neg_7: "Ring", "EF leader > 1" => false in include_str!("../systems/wccs/LeaderElection7.wccs");
     leader_election_8: "Ring", "EF leader" => true in include_str!("../systems/wccs/LeaderElection8.wccs");
-    // leader_election_neg_8: "Ring", "EF leader > 1" => false in include_str!("../systems/wccs/LeaderElection8.wccs");
+    leader_election_neg_8: "Ring", "EF leader > 1" => false in include_str!("../systems/wccs/LeaderElection8.wccs");
 }
 
 criterion_main!(benches);
