@@ -20,13 +20,6 @@ pub trait SetMethods {
     fn last_one(&self) -> usize;
 }
 
-impl RawBitSet<FixedBitSet> {
-    /// Get a reference to the underlying bitset
-    pub fn remove(&mut self, index: usize) {
-        self.bitset.remove(index);
-    }
-}
-
 impl SetMethods for RawBitSet<FixedBitSet> {
     fn full(count: usize) -> Self {
         let iter = std::iter::repeat(usize::MAX);
@@ -99,6 +92,15 @@ impl Set<usize> for RawBitSet<FixedBitSet> {
         let ret = self.bitset.contains(item.index());
         self.bitset.grow_and_insert(item.index());
         ret
+    }
+
+    fn remove(&mut self, x: &usize) -> bool {
+        let r = self.bitset.contains(*x);
+        // Remove panics if bit is out of bounds
+        if r {
+            self.bitset.remove(*x);
+        }
+        r
     }
 
     fn len(&self) -> usize {
