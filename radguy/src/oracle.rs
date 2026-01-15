@@ -1,7 +1,7 @@
 use crate::{
     Arguments, Assignment, Bottom, Cartesian, CopiedIter, DependencyGraphSystem, Diagonal,
-    FromLefts, FromRights, Intersect, Maximal, PairUniverse, RightSliced, Set, System, Union,
-    UnionWith, Universe, Visited, Without,
+    FromLefts, FromRights, Intersect, LeftSliced, Maximal, PairUniverse, RightSliced, Set, System,
+    Union, UnionWith, Universe, Visited, Without,
     arena::{Key, SecondaryArena},
     set::bitset::{BitSet, BitsetRelation},
 };
@@ -154,21 +154,28 @@ impl<K> Display for SMax<BitsetRelation<K, K>> {
 impl<
     K: Hash + Eq + Copy + Debug,
     V: Maximal + Bottom + Clone + Debug,
-    S: System<K, V>,
-    PS: for<'a> CopiedIter<'a, (K, K)> + FromIterator<(K, K)>,
+    S: System<K, V> + Universe<VS>,
+    VS: Clone,
+    PS: FromLefts<K, VS>
+        + FromRights<VS, K>
+        + LeftSliced<K, K, SlicedLeft = VS>
+        + UnionWith
+        + Clone
+        + Without,
 > LocalOracle<K, V, PS, S> for SMax<PS>
 {
-    fn approximate_flow(&self, assignment: &HashMap<K, V>, possible: &PS, _system: &S) -> PS {
-        // TODO: currently it's actually faster to just iterate over `system.pair_universe` with
-        // the ordered algorithm, because we construct the initial strategy each time.
-        // this (hopefully) isn't the case when we start reusing the relation
-        possible
-            .copied_iter()
-            .filter(|(x, y)| {
-                !assignment.get_assignment(x).is_maximal()
-                    && !assignment.get_assignment(y).is_maximal()
-            })
-            .collect()
+    fn approximate_flow(&self, assignment: &HashMap<K, V>, possible: &PS, system: &S) -> PS {
+        let mut to_remove_l = PS::from_lefts([]);
+        let mut to_remove_r = PS::from_rights([]);
+        let universe = system.universe();
+        for (var, val) in assignment {
+            if val.is_maximal() {
+                to_remove_l.union_with(PS::from_lefts([(*var, universe.clone())]));
+                to_remove_r.union_with(PS::from_rights([(universe.clone(), *var)]));
+            }
+        }
+        to_remove_r.union_with(to_remove_l);
+        possible.clone().without(&to_remove_r)
     }
 }
 

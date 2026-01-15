@@ -42,7 +42,7 @@ impl<K: Key> Extract<K> for BitSet<K, FixedBitSet> {
             .copied_iter()
             .nth(random_index)
             .expect("Should not be empty");
-        self.bitset.remove(removed.index());
+        self.bitset.remove(&removed.index());
         Some(removed)
     }
 }
@@ -109,6 +109,10 @@ where
         let ret = self.bitset.contains(&item.index());
         self.bitset.insert(item.index());
         ret
+    }
+
+    fn remove(&mut self, x: &K) -> bool {
+        self.bitset.remove(&x.index())
     }
 
     fn len(&self) -> usize {
