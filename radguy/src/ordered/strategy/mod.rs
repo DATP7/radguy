@@ -118,6 +118,8 @@ pub trait Strategy<T> {
     /// Returns `None` if there are no more elements in the strategy
     // TODO: should we just have an iterator instead?
     fn extract_min(&mut self) -> Option<T>;
+
+    fn extract_mins(&mut self) -> Option<Vec<T>>;
 }
 
 // We have `LeftSliced` and `RightSliced` so we can easily have the same implementation of

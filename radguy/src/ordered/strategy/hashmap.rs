@@ -76,6 +76,16 @@ impl<T: Copy + Eq + Hash> Strategy<T> for HashMapStrategy<T> {
         }
         key
     }
+
+    fn extract_mins(&mut self) -> Option<Vec<T>> {
+        let (_, &w) = self.0.iter().min_by_key(|(_, w)| **w)?;
+        self.0
+            .iter()
+            .filter(|(_, weight)| **weight == w)
+            .map(|(v, _)| *v)
+            .collect::<Vec<_>>()
+            .into()
+    }
 }
 
 impl<T: Eq + Hash> GetWeight<T> for HashMapStrategy<T> {

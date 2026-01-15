@@ -21,6 +21,20 @@ impl<T, H> LazyHeap<T, H> {
         self.heap = None;
         &mut self.items
     }
+
+    fn get_heap(&mut self) -> &mut H
+    where
+        T: Copy,
+        H: FromIterator<StrategyItem<T>>,
+    {
+        self.heap.get_or_insert_with(|| {
+            self.items
+                .iter()
+                .map(|(v, w)| StrategyItem(*w, *v))
+                .collect()
+        })
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = StrategyItem<T>>
     where
         T: Copy,
@@ -31,14 +45,11 @@ impl<T, H> LazyHeap<T, H> {
 
 impl<T: Copy + Eq, H: FromIterator<StrategyItem<T>> + Strategy<T>> Strategy<T> for LazyHeap<T, H> {
     fn extract_min(&mut self) -> Option<T> {
-        self.heap
-            .get_or_insert_with(|| {
-                self.items
-                    .iter()
-                    .map(|(v, w)| StrategyItem(*w, *v))
-                    .collect()
-            })
-            .extract_min()
+        self.get_heap().extract_min()
+    }
+
+    fn extract_mins(&mut self) -> Option<Vec<T>> {
+        self.get_heap().extract_mins()
     }
 }
 

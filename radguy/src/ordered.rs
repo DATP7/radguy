@@ -54,39 +54,45 @@ where
     #[cfg(feature = "timeout")]
     let start_time = chrono::Utc::now();
 
-    while let Some(x) = todo.extract_min() {
-        debug_assert!(discovered.contains(&x), "discovered should contain {x:?}");
-        variable_iterations += 1;
+    while let Some(xs) = todo.extract_mins() {
+        let mut updated = false;
+        for x in xs {
+            debug_assert!(discovered.contains(&x), "discovered should contain {x:?}");
+            variable_iterations += 1;
 
-        let evaluated = system.evaluate(x, &assignment);
-        let args = system.arguments(x);
-        if assignment.get_assignment(&x) != evaluated || !args.is_subset(&discovered) {
-            #[cfg(feature = "timeout")]
-            if (chrono::Utc::now() - start_time) >= crate::KLEENE_TIMEOUT {
-                return None;
+            let evaluated = system.evaluate(x, &assignment);
+            let args = system.arguments(x);
+            if assignment.get_assignment(&x) != evaluated || !args.is_subset(&discovered) {
+                #[cfg(feature = "timeout")]
+                if (chrono::Utc::now() - start_time) >= crate::KLEENE_TIMEOUT {
+                    return None;
+                }
+                updated = true;
+                assignment.update_assignment(x, evaluated);
+                // At this point `rel` is D x D with some elements pruned by oracles
+                // We expand it with args to create (D u A) x (D u A), still with those elements
+                // pruned, by unioning with the elements of the square below.
+                // +-------------+-------+
+                // | A x D       | A x A |
+                // +-------------+-------+
+                // | D x D (rel) | D x A |
+                // +-------------+-------+
+                let new_args = args.without(&discovered);
+                let axa = new_args.cartesian(&new_args);
+                let axd = new_args.cartesian(&discovered);
+                let dxa = discovered.cartesian(&new_args);
+                let new_pairs = axa
+                    .union(axd)
+                    .union(dxa)
+                    .into_iter()
+                    .map(|p| StrategyItem(StrategyWeight::Infinity, p));
+                strategy.extend(new_pairs);
+                strategy.reset_weights();
+                discovered = system.universe();
             }
+        }
+        if updated {
             oracle_iterations += 1;
-            assignment.update_assignment(x, evaluated);
-            // At this point `rel` is D x D with some elements pruned by oracles
-            // We expand it with args to create (D u A) x (D u A), still with those elements
-            // pruned, by unioning with the elements of the square below.
-            // +-------------+-------+
-            // | A x D       | A x A |
-            // +-------------+-------+
-            // | D x D (rel) | D x A |
-            // +-------------+-------+
-            let new_args = args.without(&discovered);
-            let axa = new_args.cartesian(&new_args);
-            let axd = new_args.cartesian(&discovered);
-            let dxa = discovered.cartesian(&new_args);
-            let new_pairs = axa
-                .union(axd)
-                .union(dxa)
-                .into_iter()
-                .map(|p| StrategyItem(StrategyWeight::Infinity, p));
-            strategy.extend(new_pairs);
-            strategy.reset_weights();
-            discovered = system.universe();
             system.lock();
             strategy = oracle.get_strategy(&assignment, &strategy, system);
             todo = strategy.slice_right(target);

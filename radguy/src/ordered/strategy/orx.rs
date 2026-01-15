@@ -48,6 +48,16 @@ impl<T: Copy + Eq, H: PriorityQueueDecKey<T, StrategyWeight>> Strategy<T> for Or
     fn extract_min(&mut self) -> Option<T> {
         self.0.pop().map(|(v, _)| v)
     }
+
+    fn extract_mins(&mut self) -> Option<Vec<T>> {
+        let min_w = *self.0.peek()?.key();
+        let mut mins = Vec::new();
+        while self.0.peek().is_some_and(|node| *node.key() == min_w) {
+            let (v, _) = self.pop()?;
+            mins.push(v);
+        }
+        Some(mins)
+    }
 }
 impl<T: Clone, H: PriorityQueueDecKey<T, StrategyWeight>> GetWeight<T> for OrxStrategy<T, H> {
     fn get_weight(&self, item: T) -> Option<StrategyWeight> {

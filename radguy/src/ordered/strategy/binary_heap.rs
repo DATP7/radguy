@@ -80,6 +80,20 @@ impl<T: Copy + Eq> Strategy<T> for BinaryHeapStrategy<T> {
     fn extract_min(&mut self) -> Option<T> {
         self.pop().map(|Reverse(StrategyItem(_, v))| v)
     }
+
+    fn extract_mins(&mut self) -> Option<Vec<T>> {
+        let min_weight = self.peek().map(|Reverse(StrategyItem(w, _))| *w)?;
+        let mut mins = Vec::new();
+        while let Some(Reverse(StrategyItem(w, v))) = self.peek() {
+            if *w == min_weight {
+                mins.push(*v);
+                self.pop();
+            } else {
+                break;
+            }
+        }
+        Some(mins)
+    }
 }
 
 impl<T: Eq + Hash + Copy> GetWeight<T> for BinaryHeapStrategy<T> {
