@@ -4,8 +4,8 @@ use fixedbitset::FixedBitSet;
 use itertools::Itertools;
 
 use crate::{
-    CopiedIter, FromLefts, FromRights, Intersect, IntersectWith, RightSliced, Set, SliceRight,
-    Union, UnionWith,
+    CopiedIter, Extract, FromLefts, FromRights, Intersect, IntersectWith, LeftSliced, RightSliced,
+    Set, SliceLeft, SliceRight, Union, UnionWith, Without,
     arena::Key,
     set::bitset::{BitSet, RawBitSet, raw::SetMethods},
 };
@@ -149,7 +149,7 @@ where
         })
     }
 
-    fn transposed(&self) -> Self
+    pub(self) fn transposed(&self) -> Self
     where
         RawBitSet<S>: for<'a> CopiedIter<'a, usize>,
     {
@@ -317,6 +317,19 @@ where
         self.insert(item)
     }
 
+    fn remove(&mut self, (l, r): &(T, U)) -> bool {
+        match self.order {
+            BitsetRelationOrder::LeftFirst => self
+                .items
+                .get_mut(l.index())
+                .is_some_and(|b| b.remove(&r.index())),
+            BitsetRelationOrder::RightFirst => self
+                .items
+                .get_mut(r.index())
+                .is_some_and(|b| b.remove(&l.index())),
+        }
+    }
+
     fn len(&self) -> usize {
         self.items.iter().map(RawBitSet::len).sum()
     }
@@ -362,6 +375,26 @@ where
     }
 }
 
+impl<T: Key, U: Key, S> Without for BitsetRelation<T, U, S>
+where
+    Self: Set<(T, U)> + for<'a> CopiedIter<'a, (T, U)>,
+    RawBitSet<S>: Without + Default,
+{
+    fn without(mut self, other: &Self) -> Self {
+        if self.order == other.order {
+            for (s, o) in self.items.iter_mut().zip(other.items.iter()) {
+                let s_old = std::mem::take(s);
+                *s = s_old.without(o);
+            }
+        } else {
+            for rmv in other.copied_iter() {
+                self.remove(&rmv);
+            }
+        }
+        self
+    }
+}
+
 impl<T: Key, U: Key, S> RightSliced<T, U> for BitsetRelation<T, U, S>
 where
     Self: Set<(T, U)>,
@@ -396,6 +429,45 @@ where
                 .get(right_index)
                 .cloned()
                 .unwrap_or_default()
+                .into(),
+        }
+    }
+}
+
+impl<T: Key, U: Key, S> LeftSliced<T, U> for BitsetRelation<T, U, S>
+where
+    Self: Set<(T, U)>,
+    RawBitSet<S>: Set<usize>,
+{
+    type SlicedLeft = BitSet<U, S>;
+}
+
+impl<T: Key, U: Key, S> SliceLeft<T, U, BitSet<U, S>> for BitsetRelation<T, U, S>
+where
+    Self: Set<(T, U)>,
+    RawBitSet<S>: Set<usize> + Default + Clone + FromIterator<usize> + From<S>,
+{
+    fn slice_left(&self, left: T) -> BitSet<U, S> {
+        let left_index = left.index();
+        match self.order {
+            BitsetRelationOrder::LeftFirst => self
+                .items
+                .get(left_index)
+                .cloned()
+                .unwrap_or_default()
+                .into(),
+            BitsetRelationOrder::RightFirst => self
+                .items
+                .iter()
+                .enumerate()
+                .filter_map(|(i, b)| {
+                    if b.contains(&left_index) {
+                        Some(i)
+                    } else {
+                        None
+                    }
+                })
+                .collect::<RawBitSet<S>>()
                 .into(),
         }
     }
@@ -475,7 +547,7 @@ mod tests {
     use fixedbitset::FixedBitSet;
 
     use crate::{
-        Cartesian, Intersect, SliceRight, UnionWith,
+        Cartesian, Intersect, SliceLeft, SliceRight, UnionWith, Without,
         set::bitset::{BitSet, BitsetRelation},
     };
 
@@ -557,6 +629,18 @@ mod tests {
         let expected = BitSet::from([3, 4, 5]);
 
         assert_eq!(expected, BitsetRelation::from_rights(rights).slice_right(5));
+    }
+
+    #[test]
+    fn slice_left_left() {
+        let lefts = [
+            (2, BitSet::from([1, 2, 3])),
+            (3, BitSet::from([0, 2, 4])),
+            (5, BitSet::from([3, 4, 5])),
+        ];
+        let expected = BitSet::from([3, 4, 5]);
+
+        assert_eq!(expected, BitsetRelation::from_lefts(lefts).slice_left(5));
     }
 
     #[test]
@@ -652,5 +736,24 @@ mod tests {
         );
         let expected = [(0, 0), (0, 1), (1, 0)].into_iter().collect();
         assert_eq!(rel, expected);
+    }
+
+    #[test]
+    fn without_same_order() {
+        let a: BitsetRelation<usize, usize> = [(0, 0), (1, 2), (4, 3)].into_iter().collect();
+        let b: BitsetRelation<usize, usize> = [(1, 3), (4, 3)].into_iter().collect();
+        let expected: BitsetRelation<usize, usize> = [(0, 0), (1, 2)].into_iter().collect();
+        assert_eq!(a.without(&b), expected);
+    }
+
+    #[test]
+    fn without_different_order() {
+        let a: BitsetRelation<usize, usize> = [(0, 0), (1, 2), (4, 3)].into_iter().collect();
+        let b = [(1, 3), (4, 3)]
+            .into_iter()
+            .collect::<BitsetRelation<_, _>>()
+            .transposed();
+        let expected: BitsetRelation<usize, usize> = [(0, 0), (1, 2)].into_iter().collect();
+        assert_eq!(a.without(&b), expected);
     }
 }
