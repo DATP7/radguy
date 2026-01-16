@@ -6,3 +6,4 @@ ccs_examples
 profile.json.gz
 .DS_Store
 iteration_results
+*.ignore.*
