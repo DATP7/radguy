@@ -218,7 +218,7 @@ macro_rules! bisim_bench_problem_ordered {
             [
                 // SiblingsOracle,
                 // SiblingsOracleInv,
-                StrategicBoolExtension::bitset().as_oracle()
+                // StrategicBoolExtension::bitset().as_oracle()
             ]
         );
     };
@@ -243,7 +243,7 @@ macro_rules! bisim_bench_suite {
                 // ArgumentsOracle::bitset().then(SMax::bitset()),
                 // ArgumentsOracle::bitset().then(LocalMaxR::bitset()),
             }
-            bisim_bench_problem_ordered!($name: using c, strategy BinaryHeapStrategy<_>; "std_binary"; $left, $right => $eq in $ccs);
+            // bisim_bench_problem_ordered!($name: using c, strategy BinaryHeapStrategy<_>; "std_binary"; $left, $right => $eq in $ccs);
             // bisim_bench_problem_ordered!($name: using c, strategy OrxStrategy<_, DaryHeapWithMap<_, _, 4>>; "orx_quad"; $left, $right => $eq in $ccs);
             // bisim_bench_problem_ordered!($name: using c, strategy LazyHeap<_, BinaryHeapStrategy<_>>; "std_binary_lazy"; $left, $right => $eq in $ccs);
             // bisim_bench_problem_ordered!($name: using c, strategy LazyHeap<_, OrxStrategy<_, DaryHeapWithMap<_, _, 4>>>; "orx_quad_lazy"; $left, $right => $eq in $ccs);
