@@ -246,9 +246,9 @@ mod tests {
     fn full_to_empty() {
         let mut s = RawBitSet::<FixedBitSet>::full(3);
         assert_eq!(s.len(), 3);
-        s.remove(0);
-        s.remove(1);
-        s.remove(2);
+        s.remove(&0);
+        s.remove(&1);
+        s.remove(&2);
         assert!(s.len() == 0);
         assert!(s.is_empty());
     }
