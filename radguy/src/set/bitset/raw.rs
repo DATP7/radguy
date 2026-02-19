@@ -142,8 +142,8 @@ impl<'a> UnionWith<&'a Self> for RawBitSet<FixedBitSet> {
     }
 }
 
-impl UnionWith<HashSet<usize>> for RawBitSet<FixedBitSet> {
-    fn union_with(&mut self, other: HashSet<usize>) {
+impl<K: Key> UnionWith<HashSet<K>> for RawBitSet<FixedBitSet> {
+    fn union_with(&mut self, other: HashSet<K>) {
         for i in other {
             self.bitset.grow_and_insert(i.index());
         }
